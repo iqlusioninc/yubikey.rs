@@ -1,0 +1,8 @@
+[package]
+name = "yubikey-piv"
+version = "0.0.0"
+authors = ["Tony Arcieri <bascule@gmail.com>", "Yubico AB"]
+edition = "2018"
+license = "BSD"
+
+[dependencies]
