@@ -71,7 +71,7 @@ extern "C"
 // is CB_BUF_MAX - 9
 #define CB_OBJ_MAX_NEO      (CB_BUF_MAX_NEO - 9)
 #define CB_OBJ_MAX_YK4      (CB_BUF_MAX_YK4 - 9)
-#define CB_OBJ_MAX          CB_OBJ_MAX_YK4
+#define CB_OBJ_MAX          3063
 
 #define CB_BUF_MAX_NEO      2048
 #define CB_BUF_MAX_YK4      3072
@@ -235,8 +235,6 @@ typedef enum _yc_log_level_t {
   YC_LOG_LEVEL_VERBOSE,
   YC_LOG_LEVEL_DEBUG
 } yc_log_level_t;
-
-void yc_log_event(uint32_t id, yc_log_level_t level, const char *sz_format, ...);
 
 #ifdef _WIN32
 #include <windows.h>

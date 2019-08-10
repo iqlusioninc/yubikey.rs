@@ -41,7 +41,7 @@ typedef struct
   const char *description;
 } err_t;
 
-static const err_t errors[] = {
+static const err_t *errors = {
   ERR (YKPIV_OK, "Successful return"),
   ERR (YKPIV_MEMORY_ERROR, "Error allocating memory"),
   ERR (YKPIV_PCSC_ERROR, "Error in PCSC call"),

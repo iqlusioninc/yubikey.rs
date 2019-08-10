@@ -105,7 +105,7 @@ static ykpiv_rc _cache_pin(ykpiv_state *state, const char *pin, size_t len);
 static ykpiv_rc _ykpiv_get_serial(ykpiv_state *state, uint32_t *p_serial, bool force);
 static ykpiv_rc _ykpiv_get_version(ykpiv_state *state, ykpiv_version_t *p_version);
 
-static unsigned const char aid[] = {
+static unsigned const char *aid = {
 	0xa0, 0x00, 0x00, 0x03, 0x08
 };
 
@@ -277,11 +277,14 @@ ykpiv_rc _ykpiv_select_application(ykpiv_state *state) {
   int sw;
   ykpiv_rc res = YKPIV_OK;
 
+  /* XXX FIX THIS!!! */
+/*
   memset(apdu.raw, 0, sizeof(apdu));
   apdu.st.ins = YKPIV_INS_SELECT_APPLICATION;
   apdu.st.p1 = 0x04;
   apdu.st.lc = sizeof(aid);
   memcpy(apdu.st.data, aid, sizeof(aid));
+*/
 
   if((res = _send_data(state, &apdu, data, &recv_len, &sw)) != YKPIV_OK) {
     if(state->verbose) {
@@ -591,6 +594,8 @@ ykpiv_rc _ykpiv_transfer_data(ykpiv_state *state, const unsigned char *templ,
     uint32_t recv_len = sizeof(data);
     APDU apdu;
 
+  /* XXX FIX THIS!!! */
+/*
     memset(apdu.raw, 0, sizeof(apdu.raw));
     memcpy(apdu.raw, templ, 4);
     if(in_ptr + 0xff < in_data + in_len) {
@@ -598,11 +603,15 @@ ykpiv_rc _ykpiv_transfer_data(ykpiv_state *state, const unsigned char *templ,
     } else {
       this_size = (size_t)((in_data + in_len) - in_ptr);
     }
+    */
     if(state->verbose > 2) {
       fprintf(stderr, "Going to send %lu bytes in this go.\n", (unsigned long)this_size);
     }
+      /* XXX FIX THIS!!! */
+    /*
     apdu.st.lc = (unsigned char)this_size;
     memcpy(apdu.st.data, in_ptr, this_size);
+    */
     res = _send_data(state, &apdu, data, &recv_len, sw);
     if(res != YKPIV_OK) {
       goto Cleanup;
@@ -632,8 +641,11 @@ ykpiv_rc _ykpiv_transfer_data(ykpiv_state *state, const unsigned char *templ,
       fprintf(stderr, "The card indicates there is %d bytes more data for us.\n", *sw & 0xff);
     }
 
+  /* XXX FIX THIS!!! */
+  /*
     memset(apdu.raw, 0, sizeof(apdu.raw));
     apdu.st.ins = YKPIV_INS_GET_RESPONSE_APDU;
+    */
     res = _send_data(state, &apdu, data, &recv_len, sw);
     if(res != YKPIV_OK) {
       goto Cleanup;
@@ -674,14 +686,17 @@ ykpiv_rc ykpiv_transfer_data(ykpiv_state *state, const unsigned char *templ,
 ykpiv_rc _send_data(ykpiv_state *state, APDU *apdu,
     unsigned char *data, uint32_t *recv_len, int *sw) {
   long rc;
-  unsigned int send_len = (unsigned int)apdu->st.lc + 5;
+  unsigned int send_len = 0;   /* XXX FIX THIS!!! (unsigned int)apdu->st.lc + 5; */
   pcsc_word tmp_len = *recv_len;
 
+  /* XXX FIX THIS!!! */
+  /*
   if(state->verbose > 1) {
     fprintf(stderr, "> ");
     dump_hex(apdu->raw, send_len);
     fprintf(stderr, "\n");
   }
+
   rc = SCardTransmit(state->card, SCARD_PCI_T1, apdu->raw, send_len, NULL, data, &tmp_len);
   if(rc != SCARD_S_SUCCESS) {
     if(state->verbose) {
@@ -689,6 +704,7 @@ ykpiv_rc _send_data(ykpiv_state *state, APDU *apdu,
     }
     return YKPIV_PCSC_ERROR;
   }
+  */
   *recv_len = (uint32_t)tmp_len;
 
   if(state->verbose > 1) {
@@ -732,11 +748,13 @@ ykpiv_rc ykpiv_authenticate(ykpiv_state *state, unsigned const char *key) {
   }
 
   /* get a challenge from the card */
+    /* XXX FIX THIS!!! */
+    /*
   {
     memset(apdu.raw, 0, sizeof(apdu));
     apdu.st.ins = YKPIV_INS_AUTHENTICATE;
-    apdu.st.p1 = YKPIV_ALGO_3DES; /* triple des */
-    apdu.st.p2 = YKPIV_KEY_CARDMGM; /* management key */
+    apdu.st.p1 = YKPIV_ALGO_3DES; // triple des
+    apdu.st.p2 = YKPIV_KEY_CARDMGM; // management key
     apdu.st.lc = 0x04;
     apdu.st.data[0] = 0x7c;
     apdu.st.data[1] = 0x02;
@@ -749,9 +767,11 @@ ykpiv_rc ykpiv_authenticate(ykpiv_state *state, unsigned const char *key) {
       goto Cleanup;
     }
     memcpy(challenge, data + 4, 8);
-  }
+  }*/
 
   /* send a response to the cards challenge and a challenge of our own. */
+    /* XXX FIX THIS!!! */
+    /*
   {
     unsigned char *dataptr = apdu.st.data;
     unsigned char response[8];
@@ -766,10 +786,10 @@ ykpiv_rc ykpiv_authenticate(ykpiv_state *state, unsigned const char *key) {
     recv_len = sizeof(data);
     memset(apdu.raw, 0, sizeof(apdu));
     apdu.st.ins = YKPIV_INS_AUTHENTICATE;
-    apdu.st.p1 = YKPIV_ALGO_3DES; /* triple des */
-    apdu.st.p2 = YKPIV_KEY_CARDMGM; /* management key */
+    apdu.st.p1 = YKPIV_ALGO_3DES; // triple des
+    apdu.st.p2 = YKPIV_KEY_CARDMGM; // management key
     *dataptr++ = 0x7c;
-    *dataptr++ = 20; /* 2 + 8 + 2 +8 */
+    *dataptr++ = 20; // 2 + 8 + 2 +8
     *dataptr++ = 0x80;
     *dataptr++ = 8;
     memcpy(dataptr, response, 8);
@@ -794,6 +814,7 @@ ykpiv_rc ykpiv_authenticate(ykpiv_state *state, unsigned const char *key) {
       goto Cleanup;
     }
   }
+  */
 
   /* compare the response from the card with our challenge */
   {
@@ -848,6 +869,8 @@ ykpiv_rc ykpiv_set_mgmkey2(ykpiv_state *state, const unsigned char *new_key, con
     goto Cleanup;
   }
 
+  /* XXX FIX THIS!!! */
+  /*
   memset(apdu.raw, 0, sizeof(apdu));
   apdu.st.ins = YKPIV_INS_SET_MGMKEY;
   apdu.st.p1 = 0xff;
@@ -867,6 +890,7 @@ ykpiv_rc ykpiv_set_mgmkey2(ykpiv_state *state, const unsigned char *new_key, con
   apdu.st.data[1] = YKPIV_KEY_CARDMGM;
   apdu.st.data[2] = DES_LEN_3DES;
   memcpy(apdu.st.data + 3, new_key, DES_LEN_3DES);
+  */
 
   if ((res = _send_data(state, &apdu, data, &recv_len, &sw)) != YKPIV_OK) {
     goto Cleanup;
@@ -882,7 +906,7 @@ Cleanup:
   return res;
 }
 
-static char hex_translate[] = "0123456789abcdef";
+static char *hex_translate = "0123456789abcdef";
 
 ykpiv_rc ykpiv_hex_decode(const char *hex_in, size_t in_len,
     unsigned char *hex_out, size_t *out_len) {
@@ -920,7 +944,7 @@ static ykpiv_rc _general_authenticate(ykpiv_state *state,
   unsigned char indata[1024];
   unsigned char *dataptr = indata;
   unsigned char data[1024];
-  unsigned char templ[] = {0, YKPIV_INS_AUTHENTICATE, algorithm, key};
+  unsigned char *templ = {0, YKPIV_INS_AUTHENTICATE, algorithm, key};
   unsigned long recv_len = sizeof(data);
   size_t key_len = 0;
   int sw = 0;
@@ -1078,9 +1102,11 @@ static ykpiv_rc _ykpiv_get_version(ykpiv_state *state, ykpiv_version_t *p_versio
   }
 
   /* get version from device */
-
+    /* XXX FIX THIS!!! */
+    /*
   memset(apdu.raw, 0, sizeof(apdu));
   apdu.st.ins = YKPIV_INS_GET_VERSION;
+  */
   if((res = _send_data(state, &apdu, data, &recv_len, &sw)) != YKPIV_OK) {
     return res;
   } else if(sw == SW_SUCCESS) {
@@ -1128,7 +1154,7 @@ Cleanup:
 static ykpiv_rc _ykpiv_get_serial(ykpiv_state *state, uint32_t *p_serial, bool f_force) {
   ykpiv_rc res = YKPIV_OK;
   APDU apdu;
-  const uint8_t yk_applet[] = { 0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01 };
+  const uint8_t *yk_applet = { 0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01 };
   unsigned char data[0xff];
   uint32_t recv_len = sizeof(data);
   int sw;
@@ -1148,11 +1174,12 @@ static ykpiv_rc _ykpiv_get_serial(ykpiv_state *state, uint32_t *p_serial, bool f
     uint8_t temp[0xff];
 
     recv_len = sizeof(temp);
-    memset(apdu.raw, 0, sizeof(apdu));
+      /* XXX FIX THIS!!! */
+    /*memset(apdu.raw, 0, sizeof(apdu));
     apdu.st.ins = YKPIV_INS_SELECT_APPLICATION;
     apdu.st.p1 = 0x04;
     apdu.st.lc = sizeof(yk_applet);
-    memcpy(apdu.st.data, yk_applet, sizeof(yk_applet));
+    memcpy(apdu.st.data, yk_applet, sizeof(yk_applet));*/
 
     if ((res = _send_data(state, &apdu, temp, &recv_len, &sw)) < YKPIV_OK) {
       if (state->verbose) {
@@ -1169,10 +1196,13 @@ static ykpiv_rc _ykpiv_get_serial(ykpiv_state *state, uint32_t *p_serial, bool f
     }
 
     recv_len = sizeof(data);
+      /* XXX FIX THIS!!! */
+      /*
     memset(apdu.raw, 0, sizeof(apdu));
     apdu.st.ins = 0x01;
     apdu.st.p1 = 0x10;
     apdu.st.lc = 0x00;
+    */
 
     if ((res = _send_data(state, &apdu, data, &recv_len, &sw)) < YKPIV_OK) {
       if (state->verbose) {
@@ -1189,11 +1219,14 @@ static ykpiv_rc _ykpiv_get_serial(ykpiv_state *state, uint32_t *p_serial, bool f
     }
 
     recv_len = sizeof(temp);
+      /* XXX FIX THIS!!! */
+      /*
     memset(apdu.raw, 0, sizeof(apdu));
     apdu.st.ins = YKPIV_INS_SELECT_APPLICATION;
     apdu.st.p1 = 0x04;
     apdu.st.lc = (unsigned char)sizeof(aid);
     memcpy(apdu.st.data, aid, sizeof(aid));
+    */
 
     if((res = _send_data(state, &apdu, temp, &recv_len, &sw)) < YKPIV_OK) {
       if(state->verbose) {
@@ -1211,8 +1244,9 @@ static ykpiv_rc _ykpiv_get_serial(ykpiv_state *state, uint32_t *p_serial, bool f
   else {
     /* get serial from yk5 and later devices using the f8 command */
 
-    memset(apdu.raw, 0, sizeof(apdu));
-    apdu.st.ins = YKPIV_INS_GET_SERIAL;
+  /* XXX FIX THIS!!! */
+    /*memset(apdu.raw, 0, sizeof(apdu));
+    apdu.st.ins = YKPIV_INS_GET_SERIAL;*/
 
     if ((res = _send_data(state, &apdu, data, &recv_len, &sw)) != YKPIV_OK) {
       if(state->verbose) {
@@ -1300,6 +1334,8 @@ static ykpiv_rc _verify(ykpiv_state *state, const char *pin, const size_t pin_le
     return YKPIV_SIZE_ERROR;
   }
 
+  /* XXX FIX THIS!!! */
+  /*
   memset(apdu.raw, 0, sizeof(apdu.raw));
   apdu.st.ins = YKPIV_INS_VERIFY;
   apdu.st.p1 = 0x00;
@@ -1310,7 +1346,7 @@ static ykpiv_rc _verify(ykpiv_state *state, const char *pin, const size_t pin_le
     if (pin_len < CB_PIN_MAX) {
       memset(apdu.st.data + pin_len, 0xff, CB_PIN_MAX - pin_len);
     }
-  }
+  }*/
 
   res = _send_data(state, &apdu, data, &recv_len, &sw);
   yc_memzero(&apdu, sizeof(apdu));
@@ -1377,7 +1413,7 @@ ykpiv_rc ykpiv_get_pin_retries(ykpiv_state *state, int *tries) {
 
 ykpiv_rc ykpiv_set_pin_retries(ykpiv_state *state, int pin_tries, int puk_tries) {
   ykpiv_rc res = YKPIV_OK;
-  unsigned char templ[] = {0, YKPIV_INS_SET_PIN_RETRIES, 0, 0};
+  unsigned char *templ = {0, YKPIV_INS_SET_PIN_RETRIES, 0, 0};
   unsigned char data[0xff];
   unsigned long recv_len = sizeof(data);
   int sw = 0;
@@ -1417,7 +1453,7 @@ Cleanup:
 
 static ykpiv_rc _ykpiv_change_pin(ykpiv_state *state, int action, const char * current_pin, size_t current_pin_len, const char * new_pin, size_t new_pin_len, int *tries) {
   int sw;
-  unsigned char templ[] = {0, YKPIV_INS_CHANGE_REFERENCE, 0, 0x80};
+  unsigned char *templ = {0, YKPIV_INS_CHANGE_REFERENCE, 0, 0x80};
   unsigned char indata[0x10];
   unsigned char data[0xff];
   unsigned long recv_len = sizeof(data);
@@ -1527,7 +1563,7 @@ ykpiv_rc _ykpiv_fetch_object(ykpiv_state *state, int object_id,
   int sw;
   unsigned char indata[5];
   unsigned char *inptr = indata;
-  unsigned char templ[] = {0, YKPIV_INS_GET_DATA, 0x3f, 0xff};
+  unsigned char *templ = {0, YKPIV_INS_GET_DATA, 0x3f, 0xff};
   ykpiv_rc res;
 
   inptr = set_object(object_id, inptr);
@@ -1543,7 +1579,7 @@ ykpiv_rc _ykpiv_fetch_object(ykpiv_state *state, int object_id,
   if(sw == SW_SUCCESS) {
     size_t outlen = 0;
     unsigned int offs = 0;
-    
+
     if ((*len < 2) || !_ykpiv_has_valid_length(data + 1, *len - 1)) {
       return YKPIV_SIZE_ERROR;
     }
@@ -1587,7 +1623,7 @@ ykpiv_rc _ykpiv_save_object(
     size_t len) {
   unsigned char data[CB_BUF_MAX];
   unsigned char *dataptr = data;
-  unsigned char templ[] = {0, YKPIV_INS_PUT_DATA, 0x3f, 0xff};
+  unsigned char *templ = {0, YKPIV_INS_PUT_DATA, 0x3f, 0xff};
   int sw;
   ykpiv_rc res;
   unsigned long outlen = 0;
@@ -1631,7 +1667,7 @@ ykpiv_rc ykpiv_import_private_key(ykpiv_state *state, const unsigned char key, u
 
   unsigned char key_data[1024];
   unsigned char *in_ptr = key_data;
-  unsigned char templ[] = {0, YKPIV_INS_IMPORT_KEY, algorithm, key};
+  unsigned char *templ = {0, YKPIV_INS_IMPORT_KEY, algorithm, key};
   unsigned char data[256];
   unsigned long recv_len = sizeof(data);
   unsigned elem_len;
@@ -1771,7 +1807,7 @@ Cleanup:
 
 ykpiv_rc ykpiv_attest(ykpiv_state *state, const unsigned char key, unsigned char *data, size_t *data_len) {
   ykpiv_rc res;
-  unsigned char templ[] = {0, YKPIV_INS_ATTEST, key, 0};
+  unsigned char *templ = {0, YKPIV_INS_ATTEST, key, 0};
   int sw;
   unsigned long ul_data_len;
 
@@ -1810,7 +1846,7 @@ Cleanup:
 ykpiv_rc ykpiv_auth_getchallenge(ykpiv_state *state, uint8_t *challenge, const size_t challenge_len) {
   ykpiv_rc res = YKPIV_OK;
   APDU apdu = { 0 };
-  unsigned char data[261] = { 0 };
+  unsigned char data[261]; /* XXX ZERO THIS!!! */
   uint32_t recv_len = sizeof(data);
   int sw = 0;
 
@@ -1822,14 +1858,17 @@ ykpiv_rc ykpiv_auth_getchallenge(ykpiv_state *state, uint8_t *challenge, const s
   if (YKPIV_OK != (res = _ykpiv_ensure_application_selected(state))) goto Cleanup;
 
   /* get a challenge from the card */
+    /* XXX FIX THIS!!! */
+    /*
   memset(apdu.raw, 0, sizeof(apdu));
   apdu.st.ins = YKPIV_INS_AUTHENTICATE;
-  apdu.st.p1 = YKPIV_ALGO_3DES; /* triple des */
-  apdu.st.p2 = YKPIV_KEY_CARDMGM; /* management key */
+  apdu.st.p1 = YKPIV_ALGO_3DES; // triple des
+  apdu.st.p2 = YKPIV_KEY_CARDMGM; // management key
   apdu.st.lc = 0x04;
   apdu.st.data[0] = 0x7c;
   apdu.st.data[1] = 0x02;
   apdu.st.data[2] = 0x81; //0x80;
+  */
   if ((res = _send_data(state, &apdu, data, &recv_len, &sw)) != YKPIV_OK) {
     goto Cleanup;
   }
@@ -1848,10 +1887,10 @@ Cleanup:
 ykpiv_rc ykpiv_auth_verifyresponse(ykpiv_state *state, uint8_t *response, const size_t response_len) {
   ykpiv_rc res = YKPIV_OK;
   APDU apdu = { 0 };
-  unsigned char data[261] = { 0 };
+  unsigned char data[261]; /* XXX ZERO THIS!!! */
   uint32_t recv_len = sizeof(data);
   int sw = 0;
-  unsigned char *dataptr = apdu.st.data;
+  unsigned char *dataptr = 0; /* XXX FIX THIS!!! apdu.st.data; */
 
   if (NULL == state) return YKPIV_GENERIC_ERROR;
   if (NULL == response) return YKPIV_GENERIC_ERROR;
@@ -1862,17 +1901,21 @@ ykpiv_rc ykpiv_auth_verifyresponse(ykpiv_state *state, uint8_t *response, const 
 
   /* send the response to the card and a challenge of our own. */
   recv_len = sizeof(data);
+    /* XXX FIX THIS!!! */
+    /*
   memset(apdu.raw, 0, sizeof(apdu));
   apdu.st.ins = YKPIV_INS_AUTHENTICATE;
-  apdu.st.p1 = YKPIV_ALGO_3DES; /* triple des */
-  apdu.st.p2 = YKPIV_KEY_CARDMGM; /* management key */
+  apdu.st.p1 = YKPIV_ALGO_3DES; // triple des
+  apdu.st.p2 = YKPIV_KEY_CARDMGM; // management key
+  */
   *dataptr++ = 0x7c;
   *dataptr++ = 0x0a; /* 2 + 8 */
   *dataptr++ = 0x82;
   *dataptr++ = 8;
   memcpy(dataptr, response, response_len);
   dataptr += 8;
-  apdu.st.lc = (unsigned char)(dataptr - apdu.st.data);
+    /* XXX FIX THIS!!! */
+  //apdu.st.lc = (unsigned char)(dataptr - apdu.st.data);
   if ((res = _send_data(state, &apdu, data, &recv_len, &sw)) != YKPIV_OK) {
     goto Cleanup;
   }
@@ -1888,7 +1931,7 @@ Cleanup:
   return res;
 }
 
-static const uint8_t MGMT_AID[] = { 0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17 };
+static const uint8_t *MGMT_AID = { 0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17 };
 
 /* deauthenticates the user pin and mgm key */
 ykpiv_rc ykpiv_auth_deauthenticate(ykpiv_state *state) {
@@ -1905,11 +1948,14 @@ ykpiv_rc ykpiv_auth_deauthenticate(ykpiv_state *state) {
   /* this function does not use ykpiv_transfer_data because it selects a different app */
   if ((res = _ykpiv_begin_transaction(state)) < YKPIV_OK) return res;
 
+  /* XXX FIX THIS!!! */
+  /*
   memset(apdu.raw, 0, sizeof(apdu));
   apdu.st.ins = YKPIV_INS_SELECT_APPLICATION;
   apdu.st.p1 = 0x04;
   apdu.st.lc = sizeof(MGMT_AID);
   memcpy(apdu.st.data, MGMT_AID, sizeof(MGMT_AID));
+  */
 
   if ((res = _send_data(state, &apdu, data, &recv_len, &sw)) < YKPIV_OK) {
     if (state->verbose) {

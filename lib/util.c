@@ -41,6 +41,10 @@
 #define MAX(a,b) (a) > (b) ? (a) : (b)
 #define MIN(a,b) (a) < (b) ? (a) : (b)
 
+
+#define SIZEOF_CHUID_TMPL 59
+#define SIZEOF_CCC_TMPL 51
+
 /*
  * Format defined in SP-800-73-4, Appendix A, Table 9
  *
@@ -55,7 +59,7 @@
  *  - 0x3e: Signature (hard-coded, empty)
  *  - 0xfe: Error Detection Code (hard-coded)
  */
-const uint8_t CHUID_TMPL[] = {
+const uint8_t *CHUID_TMPL = {
   0x30, 0x19, 0xd4, 0xe7, 0x39, 0xda, 0x73, 0x9c, 0xed, 0x39, 0xce, 0x73, 0x9d,
   0x83, 0x68, 0x58, 0x21, 0x08, 0x42, 0x10, 0x84, 0x21, 0xc8, 0x42, 0x10, 0xc3,
   0xeb, 0x34, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -69,7 +73,7 @@ const uint8_t CHUID_TMPL[] = {
 //  - 0xff == Manufacturer ID (dummy)
 //  - 0x02 == Card type (javaCard)
 //  - next 14 bytes: card ID
-const uint8_t CCC_TMPL[] = {
+const uint8_t *CCC_TMPL = {
   0xf0, 0x15, 0xa0, 0x00, 0x00, 0x01, 0x16, 0xff, 0x02, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf1, 0x01, 0x21,
   0xf2, 0x01, 0x21, 0xf3, 0x00, 0xf4, 0x01, 0x00, 0xf5, 0x01, 0x10, 0xf6, 0x00,
@@ -105,7 +109,7 @@ ykpiv_rc ykpiv_util_get_cardid(ykpiv_state *state, ykpiv_cardid *cardid) {
 
   res = _ykpiv_fetch_object(state, YKPIV_OBJ_CHUID, buf, (unsigned long *)&len);
   if (YKPIV_OK == res) {
-    if (len != sizeof(CHUID_TMPL)) {
+    if (len != SIZEOF_CHUID_TMPL) {
       res = YKPIV_GENERIC_ERROR;
     }
     else {
@@ -122,7 +126,7 @@ Cleanup:
 ykpiv_rc ykpiv_util_set_cardid(ykpiv_state *state, const ykpiv_cardid *cardid) {
   ykpiv_rc res = YKPIV_OK;
   uint8_t id[YKPIV_CARDID_SIZE];
-  uint8_t buf[sizeof(CHUID_TMPL)];
+  uint8_t buf[SIZEOF_CHUID_TMPL];
   size_t len = 0;
 
   if (!state) return YKPIV_GENERIC_ERROR;
@@ -139,9 +143,9 @@ ykpiv_rc ykpiv_util_set_cardid(ykpiv_state *state, const ykpiv_cardid *cardid) {
   if (YKPIV_OK != (res = _ykpiv_begin_transaction(state))) return YKPIV_PCSC_ERROR;
   if (YKPIV_OK != (res = _ykpiv_ensure_application_selected(state))) goto Cleanup;
 
-  memcpy(buf, CHUID_TMPL, sizeof(CHUID_TMPL));
+  memcpy(buf, CHUID_TMPL, SIZEOF_CHUID_TMPL);
   memcpy(buf + CHUID_GUID_OFFS, id, sizeof(id));
-  len = sizeof(CHUID_TMPL);
+  len = SIZEOF_CHUID_TMPL;
 
   res = _ykpiv_save_object(state, YKPIV_OBJ_CHUID, buf, len);
 
@@ -163,7 +167,7 @@ ykpiv_rc ykpiv_util_get_cccid(ykpiv_state *state, ykpiv_cccid *ccc) {
 
   res = _ykpiv_fetch_object(state, YKPIV_OBJ_CAPABILITY, buf, (unsigned long *)&len);
   if (YKPIV_OK == res) {
-    if (len != sizeof(CCC_TMPL)) {
+    if (len != SIZEOF_CCC_TMPL) {
       res = YKPIV_GENERIC_ERROR;
     }
     else {
@@ -180,7 +184,7 @@ Cleanup:
 ykpiv_rc ykpiv_util_set_cccid(ykpiv_state *state, const ykpiv_cccid *ccc) {
   ykpiv_rc res = YKPIV_OK;
   uint8_t id[YKPIV_CCCID_SIZE];
-  uint8_t buf[sizeof(CCC_TMPL)];
+  uint8_t buf[SIZEOF_CCC_TMPL];
   size_t len = 0;
 
   if (!state) return YKPIV_GENERIC_ERROR;
@@ -197,7 +201,7 @@ ykpiv_rc ykpiv_util_set_cccid(ykpiv_state *state, const ykpiv_cccid *ccc) {
   if (YKPIV_OK != (res = _ykpiv_begin_transaction(state))) return YKPIV_PCSC_ERROR;
   if (YKPIV_OK != (res = _ykpiv_ensure_application_selected(state))) goto Cleanup;
 
-  len = sizeof(CCC_TMPL);
+  len = SIZEOF_CCC_TMPL;
   memcpy(buf, CCC_TMPL, len);
   memcpy(buf + CCC_ID_OFFS, id, YKPIV_CCCID_SIZE);
   res = _ykpiv_save_object(state, YKPIV_OBJ_CAPABILITY, buf, len);
@@ -228,7 +232,7 @@ ykpiv_rc ykpiv_util_list_keys(ykpiv_state *state, uint8_t *key_count, ykpiv_key 
 
   const size_t CB_PAGE = 4096;
 
-  const uint8_t SLOTS[] = {
+  const uint8_t *SLOTS = {
     YKPIV_KEY_AUTHENTICATION,
     YKPIV_KEY_SIGNATURE,
     YKPIV_KEY_KEYMGM,
@@ -393,7 +397,7 @@ ykpiv_rc ykpiv_util_delete_cert(ykpiv_state *state, uint8_t slot) {
 
 ykpiv_rc ykpiv_util_block_puk(ykpiv_state *state) {
   ykpiv_rc res = YKPIV_OK;
-  uint8_t puk[] = { 0x30, 0x42, 0x41, 0x44, 0x46, 0x30, 0x30, 0x44 };
+  uint8_t *puk = { 0x30, 0x42, 0x41, 0x44, 0x46, 0x30, 0x30, 0x44 };
   int tries = -1;
   uint8_t data[CB_BUF_MAX];
   size_t  cb_data = sizeof(data);
@@ -716,7 +720,7 @@ ykpiv_rc ykpiv_util_generate_key(ykpiv_state *state, uint8_t slot, uint8_t algor
   unsigned char in_data[11];
   unsigned char *in_ptr = in_data;
   unsigned char data[1024];
-  unsigned char templ[] = { 0, YKPIV_INS_GENERATE_ASYMMETRIC, 0, 0 };
+  unsigned char *templ = { 0, YKPIV_INS_GENERATE_ASYMMETRIC, 0, 0 };
   unsigned long recv_len = sizeof(data);
   int sw;
   uint8_t *ptr_modulus = NULL;
@@ -726,17 +730,17 @@ ykpiv_rc ykpiv_util_generate_key(ykpiv_state *state, uint8_t slot, uint8_t algor
   uint8_t *ptr_point = NULL;
   size_t  cb_point = 0;
 
-  setting_bool_t setting_roca = { 0 };
-  const char sz_setting_roca[] = "Enable_Unsafe_Keygen_ROCA";
-  const char sz_roca_format[] = "YubiKey serial number %u is affected by vulnerability "
+  setting_bool_t setting_roca; /* XXX was 0 */
+  const char *sz_setting_roca = "Enable_Unsafe_Keygen_ROCA";
+  const char *sz_roca_format = "YubiKey serial number %u is affected by vulnerability "
     "CVE-2017-15361 (ROCA) and should be replaced. On-chip key generation %s  "
     "See YSA-2017-01 <https://www.yubico.com/support/security-advisories/ysa-2017-01/> "
     "for additional information on device replacement and mitigation assistance.\n";
-  const char sz_roca_allow_user[] = "was permitted by an end-user configuration setting, but is not recommended.";
-  const char sz_roca_allow_admin[] = "was permitted by an administrator configuration setting, but is not recommended.";
-  const char sz_roca_block_user[] = "was blocked due to an end-user configuration setting.";
-  const char sz_roca_block_admin[] = "was blocked due to an administrator configuration setting.";
-  const char sz_roca_default[] = "was permitted by default, but is not recommended.  "
+  const char *sz_roca_allow_user = "was permitted by an end-user configuration setting, but is not recommended.";
+  const char *sz_roca_allow_admin = "was permitted by an administrator configuration setting, but is not recommended.";
+  const char *sz_roca_block_user = "was blocked due to an end-user configuration setting.";
+  const char *sz_roca_block_admin = "was blocked due to an administrator configuration setting.";
+  const char *sz_roca_default = "was permitted by default, but is not recommended.  "
     "The default behavior will change in a future Yubico release.";
 
   if (!state) return YKPIV_ARGUMENT_ERROR;
@@ -762,7 +766,7 @@ ykpiv_rc ykpiv_util_generate_key(ykpiv_state *state, uint8_t slot, uint8_t algor
       }
 
       fprintf(stderr, sz_roca_format, state->serial, psz_msg);
-      yc_log_event(1, setting_roca.value ? YC_LOG_LEVEL_WARN : YC_LOG_LEVEL_ERROR, sz_roca_format, state->serial, psz_msg);
+      //yc_log_event(1, setting_roca.value ? YC_LOG_LEVEL_WARN : YC_LOG_LEVEL_ERROR, sz_roca_format, state->serial, psz_msg);
 
       if (!setting_roca.value) {
         return YKPIV_NOT_SUPPORTED;
@@ -974,7 +978,7 @@ Cleanup:
 
 ykpiv_rc ykpiv_util_get_config(ykpiv_state *state, ykpiv_config *config) {
   ykpiv_rc res = YKPIV_OK;
-  uint8_t data[CB_BUF_MAX] = { 0 };
+  uint8_t data[CB_BUF_MAX]; /* XXX REMEMBER TO ZERO */
   size_t cb_data = sizeof(data);
   uint8_t *p_item = NULL;
   size_t cb_item = 0;
@@ -1052,7 +1056,7 @@ Cleanup:
 ykpiv_rc ykpiv_util_set_pin_last_changed(ykpiv_state *state) {
   ykpiv_rc res = YKPIV_OK;
   ykpiv_rc ykrc = YKPIV_OK;
-  uint8_t  data[CB_BUF_MAX] = { 0 };
+  uint8_t  data[CB_BUF_MAX]; /* XXX REMEMBER TO ZERO */
   size_t   cb_data = sizeof(data);
   time_t   tnow = 0;
 
@@ -1087,7 +1091,7 @@ Cleanup:
 ykpiv_rc ykpiv_util_get_derived_mgm(ykpiv_state *state, const uint8_t *pin, const size_t pin_len, ykpiv_mgm *mgm) {
   ykpiv_rc res = YKPIV_OK;
   pkcs5_rc p5rc = PKCS5_OK;
-  uint8_t  data[CB_BUF_MAX] = { 0 };
+  uint8_t  data[CB_BUF_MAX]; /* XXX REMEMBER TO ZERO */
   size_t   cb_data = sizeof(data);
   uint8_t  *p_item = NULL;
   size_t   cb_item = 0;
@@ -1123,7 +1127,7 @@ Cleanup:
 
 ykpiv_rc ykpiv_util_get_protected_mgm(ykpiv_state *state, ykpiv_mgm *mgm) {
   ykpiv_rc res = YKPIV_OK;
-  uint8_t  data[CB_BUF_MAX] = { 0 };
+  uint8_t  data[CB_BUF_MAX]; /* XXX REMEMBER TO ZERO */
   size_t   cb_data = sizeof(data);
   uint8_t  *p_item = NULL;
   size_t   cb_item = 0;
@@ -1167,9 +1171,9 @@ ykpiv_rc ykpiv_util_set_protected_mgm(ykpiv_state *state, ykpiv_mgm *mgm) {
   ykpiv_rc ykrc = YKPIV_OK;
   prng_rc  prngrc = PRNG_OK;
   bool     fGenerate = false;
-  uint8_t  mgm_key[member_size(ykpiv_mgm, data)] = { 0 };
+  uint8_t  mgm_key[24];
   size_t   i = 0;
-  uint8_t  data[CB_BUF_MAX] = { 0 };
+  uint8_t  data[CB_BUF_MAX]; /* XXX REMEMBER TO ZERO */
   size_t   cb_data = sizeof(data);
   uint8_t  *p_item = NULL;
   size_t   cb_item = 0;
@@ -1295,7 +1299,7 @@ Cleanup:
 }
 
 ykpiv_rc ykpiv_util_reset(ykpiv_state *state) {
-  unsigned char templ[] = {0, YKPIV_INS_RESET, 0, 0};
+  unsigned char *templ = {0, YKPIV_INS_RESET, 0, 0};
   unsigned char data[0xff];
   unsigned long recv_len = sizeof(data);
   ykpiv_rc res;
@@ -1645,7 +1649,7 @@ static ykpiv_rc _read_metadata(ykpiv_state *state, uint8_t tag, uint8_t* data, s
 */
 static ykpiv_rc _write_metadata(ykpiv_state *state, uint8_t tag, uint8_t *data, size_t cb_data) {
   ykpiv_rc res = YKPIV_OK;
-  uint8_t buf[CB_OBJ_MAX] = { 0 };
+  uint8_t buf[CB_OBJ_MAX]; /* XXX REMEMBER TO ZERO */
   uint8_t *pTemp = buf;
   int obj_id = 0;
 
