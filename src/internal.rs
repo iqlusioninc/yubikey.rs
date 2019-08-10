@@ -653,8 +653,8 @@ pub unsafe extern fn _get_bool_config(
     let mut sz_line : [u8; 256];
     let mut psz_name : *mut u8 = 0i32 as (*mut u8);
     let mut psz_value : *mut u8 = 0i32 as (*mut u8);
-    let mut sz_name : [u8; 256];
-    let mut sz_value : [u8; 256];
+    let mut sz_name = [0u8; 256];
+    let mut sz_value = [0u8; 256];
     let mut pf : *mut __sFILE = 0i32 as (*mut __sFILE);
     if !{
             pf = fopen(
@@ -737,7 +737,7 @@ pub unsafe extern fn _get_bool_env(
     let mut psz_value
         : *mut u8
         = 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8);
-    let mut sz_name : [u8; 256];
+    let mut sz_name = [0u8; 256];
     snprintf(
         sz_name.as_mut_ptr(),
         ::std::mem::size_of::<[u8; 256]>().wrapping_sub(1usize),

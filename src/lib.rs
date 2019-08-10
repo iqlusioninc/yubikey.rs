@@ -730,6 +730,16 @@ pub unsafe extern fn _ykpiv_select_application(
         = ::std::mem::size_of::<[u8; 255]>() as (u32);
     let mut sw : i32;
     let mut res : Enum5 = Enum5::YKPIV_OK;
+
+    // FIXME(tarcieri): translate APDU construction
+    /*
+      memset(apdu.raw, 0, sizeof(apdu));
+      apdu.st.ins = YKPIV_INS_SELECT_APPLICATION;
+      apdu.st.p1 = 0x04;
+      apdu.st.lc = sizeof(aid);
+      memcpy(apdu.st.data, aid, sizeof(aid));
+    */
+
     if {
            res = _send_data(
                      state,
@@ -1175,6 +1185,16 @@ pub unsafe extern fn _ykpiv_transfer_data(
             : u32
             = ::std::mem::size_of::<[u8; 261]>() as (u32);
         let mut apdu : u_APDU;
+        // FIXME(tarcieri): translate APDU code
+        /*
+        memset(apdu.raw, 0, sizeof(apdu.raw));
+        memcpy(apdu.raw, templ, 4);
+        if(in_ptr + 0xff < in_data + in_len) {
+          apdu.st.cla = 0x10;
+        } else {
+          this_size = (size_t)((in_data + in_len) - in_ptr);
+        }
+        */
         if (*state).verbose > 2i32 {
             fprintf(
                 __stderrp,
@@ -1182,6 +1202,11 @@ pub unsafe extern fn _ykpiv_transfer_data(
                 this_size
             );
         }
+        // FIXME(tarcieri): translate APDU code
+        /*
+        apdu.st.lc = (unsigned char)this_size;
+        memcpy(apdu.st.data, in_ptr, this_size);
+        */
         res = _send_data(
                   state,
                   &mut apdu as (*mut u_APDU),
@@ -1239,6 +1264,11 @@ pub unsafe extern fn _ykpiv_transfer_data(
                     *sw & 0xffi32
                 );
             }
+            // FIXME(tarcieri): translate APDU code
+            /*
+            memset(apdu.raw, 0, sizeof(apdu.raw));
+            apdu.st.ins = YKPIV_INS_GET_RESPONSE_APDU;
+            */
             res = _send_data(
                       state,
                       &mut apdu as (*mut u_APDU),
@@ -1358,8 +1388,27 @@ pub unsafe extern fn _send_data(
     mut sw : *mut i32
 ) -> Enum5 {
     let mut rc : isize;
-    let mut send_len : u32 = 0u32;
+    // FIXME(tarcieri): `send_len` is NOT supposed to be 0. Translate C code
+    let mut send_len : u32 = 0u32; // (unsigned int)apdu->st.lc + 5;
     let mut tmp_len : u32 = *recv_len;
+
+    // FIXME(tarcieri): Translate C code below
+    /*
+        if(state->verbose > 1) {
+          fprintf(stderr, "> ");
+          dump_hex(apdu->raw, send_len);
+          fprintf(stderr, "\n");
+        }
+
+        rc = SCardTransmit(state->card, SCARD_PCI_T1, apdu->raw, send_len, NULL, data, &tmp_len);
+        if(rc != SCARD_S_SUCCESS) {
+          if(state->verbose) {
+            fprintf (stderr, "error: SCardTransmit failed, rc=%08lx\n", rc);
+          }
+          return YKPIV_PCSC_ERROR;
+        }
+    */
+
     *recv_len = tmp_len;
     if (*state).verbose > 1i32 {
         fprintf(__stderrp,(*b"< \0").as_ptr());
@@ -1429,6 +1478,75 @@ pub unsafe extern fn ykpiv_authenticate(
                                          ) as (i32) {
                 res = Enum5::YKPIV_ALGORITHM_ERROR;
             } else {
+                // get a challenge from the card
+                // FIXME(tarcieri): Translate C code below
+                /*
+                  {
+                    memset(apdu.raw, 0, sizeof(apdu));
+                    apdu.st.ins = YKPIV_INS_AUTHENTICATE;
+                    apdu.st.p1 = YKPIV_ALGO_3DES; // triple des
+                    apdu.st.p2 = YKPIV_KEY_CARDMGM; // management key
+                    apdu.st.lc = 0x04;
+                    apdu.st.data[0] = 0x7c;
+                    apdu.st.data[1] = 0x02;
+                    apdu.st.data[2] = 0x80;
+                    if ((res = _send_data(state, &apdu, data, &recv_len, &sw)) != YKPIV_OK) {
+                      goto Cleanup;
+                    }
+                    else if (sw != SW_SUCCESS) {
+                      res = YKPIV_AUTHENTICATION_ERROR;
+                      goto Cleanup;
+                    }
+                    memcpy(challenge, data + 4, 8);
+                  }
+                */
+
+                // send a response to the cards challenge and a challenge of our own.
+                // FIXME(tarcieri): Translate C code below
+                /*
+                  {
+                    unsigned char *dataptr = apdu.st.data;
+                    unsigned char response[8];
+                    out_len = sizeof(response);
+                    drc = des_decrypt(mgm_key, challenge, sizeof(challenge), response, &out_len);
+
+                    if (drc != DES_OK) {
+                      res = YKPIV_AUTHENTICATION_ERROR;
+                      goto Cleanup;
+                    }
+
+                    recv_len = sizeof(data);
+                    memset(apdu.raw, 0, sizeof(apdu));
+                    apdu.st.ins = YKPIV_INS_AUTHENTICATE;
+                    apdu.st.p1 = YKPIV_ALGO_3DES; // triple des
+                    apdu.st.p2 = YKPIV_KEY_CARDMGM; // management key
+                    *dataptr++ = 0x7c;
+                    *dataptr++ = 20; // 2 + 8 + 2 +8
+                    *dataptr++ = 0x80;
+                    *dataptr++ = 8;
+                    memcpy(dataptr, response, 8);
+                    dataptr += 8;
+                    *dataptr++ = 0x81;
+                    *dataptr++ = 8;
+                    if (PRNG_GENERAL_ERROR == _ykpiv_prng_generate(dataptr, 8)) {
+                      if (state->verbose) {
+                        fprintf(stderr, "Failed getting randomness for authentication.\n");
+                      }
+                      res = YKPIV_RANDOMNESS_ERROR;
+                      goto Cleanup;
+                    }
+                    memcpy(challenge, dataptr, 8);
+                    dataptr += 8;
+                    apdu.st.lc = (unsigned char)(dataptr - apdu.st.data);
+                    if ((res = _send_data(state, &apdu, data, &recv_len, &sw)) != YKPIV_OK) {
+                      goto Cleanup;
+                    }
+                    else if (sw != SW_SUCCESS) {
+                      res = YKPIV_AUTHENTICATION_ERROR;
+                      goto Cleanup;
+                    }
+                  }
+                */
                 let mut response : [u8; 8];
                 out_len = ::std::mem::size_of::<[u8; 8]>();
                 drc = des_encrypt(
@@ -1499,6 +1617,28 @@ pub unsafe extern fn ykpiv_set_mgmkey2(
                     );
                 }
                 res = Enum5::YKPIV_KEY_ERROR;
+                // FIXME(tarcieri): Translate C code below (should go after else clause)
+                /*
+                    memset(apdu.raw, 0, sizeof(apdu));
+                    apdu.st.ins = YKPIV_INS_SET_MGMKEY;
+                    apdu.st.p1 = 0xff;
+                    if (touch == 0) {
+                      apdu.st.p2 = 0xff;
+                    }
+                    else if (touch == 1) {
+                      apdu.st.p2 = 0xfe;
+                    }
+                    else {
+                      res = YKPIV_GENERIC_ERROR;
+                      goto Cleanup;
+                    }
+
+                    apdu.st.lc = DES_LEN_3DES + 3;
+                    apdu.st.data[0] = YKPIV_ALGO_3DES;
+                    apdu.st.data[1] = YKPIV_KEY_CARDMGM;
+                    apdu.st.data[2] = DES_LEN_3DES;
+                    memcpy(apdu.st.data + 3, new_key, DES_LEN_3DES);
+                */
             } else if !({
                             res = _send_data(
                                       state,
@@ -1870,6 +2010,12 @@ unsafe extern fn _ykpiv_get_version(
             );
         }
         Enum5::YKPIV_OK
+        // get version from device
+        // FIXME(tarcieri): Translate C code below (should go after the else clause)
+        /*
+            memset(apdu.raw, 0, sizeof(apdu));
+            apdu.st.ins = YKPIV_INS_GET_VERSION;
+        */
     } else if {
                   res = _send_data(
                             state,
@@ -1978,6 +2124,14 @@ unsafe extern fn _ykpiv_get_serial(
         if (*state).ver.major as (i32) < 5i32 {
             let mut temp : [u8; 255];
             recv_len = ::std::mem::size_of::<[u8; 255]>() as (u32);
+            // FIXME(tarcieri): Translate C code below
+            /*
+                memset(apdu.raw, 0, sizeof(apdu));
+                apdu.st.ins = YKPIV_INS_SELECT_APPLICATION;
+                apdu.st.p1 = 0x04;
+                apdu.st.lc = sizeof(yk_applet);
+                memcpy(apdu.st.data, yk_applet, sizeof(yk_applet));
+            */
             if {
                    res = _send_data(
                              state,
@@ -2010,6 +2164,13 @@ unsafe extern fn _ykpiv_get_serial(
                 _currentBlock = 37;
             } else {
                 recv_len = ::std::mem::size_of::<[u8; 255]>() as (u32);
+                // FIXME(tarcieri): Translate C code below
+                /*
+                  memset(apdu.raw, 0, sizeof(apdu));
+                  apdu.st.ins = 0x01;
+                  apdu.st.p1 = 0x10;
+                  apdu.st.lc = 0x00;
+                */
                 if {
                        res = _send_data(
                                  state,
@@ -2042,6 +2203,14 @@ unsafe extern fn _ykpiv_get_serial(
                     _currentBlock = 37;
                 } else {
                     recv_len = ::std::mem::size_of::<[u8; 255]>() as (u32);
+                    // FIXME(tarcieri): Translate C code below
+                    /*
+                      memset(apdu.raw, 0, sizeof(apdu));
+                      apdu.st.ins = YKPIV_INS_SELECT_APPLICATION;
+                      apdu.st.p1 = 0x04;
+                      apdu.st.lc = (unsigned char)sizeof(aid);
+                      memcpy(apdu.st.data, aid, sizeof(aid));
+                    */
                     if {
                            res = _send_data(
                                      state,
@@ -2074,6 +2243,13 @@ unsafe extern fn _ykpiv_get_serial(
                 }
             }
         } else {
+            // get serial from yk5 and later devices using the f8 command
+            // FIXME(tarcieri): Translate C code below
+            /*
+                memset(apdu.raw, 0, sizeof(apdu));
+                apdu.st.ins = YKPIV_INS_GET_SERIAL;
+            */
+
             if {
                    res = _send_data(
                              state,
@@ -2229,6 +2405,20 @@ unsafe extern fn _verify(
     if pin_len > 8usize {
         Enum5::YKPIV_SIZE_ERROR
     } else {
+        // FIXME(tarcieri): Translate C code below
+        /*
+            memset(apdu.raw, 0, sizeof(apdu.raw));
+            apdu.st.ins = YKPIV_INS_VERIFY;
+            apdu.st.p1 = 0x00;
+            apdu.st.p2 = 0x80;
+            apdu.st.lc = pin ? 0x08 : 0;
+            if (pin) {
+              memcpy(apdu.st.data, pin, pin_len);
+              if (pin_len < CB_PIN_MAX) {
+                memset(apdu.st.data + pin_len, 0xff, CB_PIN_MAX - pin_len);
+              }
+            }
+        */
         res = _send_data(
                   state,
                   &mut apdu as (*mut u_APDU),
@@ -3096,7 +3286,7 @@ pub unsafe extern fn ykpiv_auth_getchallenge(
 ) -> Enum5 {
     let mut res : Enum5 = Enum5::YKPIV_OK;
     let mut apdu : u_APDU = 0i32 as (u_APDU);
-    let mut data : [u8; 261];
+    let mut data = [0u8; 261];
     let mut recv_len
         : u32
         = ::std::mem::size_of::<[u8; 261]>() as (u32);
@@ -3117,6 +3307,18 @@ pub unsafe extern fn ykpiv_auth_getchallenge(
                                              res = _ykpiv_ensure_application_selected(state);
                                              res
                                          } as (i32)) {
+            // get a challenge from the card
+            // FIXME(tarcieri): Translate C code below
+            /*
+             memset(apdu.raw, 0, sizeof(apdu));
+             apdu.st.ins = YKPIV_INS_AUTHENTICATE;
+             apdu.st.p1 = YKPIV_ALGO_3DES; // triple des
+             apdu.st.p2 = YKPIV_KEY_CARDMGM; // management key
+             apdu.st.lc = 0x04;
+             apdu.st.data[0] = 0x7c;
+             apdu.st.data[1] = 0x02;
+             apdu.st.data[2] = 0x81; //0x80;
+            */
             if !({
                      res = _send_data(
                                state,
@@ -3153,12 +3355,13 @@ pub unsafe extern fn ykpiv_auth_verifyresponse(
 ) -> Enum5 {
     let mut res : Enum5 = Enum5::YKPIV_OK;
     let mut apdu : u_APDU = 0i32 as (u_APDU);
-    let mut data : [u8; 261];
+    let mut data = [0u8; 261];
     let mut recv_len
         : u32
         = ::std::mem::size_of::<[u8; 261]>() as (u32);
     let mut sw : i32 = 0i32;
-    let mut dataptr : *mut u8 = 0i32 as (*mut u8);
+    // FIXME(tarcieri): dataptr should NOT be 0! Translate C code below
+    let mut dataptr : *mut u8 = 0i32 as (*mut u8); // apdu.st.data
     if 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state) == state {
         Enum5::YKPIV_GENERIC_ERROR
     } else if 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8) == response {
@@ -3171,7 +3374,15 @@ pub unsafe extern fn ykpiv_auth_verifyresponse(
                                           } as (i32) {
         Enum5::YKPIV_PCSC_ERROR
     } else {
+        // send the response to the card and a challenge of our own.
         recv_len = ::std::mem::size_of::<[u8; 261]>() as (u32);
+        // FIXME(tarcieri): Translate C code below
+        /*
+          memset(apdu.raw, 0, sizeof(apdu));
+          apdu.st.ins = YKPIV_INS_AUTHENTICATE;
+          apdu.st.p1 = YKPIV_ALGO_3DES; // triple des
+          apdu.st.p2 = YKPIV_KEY_CARDMGM; // management key
+        */
         *{
              let _old = dataptr;
              dataptr = dataptr.offset(1isize);
@@ -3198,6 +3409,8 @@ pub unsafe extern fn ykpiv_auth_verifyresponse(
             response_len
         );
         dataptr = dataptr.offset(8isize);
+        // FIXME(tarcieri): Translate C code below
+        /* apdu.st.lc = (unsigned char)(dataptr - apdu.st.data); */
         if !({
                  res = _send_data(
                            state,
@@ -3244,6 +3457,14 @@ pub unsafe extern fn ykpiv_auth_deauthenticate(
               } as (i32) < Enum5::YKPIV_OK as (i32) {
         res
     } else {
+        // FIXME(tarcieri): Translate C code below
+        /*
+            memset(apdu.raw, 0, sizeof(apdu));
+            apdu.st.ins = YKPIV_INS_SELECT_APPLICATION;
+            apdu.st.p1 = 0x04;
+            apdu.st.lc = sizeof(MGMT_AID);
+            memcpy(apdu.st.data, MGMT_AID, sizeof(MGMT_AID));
+        */
         if {
                res = _send_data(
                          state,

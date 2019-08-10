@@ -1604,7 +1604,7 @@ pub unsafe extern fn ykpiv_util_generate_key(
         : *mut u8
         = 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8);
     let mut cb_point : usize = 0usize;
-    let mut setting_roca : _setting_bool_t;
+    let mut setting_roca = _setting_bool_t { value: false, source: _setting_source_t::SETTING_SOURCE_DEFAULT };
     let mut sz_setting_roca
         : *const u8
         = (*b"Enable_Unsafe_Keygen_ROCA\0").as_ptr();
@@ -2040,7 +2040,7 @@ pub unsafe extern fn ykpiv_util_get_config(
     mut state : *mut ykpiv_state, mut config : *mut _ykpiv_config
 ) -> Enum5 {
     let mut res : Enum5 = Enum5::YKPIV_OK;
-    let mut data : [u8; 3072];
+    let mut data = [0u8; 3072];
     let mut cb_data : usize = ::std::mem::size_of::<[u8; 3072]>();
     let mut p_item
         : *mut u8
@@ -2180,7 +2180,7 @@ pub unsafe extern fn ykpiv_util_set_pin_last_changed(
 ) -> Enum5 {
     let mut res : Enum5 = Enum5::YKPIV_OK;
     let mut ykrc : Enum5 = Enum5::YKPIV_OK;
-    let mut data : [u8; 3072];
+    let mut data = [0u8; 3072];
     let mut cb_data : usize = ::std::mem::size_of::<[u8; 3072]>();
     let mut tnow : isize = 0isize;
     if 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state) == state {
@@ -2274,7 +2274,7 @@ pub unsafe extern fn ykpiv_util_get_derived_mgm(
 ) -> Enum5 {
     let mut res : Enum5 = Enum5::YKPIV_OK;
     let mut p5rc : Enum11 = Enum11::PKCS5_OK;
-    let mut data : [u8; 3072];
+    let mut data = [0u8; 3072];
     let mut cb_data : usize = ::std::mem::size_of::<[u8; 3072]>();
     let mut p_item
         : *mut u8
@@ -2359,7 +2359,7 @@ pub unsafe extern fn ykpiv_util_get_protected_mgm(
     mut state : *mut ykpiv_state, mut mgm : *mut _ykpiv_mgm
 ) -> Enum5 {
     let mut res : Enum5 = Enum5::YKPIV_OK;
-    let mut data : [u8; 3072];
+    let mut data = [0u8; 3072];
     let mut cb_data : usize = ::std::mem::size_of::<[u8; 3072]>();
     let mut p_item
         : *mut u8
@@ -2453,7 +2453,7 @@ pub unsafe extern fn ykpiv_util_set_protected_mgm(
     let mut fGenerate : bool = false;
     let mut mgm_key : [u8; 24];
     let mut i : usize = 0usize;
-    let mut data : [u8; 3072];
+    let mut data = [0u8; 3072];
     let mut cb_data : usize = ::std::mem::size_of::<[u8; 3072]>();
     let mut p_item
         : *mut u8
@@ -3192,7 +3192,7 @@ unsafe extern fn _write_metadata(
     mut cb_data : usize
 ) -> Enum5 {
     let mut res : Enum5 = Enum5::YKPIV_OK;
-    let mut buf : [u8; 3063];
+    let mut buf = [0u8; 3063];
     let mut pTemp : *mut u8 = buf.as_mut_ptr();
     let mut obj_id : i32 = 0i32;
     if cb_data > _obj_size_max(state).wrapping_sub(
