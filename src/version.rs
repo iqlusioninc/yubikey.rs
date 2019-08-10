@@ -25,47 +25,45 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-extern {
-    fn strcmp(__s1 : *const u8, __s2 : *const u8) -> i32;
-    fn strcspn(__s : *const u8, __charset : *const u8) -> usize;
-    fn strncmp(__s1 : *const u8, __s2 : *const u8, __n : usize) -> i32;
-    fn strspn(__s : *const u8, __charset : *const u8) -> usize;
+extern "C" {
+    fn strcmp(__s1: *const u8, __s2: *const u8) -> i32;
+    fn strcspn(__s: *const u8, __charset: *const u8) -> usize;
+    fn strncmp(__s1: *const u8, __s2: *const u8, __n: usize) -> i32;
+    fn strspn(__s: *const u8, __charset: *const u8) -> usize;
 }
 
-unsafe extern fn my_strverscmp(
-    mut s1 : *const u8, mut s2 : *const u8
-) -> i32 {
+unsafe extern "C" fn my_strverscmp(mut s1: *const u8, mut s2: *const u8) -> i32 {
     let mut _currentBlock;
-    static mut digits : *const u8 = (*b"0123456789\0").as_ptr();
-    let mut p1 : usize;
-    let mut p2 : usize;
-    p1 = strcspn(s1,digits);
-    p2 = strcspn(s2,digits);
+    static mut digits: *const u8 = (*b"0123456789\0").as_ptr();
+    let mut p1: usize;
+    let mut p2: usize;
+    p1 = strcspn(s1, digits);
+    p2 = strcspn(s2, digits);
     'loop1: loop {
-        if !(p1 == p2 && (*s1.offset(
-                               p1 as (isize)
-                           ) as (i32) != b'\0' as (i32)) && (*s2.offset(
-                                                                  p2 as (isize)
-                                                              ) as (i32) != b'\0' as (i32))) {
+        if !(p1 == p2
+            && (*s1.offset(p1 as (isize)) as (i32) != b'\0' as (i32))
+            && (*s2.offset(p2 as (isize)) as (i32) != b'\0' as (i32)))
+        {
             _currentBlock = 2;
             break;
         }
-        let mut ret : i32;
-        let mut lz1 : i32;
-        let mut lz2 : i32;
+        let mut ret: i32;
+        let mut lz1: i32;
+        let mut lz2: i32;
         if {
-               ret = strncmp(s1,s2,p1);
-               ret
-           } != 0i32 {
+            ret = strncmp(s1, s2, p1);
+            ret
+        } != 0i32
+        {
             _currentBlock = 37;
             break;
         }
         s1 = s1.offset(p1 as (isize));
         s2 = s2.offset(p2 as (isize));
         lz1 = {
-                  lz2 = 0i32;
-                  lz2
-              };
+            lz2 = 0i32;
+            lz2
+        };
         if *s1 as (i32) == b'0' as (i32) {
             lz1 = 1i32;
         }
@@ -92,8 +90,8 @@ unsafe extern fn my_strverscmp(
                     s2 = s2.offset(1isize);
                     _currentBlock = 11;
                 } else {
-                    p1 = strspn(s1,digits);
-                    p2 = strspn(s2,digits);
+                    p1 = strspn(s1, digits);
+                    p2 = strspn(s2, digits);
                     if p1 == 0usize && (p2 > 0usize) {
                         _currentBlock = 33;
                         break 'loop1;
@@ -102,7 +100,10 @@ unsafe extern fn my_strverscmp(
                         _currentBlock = 32;
                         break 'loop1;
                     }
-                    if *s1 as (i32) != *s2 as (i32) && (*s1 as (i32) != b'0' as (i32)) && (*s2 as (i32) != b'0' as (i32)) {
+                    if *s1 as (i32) != *s2 as (i32)
+                        && (*s1 as (i32) != b'0' as (i32))
+                        && (*s2 as (i32) != b'0' as (i32))
+                    {
                         if p1 < p2 {
                             _currentBlock = 31;
                             break 'loop1;
@@ -115,9 +116,9 @@ unsafe extern fn my_strverscmp(
                         }
                     } else {
                         if p1 < p2 {
-                            ret = strncmp(s1,s2,p1);
+                            ret = strncmp(s1, s2, p1);
                         } else if p1 > p2 {
-                            ret = strncmp(s1,s2,p2);
+                            ret = strncmp(s1, s2, p2);
                         }
                         if ret != 0i32 {
                             _currentBlock = 20;
@@ -128,8 +129,8 @@ unsafe extern fn my_strverscmp(
                     }
                 }
             } else {
-                p1 = strspn(s1,digits);
-                p2 = strspn(s2,digits);
+                p1 = strspn(s1, digits);
+                p2 = strspn(s2, digits);
                 if p1 < p2 {
                     _currentBlock = 29;
                     break 'loop1;
@@ -143,19 +144,20 @@ unsafe extern fn my_strverscmp(
             break;
         }
         if {
-               ret = strncmp(s1,s2,p1);
-               ret
-           } != 0i32 {
+            ret = strncmp(s1, s2, p1);
+            ret
+        } != 0i32
+        {
             _currentBlock = 27;
             break;
         }
         s1 = s1.offset(p1 as (isize));
         s2 = s2.offset(p2 as (isize));
-        p1 = strcspn(s1,digits);
-        p2 = strcspn(s2,digits);
+        p1 = strcspn(s1, digits);
+        p2 = strcspn(s2, digits);
     }
     if _currentBlock == 2 {
-        strcmp(s1,s2)
+        strcmp(s1, s2)
     } else if _currentBlock == 20 {
         ret
     } else if _currentBlock == 27 {
@@ -182,13 +184,8 @@ unsafe extern fn my_strverscmp(
 }
 
 #[no_mangle]
-pub unsafe extern fn ykpiv_check_version(
-    mut req_version : *const u8
-) -> *const u8 {
-    if req_version.is_null() || my_strverscmp(
-                                    req_version,
-                                    (*b"@VERSION@\0").as_ptr()
-                                ) <= 0i32 {
+pub unsafe extern "C" fn ykpiv_check_version(mut req_version: *const u8) -> *const u8 {
+    if req_version.is_null() || my_strverscmp(req_version, (*b"@VERSION@\0").as_ptr()) <= 0i32 {
         (*b"@VERSION@\0").as_ptr()
     } else {
         0i32 as (*mut ::std::os::raw::c_void) as (*const u8)

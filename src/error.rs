@@ -50,29 +50,28 @@ pub enum Enum2 {
 #[derive(Copy)]
 #[repr(C)]
 pub struct Struct1 {
-    pub rc : Enum2,
-    pub name : *const u8,
-    pub description : *const u8,
+    pub rc: Enum2,
+    pub name: *const u8,
+    pub description: *const u8,
 }
 
 impl Clone for Struct1 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
-static mut errors
-    : *const Struct1
-    = Enum2::YKPIV_OK as (*const Struct1);
+static mut errors: *const Struct1 = Enum2::YKPIV_OK as (*const Struct1);
 
 #[no_mangle]
-pub unsafe extern fn ykpiv_strerror(mut err : Enum2) -> *const u8 {
-    static mut unknown
-        : *const u8
-        = (*b"Unknown ykpiv error\0").as_ptr();
-    let mut p : *const u8;
-    if -(err as (i32)) < 0i32 || -(err as (i32)) >= ::std::mem::size_of::<*const Struct1>(
-                                                    ).wrapping_div(
-                                                        ::std::mem::size_of::<Struct1>()
-                                                    ) as (i32) {
+pub unsafe extern "C" fn ykpiv_strerror(mut err: Enum2) -> *const u8 {
+    static mut unknown: *const u8 = (*b"Unknown ykpiv error\0").as_ptr();
+    let mut p: *const u8;
+    if -(err as (i32)) < 0i32
+        || -(err as (i32))
+            >= ::std::mem::size_of::<*const Struct1>()
+                .wrapping_div(::std::mem::size_of::<Struct1>()) as (i32)
+    {
         unknown
     } else {
         p = (*errors.offset(-(err as (i32)) as (isize))).description;
@@ -84,13 +83,12 @@ pub unsafe extern fn ykpiv_strerror(mut err : Enum2) -> *const u8 {
 }
 
 #[no_mangle]
-pub unsafe extern fn ykpiv_strerror_name(
-    mut err : Enum2
-) -> *const u8 {
-    if -(err as (i32)) < 0i32 || -(err as (i32)) >= ::std::mem::size_of::<*const Struct1>(
-                                                    ).wrapping_div(
-                                                        ::std::mem::size_of::<Struct1>()
-                                                    ) as (i32) {
+pub unsafe extern "C" fn ykpiv_strerror_name(mut err: Enum2) -> *const u8 {
+    if -(err as (i32)) < 0i32
+        || -(err as (i32))
+            >= ::std::mem::size_of::<*const Struct1>()
+                .wrapping_div(::std::mem::size_of::<Struct1>()) as (i32)
+    {
         0i32 as (*mut ::std::os::raw::c_void) as (*const u8)
     } else {
         (*errors.offset(-(err as (i32)) as (isize))).name
