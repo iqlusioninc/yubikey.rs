@@ -90,7 +90,7 @@ static ykpiv_rc _get_metadata_item(uint8_t *data, size_t cb_data, uint8_t tag, u
 static ykpiv_rc _set_metadata_item(uint8_t *data, size_t *pcb_data, size_t cb_data_max, uint8_t tag, uint8_t *p_item, size_t cb_item);
 
 static size_t _obj_size_max(ykpiv_state *state) {
-  return (state && state->isNEO) ? CB_OBJ_MAX_NEO : CB_OBJ_MAX;
+  return (state && state->is_neo) ? CB_OBJ_MAX_NEO : CB_OBJ_MAX;
 }
 
 /*
@@ -215,7 +215,7 @@ ykpiv_devmodel ykpiv_util_devicemodel(ykpiv_state *state) {
   if (!state || !state->context || (state->context == (uintptr_t)-1)) {
     return DEVTYPE_UNKNOWN;
   }
-  return (state->isNEO ? DEVTYPE_NEOr3 : DEVTYPE_YK4);
+  return (state->is_neo ? DEVTYPE_NEOr3 : DEVTYPE_YK4);
 }
 
 ykpiv_rc ykpiv_util_list_keys(ykpiv_state *state, uint8_t *key_count, ykpiv_key **data, size_t *data_len) {

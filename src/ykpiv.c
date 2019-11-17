@@ -373,7 +373,7 @@ static ykpiv_rc _ykpiv_connect(ykpiv_state *state, uintptr_t context, uintptr_t 
       return YKPIV_PCSC_ERROR;
     }
 
-    state->isNEO = (((sizeof(YKPIV_ATR_NEO_R3) - 1) == atr_len) && (0 == memcmp(YKPIV_ATR_NEO_R3, atr, atr_len)));
+    state->is_neo = (((sizeof(YKPIV_ATR_NEO_R3) - 1) == atr_len) && (0 == memcmp(YKPIV_ATR_NEO_R3, atr, atr_len)));
   }
 
   state->context = context;
