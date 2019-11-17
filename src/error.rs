@@ -1,3 +1,6 @@
+// Adapted from yubico-piv-tool:
+// <https://github.com/Yubico/yubico-piv-tool/>
+//
 // Copyright (c) 2014-2016 Yubico AB
 // All rights reserved.
 //
@@ -25,72 +28,105 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[derive(Clone, Copy)]
+use std::fmt;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(i32)]
-pub enum Enum2 {
-    YKPIV_OK = 0i32,
-    YKPIV_MEMORY_ERROR = -1i32,
-    YKPIV_PCSC_ERROR = -2i32,
-    YKPIV_SIZE_ERROR = -3i32,
-    YKPIV_APPLET_ERROR = -4i32,
-    YKPIV_AUTHENTICATION_ERROR = -5i32,
-    YKPIV_RANDOMNESS_ERROR = -6i32,
-    YKPIV_GENERIC_ERROR = -7i32,
-    YKPIV_KEY_ERROR = -8i32,
-    YKPIV_PARSE_ERROR = -9i32,
-    YKPIV_WRONG_PIN = -10i32,
-    YKPIV_INVALID_OBJECT = -11i32,
-    YKPIV_ALGORITHM_ERROR = -12i32,
-    YKPIV_PIN_LOCKED = -13i32,
-    YKPIV_ARGUMENT_ERROR = -14i32,
-    YKPIV_RANGE_ERROR = -15i32,
-    YKPIV_NOT_SUPPORTED = -16i32,
+#[allow(non_camel_case_types)]
+pub enum ErrorKind {
+    YKPIV_OK = 0,
+    YKPIV_MEMORY_ERROR = -1,
+    YKPIV_PCSC_ERROR = -2,
+    YKPIV_SIZE_ERROR = -3,
+    YKPIV_APPLET_ERROR = -4,
+    YKPIV_AUTHENTICATION_ERROR = -5,
+    YKPIV_RANDOMNESS_ERROR = -6,
+    YKPIV_GENERIC_ERROR = -7,
+    YKPIV_KEY_ERROR = -8,
+    YKPIV_PARSE_ERROR = -9,
+    YKPIV_WRONG_PIN = -10,
+    YKPIV_INVALID_OBJECT = -11,
+    YKPIV_ALGORITHM_ERROR = -12,
+    YKPIV_PIN_LOCKED = -13,
+    YKPIV_ARGUMENT_ERROR = -14,
+    YKPIV_RANGE_ERROR = -15,
+    YKPIV_NOT_SUPPORTED = -16,
 }
+
+impl ErrorKind {
+    /// Name of the error
+    pub fn name(self) -> &'static str {
+        match self {
+            ErrorKind::YKPIV_OK => "YKPIV_OK",
+            ErrorKind::YKPIV_MEMORY_ERROR => "YKPIV_MEMORY_ERROR",
+            ErrorKind::YKPIV_PCSC_ERROR => "YKPIV_PCSC_ERROR",
+            ErrorKind::YKPIV_SIZE_ERROR => "YKPIV_SIZE_ERROR",
+            ErrorKind::YKPIV_APPLET_ERROR => "YKPIV_APPLET_ERROR",
+            ErrorKind::YKPIV_AUTHENTICATION_ERROR => "YKPIV_AUTHENTICATION_ERROR",
+            ErrorKind::YKPIV_RANDOMNESS_ERROR => "YKPIV_RANDOMNESS_ERROR",
+            ErrorKind::YKPIV_GENERIC_ERROR => "YKPIV_GENERIC_ERROR",
+            ErrorKind::YKPIV_KEY_ERROR => "YKPIV_KEY_ERROR",
+            ErrorKind::YKPIV_PARSE_ERROR => "YKPIV_PARSE_ERROR",
+            ErrorKind::YKPIV_WRONG_PIN => "YKPIV_WRONG_PIN",
+            ErrorKind::YKPIV_INVALID_OBJECT => "YKPIV_INVALID_OBJECT",
+            ErrorKind::YKPIV_ALGORITHM_ERROR => "YKPIV_ALGORITHM_ERROR",
+            ErrorKind::YKPIV_PIN_LOCKED => "YKPIV_PIN_LOCKED",
+            ErrorKind::YKPIV_ARGUMENT_ERROR => "YKPIV_ARGUMENT_ERROR",
+            ErrorKind::YKPIV_RANGE_ERROR => "YKPIV_RANGE_ERROR",
+            ErrorKind::YKPIV_NOT_SUPPORTED => "YKPIV_NOT_SUPPORTED",
+        }
+    }
+
+    /// Error message
+    pub fn msg(self) -> &'static str {
+        match self {
+            ErrorKind::YKPIV_OK => "OK",
+            ErrorKind::YKPIV_MEMORY_ERROR => "memory error",
+            ErrorKind::YKPIV_PCSC_ERROR => "PCSC error",
+            ErrorKind::YKPIV_SIZE_ERROR => "size error",
+            ErrorKind::YKPIV_APPLET_ERROR => "applet error",
+            ErrorKind::YKPIV_AUTHENTICATION_ERROR => "authentication error",
+            ErrorKind::YKPIV_RANDOMNESS_ERROR => "randomness error",
+            ErrorKind::YKPIV_GENERIC_ERROR => "generic error",
+            ErrorKind::YKPIV_KEY_ERROR => "key error",
+            ErrorKind::YKPIV_PARSE_ERROR => "parse error",
+            ErrorKind::YKPIV_WRONG_PIN => "wrong pin",
+            ErrorKind::YKPIV_INVALID_OBJECT => "invalid object",
+            ErrorKind::YKPIV_ALGORITHM_ERROR => "algorithm error",
+            ErrorKind::YKPIV_PIN_LOCKED => "PIN locked",
+            ErrorKind::YKPIV_ARGUMENT_ERROR => "argument error",
+            ErrorKind::YKPIV_RANGE_ERROR => "range error",
+            ErrorKind::YKPIV_NOT_SUPPORTED => "not supported",
+        }
+    }
+}
+
+impl fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.msg())
+    }
+}
+
+impl std::error::Error for ErrorKind {}
 
 #[derive(Copy)]
 #[repr(C)]
-pub struct Struct1 {
-    pub rc: Enum2,
+pub struct Error {
+    pub rc: ErrorKind,
     pub name: *const u8,
     pub description: *const u8,
 }
 
-impl Clone for Struct1 {
+impl Clone for Error {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-static mut errors: *const Struct1 = Enum2::YKPIV_OK as (*const Struct1);
-
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_strerror(mut err: Enum2) -> *const u8 {
-    static mut unknown: *const u8 = (*b"Unknown ykpiv error\0").as_ptr();
-    let mut p: *const u8;
-    if -(err as (i32)) < 0i32
-        || -(err as (i32))
-            >= ::std::mem::size_of::<*const Struct1>()
-                .wrapping_div(::std::mem::size_of::<Struct1>()) as (i32)
-    {
-        unknown
-    } else {
-        p = (*errors.offset(-(err as (i32)) as (isize))).description;
-        if p.is_null() {
-            p = unknown;
-        }
-        p
-    }
+pub fn ykpiv_strerror(err: ErrorKind) -> &'static str {
+    err.msg()
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_strerror_name(mut err: Enum2) -> *const u8 {
-    if -(err as (i32)) < 0i32
-        || -(err as (i32))
-            >= ::std::mem::size_of::<*const Struct1>()
-                .wrapping_div(::std::mem::size_of::<Struct1>()) as (i32)
-    {
-        0i32 as (*mut ::std::os::raw::c_void) as (*const u8)
-    } else {
-        (*errors.offset(-(err as (i32)) as (isize))).name
-    }
+pub fn ykpiv_strerror_name(err: ErrorKind) -> &'static str {
+    err.name()
 }

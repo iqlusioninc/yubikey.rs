@@ -1,3 +1,6 @@
+// Adapted from yubico-piv-tool:
+// <https://github.com/Yubico/yubico-piv-tool/>
+//
 // Copyright (c) 2014-2016 Yubico AB
 // All rights reserved.
 //
@@ -28,13 +31,22 @@
 pub mod error;
 pub mod internal;
 pub mod util;
-pub mod version;
+
+use self::{error::ErrorKind, internal::DesKey};
+use std::{convert::TryInto, ffi::CStr, mem, os::raw::c_void, ptr};
+use zeroize::Zeroize;
+
+use crate::error::ykpiv_strerror;
+use libc::{
+    c_char, calloc, free, malloc, memcmp, memcpy, memmove, memset, realloc, strchr, strlen,
+    strncasecmp, strnlen,
+};
 
 extern "C" {
     fn SCardBeginTransaction(hCard: i32) -> i32;
     fn SCardConnect(
         hContext: i32,
-        szReader: *const u8,
+        szReader: *const c_char,
         dwShareMode: u32,
         dwPreferredProtocols: u32,
         phCard: *mut i32,
@@ -44,15 +56,15 @@ extern "C" {
     fn SCardEndTransaction(hCard: i32, dwDisposition: u32) -> i32;
     fn SCardEstablishContext(
         dwScope: u32,
-        pvReserved1: *const ::std::os::raw::c_void,
-        pvReserved2: *const ::std::os::raw::c_void,
+        pvReserved1: *const c_void,
+        pvReserved2: *const c_void,
         phContext: *mut i32,
     ) -> i32;
     fn SCardIsValidContext(hContext: i32) -> i32;
     fn SCardListReaders(
         hContext: i32,
-        mszGroups: *const u8,
-        mszReaders: *mut u8,
+        mszGroups: *const c_char,
+        mszReaders: *mut c_char,
         pcchReaders: *mut u32,
     ) -> i32;
     fn SCardReconnect(
@@ -74,14 +86,11 @@ extern "C" {
     ) -> i32;
     static mut _DefaultRuneLocale: Struct1;
     fn __maskrune(arg1: i32, arg2: usize) -> i32;
-    static mut __stderrp: *mut __sFILE;
-    fn __swbuf(arg1: i32, arg2: *mut __sFILE) -> i32;
     fn __tolower(arg1: i32) -> i32;
     fn __toupper(arg1: i32) -> i32;
-    fn calloc(__count: usize, __size: usize) -> *mut ::std::os::raw::c_void;
-    fn des_destroy_key(key: *mut des_key) -> Enum6;
+    fn des_destroy_key(key: *mut DesKey) -> Enum6;
     fn des_encrypt(
-        key: *mut des_key,
+        key: *mut DesKey,
         in_: *const u8,
         inlen: usize,
         out: *mut u8,
@@ -91,46 +100,116 @@ extern "C" {
         type_: i32,
         keyraw: *const u8,
         keyrawlen: usize,
-        key: *mut *mut des_key,
+        key: *mut *mut DesKey,
     ) -> Enum6;
-    fn fprintf(arg1: *mut __sFILE, arg2: *const u8, ...) -> i32;
-    fn free(arg1: *mut ::std::os::raw::c_void);
-    fn memcmp(
-        __s1: *const ::std::os::raw::c_void,
-        __s2: *const ::std::os::raw::c_void,
-        __n: usize,
-    ) -> i32;
-    fn memcpy(
-        __dst: *mut ::std::os::raw::c_void,
-        __src: *const ::std::os::raw::c_void,
-        __n: usize,
-    ) -> *mut ::std::os::raw::c_void;
-    fn memmove(
-        __dst: *mut ::std::os::raw::c_void,
-        __src: *const ::std::os::raw::c_void,
-        __len: usize,
-    ) -> *mut ::std::os::raw::c_void;
-    fn memset(
-        __b: *mut ::std::os::raw::c_void,
-        __c: i32,
-        __len: usize,
-    ) -> *mut ::std::os::raw::c_void;
-    fn memset_s(__s: *mut ::std::os::raw::c_void, __smax: usize, __c: i32, __n: usize) -> i32;
-    fn realloc(__ptr: *mut ::std::os::raw::c_void, __size: usize) -> *mut ::std::os::raw::c_void;
+    fn memset_s(__s: *mut c_void, __smax: usize, __c: i32, __n: usize) -> i32;
     fn snprintf(__str: *mut u8, __size: usize, __format: *const u8, ...) -> i32;
-    fn strchr(__s: *const u8, __c: i32) -> *mut u8;
-    fn strlen(__s: *const u8) -> usize;
-    fn strncasecmp(arg1: *const u8, arg2: *const u8, arg3: usize) -> i32;
-    fn strnlen(__s1: *const u8, __n: usize) -> usize;
     fn yk_des_is_weak_key(key: *const u8, cb_key: usize) -> bool;
-    fn ykpiv_strerror(err: Enum5) -> *const u8;
 }
 
-enum __sFILEX {}
+pub const DES_TYPE_3DES: u8 = 1;
 
-enum des_key {}
+pub const DES_LEN_DES: usize = 8;
+pub const DES_LEN_3DES: usize = DES_LEN_DES * 3;
 
-enum u_APDU {}
+pub const YKPIV_ALGO_TAG: u8 = 0x80;
+pub const YKPIV_ALGO_3DES: u8 = 0x03;
+pub const YKPIV_ALGO_RSA1024: u8 = 0x06;
+pub const YKPIV_ALGO_RSA2048: u8 = 0x07;
+pub const YKPIV_ALGO_ECCP256: u8 = 0x11;
+pub const YKPIV_ALGO_ECCP384: u8 = 0x14;
+
+pub const YKPIV_KEY_AUTHENTICATION: u8 = 0x9a;
+pub const YKPIV_KEY_CARDMGM: u8 = 0x9b;
+pub const YKPIV_KEY_SIGNATURE: u8 = 0x9c;
+pub const YKPIV_KEY_KEYMGM: u8 = 0x9d;
+pub const YKPIV_KEY_CARDAUTH: u8 = 0x9e;
+pub const YKPIV_KEY_RETIRED1: u8 = 0x82;
+pub const YKPIV_KEY_RETIRED2: u8 = 0x83;
+pub const YKPIV_KEY_RETIRED3: u8 = 0x84;
+pub const YKPIV_KEY_RETIRED4: u8 = 0x85;
+pub const YKPIV_KEY_RETIRED5: u8 = 0x86;
+pub const YKPIV_KEY_RETIRED6: u8 = 0x87;
+pub const YKPIV_KEY_RETIRED7: u8 = 0x88;
+pub const YKPIV_KEY_RETIRED8: u8 = 0x89;
+pub const YKPIV_KEY_RETIRED9: u8 = 0x8a;
+pub const YKPIV_KEY_RETIRED10: u8 = 0x8b;
+pub const YKPIV_KEY_RETIRED11: u8 = 0x8c;
+pub const YKPIV_KEY_RETIRED12: u8 = 0x8d;
+pub const YKPIV_KEY_RETIRED13: u8 = 0x8e;
+pub const YKPIV_KEY_RETIRED14: u8 = 0x8f;
+pub const YKPIV_KEY_RETIRED15: u8 = 0x90;
+pub const YKPIV_KEY_RETIRED16: u8 = 0x91;
+pub const YKPIV_KEY_RETIRED17: u8 = 0x92;
+pub const YKPIV_KEY_RETIRED18: u8 = 0x93;
+pub const YKPIV_KEY_RETIRED19: u8 = 0x94;
+pub const YKPIV_KEY_RETIRED20: u8 = 0x95;
+pub const YKPIV_KEY_ATTESTATION: u8 = 0xf9;
+
+pub const YKPIV_INS_VERIFY: u8 = 0x20;
+pub const YKPIV_INS_CHANGE_REFERENCE: u8 = 0x24;
+pub const YKPIV_INS_RESET_RETRY: u8 = 0x2c;
+pub const YKPIV_INS_GENERATE_ASYMMETRIC: u8 = 0x47;
+pub const YKPIV_INS_AUTHENTICATE: u8 = 0x87;
+pub const YKPIV_INS_GET_DATA: u8 = 0xcb;
+pub const YKPIV_INS_PUT_DATA: u8 = 0xdb;
+pub const YKPIV_INS_SELECT_APPLICATION: u8 = 0xa4;
+pub const YKPIV_INS_GET_RESPONSE_APDU: u8 = 0xc0;
+
+// Yubico vendor specific instructions
+pub const YKPIV_INS_SET_MGMKEY: u8 = 0xff;
+pub const YKPIV_INS_IMPORT_KEY: u8 = 0xfe;
+pub const YKPIV_INS_GET_VERSION: u8 = 0xfd;
+pub const YKPIV_INS_RESET: u8 = 0xfb;
+pub const YKPIV_INS_SET_PIN_RETRIES: u8 = 0xfa;
+pub const YKPIV_INS_ATTEST: u8 = 0xf9;
+pub const YKPIV_INS_GET_SERIAL: u8 = 0xf8;
+
+/// Application Protocol Data Unit
+#[derive(Clone)]
+pub struct APDU {
+    /// Instruction class - indicates the type of command, e.g. interindustry or proprietary
+    pub cla: u8,
+
+    /// Instruction code - indicates the specific command, e.g. "write data"
+    pub ins: u8,
+
+    /// Instruction parameter 1 for the command, e.g. offset into file at which to write the data
+    pub p1: u8,
+
+    /// Instruction parameter 2 for the command
+    pub p2: u8,
+
+    /// Length of command - encodes the number of bytes of command data to follow
+    pub lc: u8,
+
+    /// Command data
+    pub data: [u8; 255],
+}
+
+impl Default for APDU {
+    fn default() -> Self {
+        Self {
+            cla: 0,
+            ins: 0,
+            p1: 0,
+            p2: 0,
+            lc: 0,
+            data: [0u8; 255],
+        }
+    }
+}
+
+impl Zeroize for APDU {
+    fn zeroize(&mut self) {
+        self.cla.zeroize();
+        self.ins.zeroize();
+        self.p1.zeroize();
+        self.p2.zeroize();
+        self.lc.zeroize();
+        self.data.zeroize();
+    }
+}
 
 #[derive(Copy)]
 #[repr(C)]
@@ -145,62 +224,7 @@ impl Clone for __sbuf {
     }
 }
 
-#[derive(Copy)]
-#[repr(C)]
-pub struct __sFILE {
-    pub _p: *mut u8,
-    pub _r: i32,
-    pub _w: i32,
-    pub _flags: i16,
-    pub _file: i16,
-    pub _bf: __sbuf,
-    pub _lbfsize: i32,
-    pub _cookie: *mut ::std::os::raw::c_void,
-    pub _close: unsafe extern "C" fn(*mut ::std::os::raw::c_void) -> i32,
-    pub _read: unsafe extern "C" fn(*mut ::std::os::raw::c_void, *mut u8, i32) -> i32,
-    pub _seek: unsafe extern "C" fn(*mut ::std::os::raw::c_void, isize, i32) -> isize,
-    pub _write: unsafe extern "C" fn(*mut ::std::os::raw::c_void, *const u8, i32) -> i32,
-    pub _ub: __sbuf,
-    pub _extra: *mut __sFILEX,
-    pub _ur: i32,
-    pub _ubuf: [u8; 3],
-    pub _nbuf: [u8; 1],
-    pub _lb: __sbuf,
-    pub _blksize: i32,
-    pub _offset: isize,
-}
-
-impl Clone for __sFILE {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn __sputc(mut _c: i32, mut _p: *mut __sFILE) -> i32 {
-    if {
-        (*_p)._w = (*_p)._w - 1;
-        (*_p)._w
-    } >= 0i32
-        || (*_p)._w >= (*_p)._lbfsize && (_c as (u8) as (i32) != b'\n' as (i32))
-    {
-        ({
-            let _rhs = _c;
-            let _lhs = &mut *{
-                let _old = (*_p)._p;
-                (*_p)._p = (*_p)._p.offset(1isize);
-                _old
-            };
-            *_lhs = _rhs as (u8);
-            *_lhs
-        }) as (i32)
-    } else {
-        __swbuf(_c, _p)
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn isascii(mut _c: i32) -> i32 {
+pub fn isascii(mut _c: i32) -> i32 {
     (_c & !0x7fi32 == 0i32) as (i32)
 }
 
@@ -250,8 +274,8 @@ impl Clone for Struct4 {
 pub struct Struct1 {
     pub __magic: [u8; 8],
     pub __encoding: [u8; 32],
-    pub __sgetrune: unsafe extern "C" fn(*const u8, usize, *mut *const u8) -> i32,
-    pub __sputrune: unsafe extern "C" fn(i32, *mut u8, usize, *mut *mut u8) -> i32,
+    pub __sgetrune: unsafe fn(*const u8, usize, *mut *const u8) -> i32,
+    pub __sputrune: unsafe fn(i32, *mut u8, usize, *mut *mut u8) -> i32,
     pub __invalid_rune: i32,
     pub __runetype: [u32; 256],
     pub __maplower: [i32; 256],
@@ -259,7 +283,7 @@ pub struct Struct1 {
     pub __runetype_ext: Struct2,
     pub __maplower_ext: Struct2,
     pub __mapupper_ext: Struct2,
-    pub __variable: *mut ::std::os::raw::c_void,
+    pub __variable: *mut c_void,
     pub __variable_len: i32,
     pub __ncharclasses: i32,
     pub __charclasses: *mut Struct4,
@@ -271,8 +295,7 @@ impl Clone for Struct1 {
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __istype(mut _c: i32, mut _f: usize) -> i32 {
+pub fn __istype(mut _c: i32, mut _f: usize) -> i32 {
     if isascii(_c) != 0 {
         !(_DefaultRuneLocale.__runetype[_c as (usize)] as (usize) & _f == 0) as (i32)
     } else {
@@ -280,8 +303,7 @@ pub unsafe extern "C" fn __istype(mut _c: i32, mut _f: usize) -> i32 {
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __isctype(mut _c: i32, mut _f: usize) -> i32 {
+pub fn __isctype(mut _c: i32, mut _f: usize) -> i32 {
     if _c < 0i32 || _c >= 256i32 {
         0i32
     } else {
@@ -289,8 +311,7 @@ pub unsafe extern "C" fn __isctype(mut _c: i32, mut _f: usize) -> i32 {
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __wcwidth(mut _c: i32) -> i32 {
+pub fn __wcwidth(mut _c: i32) -> i32 {
     let mut _x: u32;
     if _c == 0i32 {
         0i32
@@ -306,113 +327,91 @@ pub unsafe extern "C" fn __wcwidth(mut _c: i32) -> i32 {
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isalnum(mut _c: i32) -> i32 {
+pub fn isalnum(mut _c: i32) -> i32 {
     __istype(_c, (0x100isize | 0x400isize) as (usize))
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isalpha(mut _c: i32) -> i32 {
+pub fn isalpha(mut _c: i32) -> i32 {
     __istype(_c, 0x100usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isblank(mut _c: i32) -> i32 {
+pub fn isblank(mut _c: i32) -> i32 {
     __istype(_c, 0x20000usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn iscntrl(mut _c: i32) -> i32 {
+pub fn iscntrl(mut _c: i32) -> i32 {
     __istype(_c, 0x200usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isdigit(mut _c: i32) -> i32 {
+pub fn isdigit(mut _c: i32) -> i32 {
     __isctype(_c, 0x400usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isgraph(mut _c: i32) -> i32 {
+pub fn isgraph(mut _c: i32) -> i32 {
     __istype(_c, 0x800usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn islower(mut _c: i32) -> i32 {
+pub fn islower(mut _c: i32) -> i32 {
     __istype(_c, 0x1000usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isprint(mut _c: i32) -> i32 {
+pub fn isprint(mut _c: i32) -> i32 {
     __istype(_c, 0x40000usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ispunct(mut _c: i32) -> i32 {
+pub fn ispunct(mut _c: i32) -> i32 {
     __istype(_c, 0x2000usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isspace(mut _c: i32) -> i32 {
+pub fn isspace(mut _c: i32) -> i32 {
     __istype(_c, 0x4000usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isupper(mut _c: i32) -> i32 {
+pub fn isupper(mut _c: i32) -> i32 {
     __istype(_c, 0x8000usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isxdigit(mut _c: i32) -> i32 {
+pub fn isxdigit(mut _c: i32) -> i32 {
     __isctype(_c, 0x10000usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn toascii(mut _c: i32) -> i32 {
+pub fn toascii(mut _c: i32) -> i32 {
     _c & 0x7fi32
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn tolower(mut _c: i32) -> i32 {
+pub fn tolower(mut _c: i32) -> i32 {
     __tolower(_c)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn toupper(mut _c: i32) -> i32 {
+pub fn toupper(mut _c: i32) -> i32 {
     __toupper(_c)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn digittoint(mut _c: i32) -> i32 {
+pub fn digittoint(mut _c: i32) -> i32 {
     __maskrune(_c, 0xfusize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ishexnumber(mut _c: i32) -> i32 {
+pub fn ishexnumber(mut _c: i32) -> i32 {
     __istype(_c, 0x10000usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isideogram(mut _c: i32) -> i32 {
+pub fn isideogram(mut _c: i32) -> i32 {
     __istype(_c, 0x80000usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isnumber(mut _c: i32) -> i32 {
+pub fn isnumber(mut _c: i32) -> i32 {
     __istype(_c, 0x400usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isphonogram(mut _c: i32) -> i32 {
+pub fn isphonogram(mut _c: i32) -> i32 {
     __istype(_c, 0x200000usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isrune(mut _c: i32) -> i32 {
+pub fn isrune(mut _c: i32) -> i32 {
     __istype(_c, 0xfffffff0usize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn isspecial(mut _c: i32) -> i32 {
+pub fn isspecial(mut _c: i32) -> i32 {
     __istype(_c, 0x100000usize)
 }
 
@@ -421,15 +420,10 @@ static mut aid: *const u8 = 0xa0i32 as (*const u8);
 #[derive(Copy)]
 #[repr(C)]
 pub struct ykpiv_allocator {
-    pub pfn_alloc:
-        unsafe extern "C" fn(*mut ::std::os::raw::c_void, usize) -> *mut ::std::os::raw::c_void,
-    pub pfn_realloc: unsafe extern "C" fn(
-        *mut ::std::os::raw::c_void,
-        *mut ::std::os::raw::c_void,
-        usize,
-    ) -> *mut ::std::os::raw::c_void,
-    pub pfn_free: unsafe extern "C" fn(*mut ::std::os::raw::c_void, *mut ::std::os::raw::c_void),
-    pub alloc_data: *mut ::std::os::raw::c_void,
+    pub pfn_alloc: unsafe fn(*mut c_void, usize) -> *mut c_void,
+    pub pfn_realloc: unsafe fn(*mut c_void, *mut c_void, usize) -> *mut c_void,
+    pub pfn_free: unsafe fn(*mut c_void, *mut c_void),
+    pub alloc_data: *mut c_void,
 }
 
 impl Clone for ykpiv_allocator {
@@ -438,37 +432,30 @@ impl Clone for ykpiv_allocator {
     }
 }
 
-unsafe extern "C" fn _default_alloc(
-    mut data: *mut ::std::os::raw::c_void,
-    mut cb: usize,
-) -> *mut ::std::os::raw::c_void {
+unsafe fn _default_alloc(mut data: *mut c_void, mut cb: usize) -> *mut c_void {
     data;
     calloc(cb, 1usize)
 }
 
-unsafe extern "C" fn _default_realloc(
-    mut data: *mut ::std::os::raw::c_void,
-    mut p: *mut ::std::os::raw::c_void,
+unsafe fn _default_realloc(
+    mut data: *mut c_void,
+    mut p: *mut c_void,
     mut cb: usize,
-) -> *mut ::std::os::raw::c_void {
+) -> *mut c_void {
     data;
     realloc(p, cb)
 }
 
-unsafe extern "C" fn _default_free(
-    mut data: *mut ::std::os::raw::c_void,
-    mut p: *mut ::std::os::raw::c_void,
-) {
+unsafe fn _default_free(mut data: *mut c_void, mut p: *mut c_void) {
     data;
     free(p);
 }
 
-#[no_mangle]
 pub static mut _default_allocator: ykpiv_allocator = ykpiv_allocator {
     pfn_alloc: _default_alloc,
     pfn_realloc: _default_realloc,
     pfn_free: _default_free,
-    alloc_data: 0i32 as (*mut ::std::os::raw::c_void),
+    alloc_data: 0i32 as (*mut c_void),
 };
 
 #[derive(Copy)]
@@ -504,44 +491,7 @@ impl Clone for ykpiv_state {
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_alloc(
-    mut state: *mut ykpiv_state,
-    mut size: usize,
-) -> *mut ::std::os::raw::c_void {
-    if state.is_null() || (*state).allocator.pfn_alloc == 0 {
-        0i32 as (*mut ::std::os::raw::c_void)
-    } else {
-        ((*state).allocator.pfn_alloc)((*state).allocator.alloc_data, size)
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_realloc(
-    mut state: *mut ykpiv_state,
-    mut address: *mut ::std::os::raw::c_void,
-    mut size: usize,
-) -> *mut ::std::os::raw::c_void {
-    if state.is_null() || (*state).allocator.pfn_realloc == 0 {
-        0i32 as (*mut ::std::os::raw::c_void)
-    } else {
-        ((*state).allocator.pfn_realloc)((*state).allocator.alloc_data, address, size)
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_free(
-    mut state: *mut ykpiv_state,
-    mut data: *mut ::std::os::raw::c_void,
-) {
-    if data.is_null() || state.is_null() || (*state).allocator.pfn_free == 0 {
-    } else {
-        ((*state).allocator.pfn_free)((*state).allocator.alloc_data, data);
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_set_length(mut buffer: *mut u8, mut length: usize) -> u32 {
+pub fn _ykpiv_set_length(mut buffer: *mut u8, mut length: usize) -> u32 {
     if length < 0x80usize {
         *{
             let _old = buffer;
@@ -581,8 +531,7 @@ pub unsafe extern "C" fn _ykpiv_set_length(mut buffer: *mut u8, mut length: usiz
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_get_length(mut buffer: *const u8, mut len: *mut usize) -> u32 {
+pub fn _ykpiv_get_length(mut buffer: *const u8, mut len: *mut usize) -> u32 {
     if *buffer.offset(0isize) as (i32) < 0x81i32 {
         *len = *buffer.offset(0isize) as (usize);
         1u32
@@ -598,8 +547,7 @@ pub unsafe extern "C" fn _ykpiv_get_length(mut buffer: *const u8, mut len: *mut 
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_has_valid_length(mut buffer: *const u8, mut len: usize) -> bool {
+pub fn _ykpiv_has_valid_length(mut buffer: *const u8, mut len: usize) -> bool {
     if *buffer.offset(0isize) as (i32) < 0x81i32 && (len > 0usize) {
         true
     } else if *buffer as (i32) & 0x7fi32 == 1i32 && (len > 1usize) {
@@ -611,68 +559,32 @@ pub unsafe extern "C" fn _ykpiv_has_valid_length(mut buffer: *const u8, mut len:
     }
 }
 
-#[derive(Clone, Copy)]
-#[repr(i32)]
-pub enum Enum5 {
-    YKPIV_OK = 0i32,
-    YKPIV_MEMORY_ERROR = -1i32,
-    YKPIV_PCSC_ERROR = -2i32,
-    YKPIV_SIZE_ERROR = -3i32,
-    YKPIV_APPLET_ERROR = -4i32,
-    YKPIV_AUTHENTICATION_ERROR = -5i32,
-    YKPIV_RANDOMNESS_ERROR = -6i32,
-    YKPIV_GENERIC_ERROR = -7i32,
-    YKPIV_KEY_ERROR = -8i32,
-    YKPIV_PARSE_ERROR = -9i32,
-    YKPIV_WRONG_PIN = -10i32,
-    YKPIV_INVALID_OBJECT = -11i32,
-    YKPIV_ALGORITHM_ERROR = -12i32,
-    YKPIV_PIN_LOCKED = -13i32,
-    YKPIV_ARGUMENT_ERROR = -14i32,
-    YKPIV_RANGE_ERROR = -15i32,
-    YKPIV_NOT_SUPPORTED = -16i32,
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_init_with_allocator(
+pub fn ykpiv_init_with_allocator(
     mut state: *mut *mut ykpiv_state,
     mut verbose: i32,
     mut allocator: *const ykpiv_allocator,
-) -> Enum5 {
+) -> ErrorKind {
     let mut s: *mut ykpiv_state;
-    if 0i32 as (*mut ::std::os::raw::c_void) as (*mut *mut ykpiv_state) == state {
-        Enum5::YKPIV_GENERIC_ERROR
-    } else if 0i32 as (*mut ::std::os::raw::c_void) as (*const ykpiv_allocator) == allocator
-        || (*allocator).pfn_alloc == 0
-        || (*allocator).pfn_realloc == 0
-        || (*allocator).pfn_free == 0
-    {
-        Enum5::YKPIV_MEMORY_ERROR
+    if 0i32 as (*mut c_void) as (*mut *mut ykpiv_state) == state {
+        ErrorKind::YKPIV_GENERIC_ERROR
     } else {
-        s = ((*allocator).pfn_alloc)(
-            (*allocator).alloc_data,
-            ::std::mem::size_of::<ykpiv_state>(),
-        ) as (*mut ykpiv_state);
-        (if 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state) == s {
-            Enum5::YKPIV_MEMORY_ERROR
+        s = malloc(mem::size_of::<ykpiv_state>()) as (*mut ykpiv_state);
+
+        (if 0i32 as (*mut c_void) as (*mut ykpiv_state) == s {
+            ErrorKind::YKPIV_MEMORY_ERROR
         } else {
-            memset(
-                s as (*mut ::std::os::raw::c_void),
-                0i32,
-                ::std::mem::size_of::<ykpiv_state>(),
-            );
-            (*s).pin = 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8);
+            memset(s as (*mut c_void), 0i32, mem::size_of::<ykpiv_state>());
+            (*s).pin = 0i32 as (*mut c_void) as (*mut u8);
             (*s).allocator = *allocator;
             (*s).verbose = verbose;
             (*s).context = -1i32;
             *state = s;
-            Enum5::YKPIV_OK
+            ErrorKind::YKPIV_OK
         })
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_init(mut state: *mut *mut ykpiv_state, mut verbose: i32) -> Enum5 {
+pub fn ykpiv_init(mut state: *mut *mut ykpiv_state, mut verbose: i32) -> ErrorKind {
     ykpiv_init_with_allocator(
         state,
         verbose,
@@ -680,31 +592,25 @@ pub unsafe extern "C" fn ykpiv_init(mut state: *mut *mut ykpiv_state, mut verbos
     )
 }
 
-unsafe extern "C" fn _ykpiv_done(mut state: *mut ykpiv_state, mut disconnect: bool) -> Enum5 {
+unsafe fn _ykpiv_done(mut state: *mut ykpiv_state, mut disconnect: bool) -> ErrorKind {
     if disconnect {
         ykpiv_disconnect(state);
     }
-    _cache_pin(
-        state,
-        0i32 as (*mut ::std::os::raw::c_void) as (*const u8),
-        0usize,
-    );
-    _ykpiv_free(state, state as (*mut ::std::os::raw::c_void));
-    Enum5::YKPIV_OK
+
+    _cache_pin(state, ptr::null(), 0usize);
+    free(state as *mut c_void);
+    ErrorKind::YKPIV_OK
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_done_with_external_card(mut state: *mut ykpiv_state) -> Enum5 {
+pub fn ykpiv_done_with_external_card(mut state: *mut ykpiv_state) -> ErrorKind {
     _ykpiv_done(state, false)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_done(mut state: *mut ykpiv_state) -> Enum5 {
+pub fn ykpiv_done(mut state: *mut ykpiv_state) -> ErrorKind {
     _ykpiv_done(state, true)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_disconnect(mut state: *mut ykpiv_state) -> Enum5 {
+pub fn ykpiv_disconnect(mut state: *mut ykpiv_state) -> ErrorKind {
     if (*state).card != 0 {
         SCardDisconnect((*state).card, 0x1u32);
         (*state).card = 0i32;
@@ -713,16 +619,15 @@ pub unsafe extern "C" fn ykpiv_disconnect(mut state: *mut ykpiv_state) -> Enum5 
         SCardReleaseContext((*state).context);
         (*state).context = -1i32;
     }
-    Enum5::YKPIV_OK
+    ErrorKind::YKPIV_OK
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_select_application(mut state: *mut ykpiv_state) -> Enum5 {
-    let mut apdu: u_APDU;
+pub fn _ykpiv_select_application(mut state: *mut ykpiv_state) -> ErrorKind {
+    let mut apdu: APDU;
     let mut data: [u8; 255];
-    let mut recv_len: u32 = ::std::mem::size_of::<[u8; 255]>() as (u32);
+    let mut recv_len: u32 = mem::size_of::<[u8; 255]>() as (u32);
     let mut sw: i32;
-    let mut res: Enum5 = Enum5::YKPIV_OK;
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
 
     // FIXME(tarcieri): translate APDU construction
     /*
@@ -736,110 +641,92 @@ pub unsafe extern "C" fn _ykpiv_select_application(mut state: *mut ykpiv_state) 
     if {
         res = _send_data(
             state,
-            &mut apdu as (*mut u_APDU),
+            &mut apdu as (*mut APDU),
             data.as_mut_ptr(),
             &mut recv_len as (*mut u32),
             &mut sw as (*mut i32),
         );
         res
     } as (i32)
-        != Enum5::YKPIV_OK as (i32)
+        != ErrorKind::YKPIV_OK as (i32)
     {
         if (*state).verbose != 0 {
-            fprintf(
-                __stderrp,
-                (*b"Failed communicating with card: \'%s\'\n\0").as_ptr(),
-                ykpiv_strerror(res),
+            eprintln!(
+                "Failed communicating with card: \'{}\'",
+                ykpiv_strerror(res)
             );
         }
         res
     } else if sw != 0x9000i32 {
         if (*state).verbose != 0 {
-            fprintf(
-                __stderrp,
-                (*b"Failed selecting application: %04x\n\0").as_ptr(),
-                sw,
-            );
+            eprintln!("Failed selecting application: {:04x}", sw);
         }
-        Enum5::YKPIV_GENERIC_ERROR
+        ErrorKind::YKPIV_GENERIC_ERROR
     } else {
-        res = _ykpiv_get_version(
-            state,
-            0i32 as (*mut ::std::os::raw::c_void) as (*mut _ykpiv_version_t),
-        );
-        if res as (i32) != Enum5::YKPIV_OK as (i32) {
+        res = _ykpiv_get_version(state, 0i32 as (*mut c_void) as (*mut _ykpiv_version_t));
+        if res as (i32) != ErrorKind::YKPIV_OK as (i32) {
             if (*state).verbose != 0 {
-                fprintf(
-                    __stderrp,
-                    (*b"Failed to retrieve version: \'%s\'\n\0").as_ptr(),
-                    ykpiv_strerror(res),
-                );
+                eprintln!("Failed to retrieve version: \'{}\'", ykpiv_strerror(res));
             }
         }
-        res = _ykpiv_get_serial(
-            state,
-            0i32 as (*mut ::std::os::raw::c_void) as (*mut u32),
-            false,
-        );
-        if res as (i32) != Enum5::YKPIV_OK as (i32) {
+        res = _ykpiv_get_serial(state, 0i32 as (*mut c_void) as (*mut u32), false);
+        if res as (i32) != ErrorKind::YKPIV_OK as (i32) {
             if (*state).verbose != 0 {
-                fprintf(
-                    __stderrp,
-                    (*b"Failed to retrieve serial number: \'%s\'\n\0").as_ptr(),
-                    ykpiv_strerror(res),
+                eprintln!(
+                    "Failed to retrieve serial number: \'{}\'",
+                    ykpiv_strerror(res)
                 );
             }
-            res = Enum5::YKPIV_OK;
+            res = ErrorKind::YKPIV_OK;
         }
         res
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_ensure_application_selected(mut state: *mut ykpiv_state) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_OK;
+pub fn _ykpiv_ensure_application_selected(mut state: *mut ykpiv_state) -> ErrorKind {
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
     state;
     res
 }
 
-unsafe extern "C" fn _ykpiv_connect(
+unsafe fn _ykpiv_connect(
     mut state: *mut ykpiv_state,
     mut context: usize,
     mut card: usize,
-) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_OK;
-    if 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state) == state {
-        Enum5::YKPIV_GENERIC_ERROR
+) -> ErrorKind {
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
+    if 0i32 as (*mut c_void) as (*mut ykpiv_state) == state {
+        ErrorKind::YKPIV_GENERIC_ERROR
     } else if context != (*state).context as (usize)
         && (0x0i32 != SCardIsValidContext(context as (i32)))
     {
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
         if card != (*state).card as (usize) {
             let mut reader: [u8; 3072];
-            let mut reader_len: u32 = ::std::mem::size_of::<[u8; 3072]>() as (u32);
+            let mut reader_len: u32 = mem::size_of::<[u8; 3072]>() as (u32);
             let mut atr: [u8; 33];
-            let mut atr_len: u32 = ::std::mem::size_of::<[u8; 33]>() as (u32);
+            let mut atr_len: u32 = mem::size_of::<[u8; 33]>() as (u32);
             if 0x0i32
                 != SCardStatus(
                     card as (i32),
                     reader.as_mut_ptr(),
                     &mut reader_len as (*mut u32),
-                    0i32 as (*mut ::std::os::raw::c_void) as (*mut u32),
-                    0i32 as (*mut ::std::os::raw::c_void) as (*mut u32),
+                    0i32 as (*mut c_void) as (*mut u32),
+                    0i32 as (*mut c_void) as (*mut u32),
                     atr.as_mut_ptr(),
                     &mut atr_len as (*mut u32),
                 )
             {
-                return Enum5::YKPIV_PCSC_ERROR;
+                return ErrorKind::YKPIV_PCSC_ERROR;
             } else {
-                (*state).isNEO = ::std::mem::size_of::<[u8; 23]>().wrapping_sub(1usize)
+                (*state).isNEO = mem::size_of::<[u8; 23]>().wrapping_sub(1usize)
                     == atr_len as (usize)
                     && (0i32
                         == memcmp(
                             (*b";\xFC\x13\0\0\x811\xFE\x15YubikeyNEOr3\xE1\0").as_ptr()
-                                as (*const ::std::os::raw::c_void),
-                            atr.as_mut_ptr() as (*const ::std::os::raw::c_void),
+                                as (*const c_void),
+                            atr.as_mut_ptr() as (*const c_void),
                             atr_len as (usize),
                         ));
             }
@@ -850,33 +737,28 @@ unsafe extern "C" fn _ykpiv_connect(
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_connect_with_external_card(
+pub fn ykpiv_connect_with_external_card(
     mut state: *mut ykpiv_state,
     mut context: usize,
     mut card: usize,
-) -> Enum5 {
+) -> ErrorKind {
     _ykpiv_connect(state, context, card)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_connect(
-    mut state: *mut ykpiv_state,
-    mut wanted: *const u8,
-) -> Enum5 {
+pub fn ykpiv_connect(mut state: *mut ykpiv_state, mut wanted: *const c_char) -> ErrorKind {
     let mut _currentBlock;
     let mut active_protocol: u32;
-    let mut reader_buf: [u8; 2048];
-    let mut num_readers: usize = ::std::mem::size_of::<[u8; 2048]>();
+    let mut reader_buf: [c_char; 2048];
+    let mut num_readers: usize = mem::size_of::<[u8; 2048]>();
     let mut rc: isize;
-    let mut reader_ptr: *mut u8;
+    let mut reader_ptr: *mut c_char;
     let mut card: i32 = -1i32;
-    let mut ret: Enum5 = ykpiv_list_readers(
+    let mut ret: ErrorKind = ykpiv_list_readers(
         state,
         reader_buf.as_mut_ptr(),
         &mut num_readers as (*mut usize),
     );
-    if ret as (i32) != Enum5::YKPIV_OK as (i32) {
+    if ret as (i32) != ErrorKind::YKPIV_OK as (i32) {
         ret
     } else {
         reader_ptr = reader_buf.as_mut_ptr();
@@ -886,14 +768,14 @@ pub unsafe extern "C" fn ykpiv_connect(
                 break;
             }
             if !wanted.is_null() {
-                let mut ptr: *mut u8 = reader_ptr;
+                let mut ptr = reader_ptr as *const c_char;
                 let mut found: bool = false;
                 'loop10: loop {
-                    if strlen(ptr as (*const u8)) < strlen(wanted) {
+                    if strlen(ptr) < strlen(wanted) {
                         _currentBlock = 14;
                         break;
                     }
-                    if strncasecmp(ptr as (*const u8), wanted, strlen(wanted)) == 0i32 {
+                    if strncasecmp(ptr, wanted, strlen(wanted)) == 0i32 {
                         _currentBlock = 13;
                         break;
                     }
@@ -912,12 +794,10 @@ pub unsafe extern "C" fn ykpiv_connect(
                 }
                 if found as (i32) == 0i32 {
                     if (*state).verbose != 0 {
-                        fprintf(
-                            __stderrp,
-                            (*b"skipping reader \'%s\' since it doesn\'t match \'%s\'.\n\0")
-                                .as_ptr(),
-                            reader_ptr,
-                            wanted,
+                        eprintln!(
+                            "skipping reader \'{}\' since it doesn\'t match \'{}\'.",
+                            CStr::from_ptr(reader_ptr).to_string_lossy(),
+                            CStr::from_ptr(wanted).to_string_lossy()
                         );
                         _currentBlock = 26;
                     } else {
@@ -931,15 +811,14 @@ pub unsafe extern "C" fn ykpiv_connect(
             }
             if _currentBlock == 15 {
                 if (*state).verbose != 0 {
-                    fprintf(
-                        __stderrp,
-                        (*b"trying to connect to reader \'%s\'.\n\0").as_ptr(),
-                        reader_ptr,
+                    eprintln!(
+                        "trying to connect to reader \'{}\'.",
+                        CStr::from_ptr(reader_ptr).to_string_lossy()
                     );
                 }
                 rc = SCardConnect(
                     (*state).context,
-                    reader_ptr as (*const u8),
+                    reader_ptr as *const c_char,
                     0x2u32,
                     0x2u32,
                     &mut card as (*mut i32),
@@ -947,39 +826,34 @@ pub unsafe extern "C" fn ykpiv_connect(
                 ) as (isize);
                 if rc != 0x0isize {
                     if (*state).verbose != 0 {
-                        fprintf(
-                            __stderrp,
-                            (*b"SCardConnect failed, rc=%08lx\n\0").as_ptr(),
-                            rc,
-                        );
+                        eprintln!("SCardConnect failed, rc={}", rc);
                     }
-                } else if Enum5::YKPIV_OK as (i32)
+                } else if ErrorKind::YKPIV_OK as (i32)
                     == _ykpiv_connect(state, (*state).context as (usize), card as (usize)) as (i32)
                 {
                     _currentBlock = 19;
                     break;
                 }
             }
-            reader_ptr = reader_ptr
-                .offset(strlen(reader_ptr as (*const u8)).wrapping_add(1usize) as (isize));
+            reader_ptr = reader_ptr.offset(strlen(reader_ptr).wrapping_add(1usize) as (isize));
         }
         (if _currentBlock == 3 {
             (if *reader_ptr as (i32) == b'\0' as (i32) {
                 if (*state).verbose != 0 {
-                    fprintf(__stderrp, (*b"error: no usable reader found.\n\0").as_ptr());
+                    eprintln!("error: no usable reader found.");
                 }
                 SCardReleaseContext((*state).context);
                 (*state).context = -1i32;
-                Enum5::YKPIV_PCSC_ERROR
+                ErrorKind::YKPIV_PCSC_ERROR
             } else {
-                Enum5::YKPIV_GENERIC_ERROR
+                ErrorKind::YKPIV_GENERIC_ERROR
             })
-        } else if Enum5::YKPIV_OK as (i32) != {
+        } else if ErrorKind::YKPIV_OK as (i32) != {
             ret = _ykpiv_begin_transaction(state);
             ret
         } as (i32)
         {
-            Enum5::YKPIV_PCSC_ERROR
+            ErrorKind::YKPIV_PCSC_ERROR
         } else {
             ret = _ykpiv_select_application(state);
             _ykpiv_end_transaction(state);
@@ -988,49 +862,40 @@ pub unsafe extern "C" fn ykpiv_connect(
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_list_readers(
+pub fn ykpiv_list_readers(
     mut state: *mut ykpiv_state,
-    mut readers: *mut u8,
+    mut readers: *mut c_char,
     mut len: *mut usize,
-) -> Enum5 {
+) -> ErrorKind {
     let mut num_readers: u32 = 0u32;
     let mut rc: isize;
     if SCardIsValidContext((*state).context) != 0x0i32 {
         rc = SCardEstablishContext(
             0x2u32,
-            0i32 as (*mut ::std::os::raw::c_void) as (*const ::std::os::raw::c_void),
-            0i32 as (*mut ::std::os::raw::c_void) as (*const ::std::os::raw::c_void),
+            0i32 as (*mut c_void) as (*const c_void),
+            0i32 as (*mut c_void) as (*const c_void),
             &mut (*state).context as (*mut i32),
         ) as (isize);
         if rc != 0x0isize {
             if (*state).verbose != 0 {
-                fprintf(
-                    __stderrp,
-                    (*b"error: SCardEstablishContext failed, rc=%08lx\n\0").as_ptr(),
-                    rc,
-                );
+                eprintln!("error: SCardEstablishContext failed, rc={}", rc);
             }
-            return Enum5::YKPIV_PCSC_ERROR;
+            return ErrorKind::YKPIV_PCSC_ERROR;
         }
     }
     rc = SCardListReaders(
         (*state).context,
-        0i32 as (*mut ::std::os::raw::c_void) as (*const u8),
-        0i32 as (*mut ::std::os::raw::c_void) as (*mut u8),
+        ptr::null(),
+        ptr::null_mut(),
         &mut num_readers as (*mut u32),
     ) as (isize);
     if rc != 0x0isize {
         if (*state).verbose != 0 {
-            fprintf(
-                __stderrp,
-                (*b"error: SCardListReaders failed, rc=%08lx\n\0").as_ptr(),
-                rc,
-            );
+            eprintln!("error: SCardListReaders failed, rc={}", rc);
         }
         SCardReleaseContext((*state).context);
         (*state).context = -1i32;
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
         if num_readers as (usize) > *len {
             num_readers = *len as (u32);
@@ -1039,38 +904,31 @@ pub unsafe extern "C" fn ykpiv_list_readers(
         }
         rc = SCardListReaders(
             (*state).context,
-            0i32 as (*mut ::std::os::raw::c_void) as (*const u8),
+            ptr::null(),
             readers,
             &mut num_readers as (*mut u32),
         ) as (isize);
         (if rc != 0x0isize {
             if (*state).verbose != 0 {
-                fprintf(
-                    __stderrp,
-                    (*b"error: SCardListReaders failed, rc=%08lx\n\0").as_ptr(),
-                    rc,
-                );
+                eprintln!("error: SCardListReaders failed, rc={}", rc);
             }
             SCardReleaseContext((*state).context);
             (*state).context = -1i32;
-            Enum5::YKPIV_PCSC_ERROR
+            ErrorKind::YKPIV_PCSC_ERROR
         } else {
             *len = num_readers as (usize);
-            Enum5::YKPIV_OK
+            ErrorKind::YKPIV_OK
         })
     }
 }
 
-unsafe extern "C" fn reconnect(mut state: *mut ykpiv_state) -> Enum5 {
+unsafe fn reconnect(mut state: *mut ykpiv_state) -> ErrorKind {
     let mut active_protocol: u32 = 0u32;
     let mut rc: isize;
-    let mut res: Enum5;
+    let mut res: ErrorKind;
     let mut tries: i32;
     if (*state).verbose != 0 {
-        fprintf(
-            __stderrp,
-            (*b"trying to reconnect to current reader.\n\0").as_ptr(),
-        );
+        eprintln!("trying to reconnect to current reader.");
     }
     rc = SCardReconnect(
         (*state).card,
@@ -1081,38 +939,37 @@ unsafe extern "C" fn reconnect(mut state: *mut ykpiv_state) -> Enum5 {
     ) as (isize);
     if rc != 0x0isize {
         if (*state).verbose != 0 {
-            fprintf(
-                __stderrp,
-                (*b"SCardReconnect failed, rc=%08lx\n\0").as_ptr(),
-                rc,
-            );
+            eprintln!("SCardReconnect failed, rc={}", rc);
         }
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else if {
         res = _ykpiv_select_application(state);
         res
     } as (i32)
-        != Enum5::YKPIV_OK as (i32)
+        != ErrorKind::YKPIV_OK as (i32)
     {
         res
     } else if !(*state).pin.is_null() {
-        ykpiv_verify(state, (*state).pin as (*const u8), &mut tries as (*mut i32))
+        ykpiv_verify(
+            state,
+            (*state).pin as *const c_char,
+            &mut tries as (*mut i32),
+        )
     } else {
-        Enum5::YKPIV_OK
+        ErrorKind::YKPIV_OK
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_begin_transaction(mut state: *mut ykpiv_state) -> Enum5 {
+pub fn _ykpiv_begin_transaction(mut state: *mut ykpiv_state) -> ErrorKind {
     let mut rc: isize;
     rc = SCardBeginTransaction((*state).card) as (isize);
     if (rc as (usize) & 0xffffffffusize) as (isize) as (usize) == 0x80100068usize {
-        let mut res: Enum5 = Enum5::YKPIV_OK;
+        let mut res: ErrorKind = ErrorKind::YKPIV_OK;
         if {
             res = reconnect(state);
             res
         } as (i32)
-            != Enum5::YKPIV_OK as (i32)
+            != ErrorKind::YKPIV_OK as (i32)
         {
             return res;
         } else {
@@ -1121,35 +978,25 @@ pub unsafe extern "C" fn _ykpiv_begin_transaction(mut state: *mut ykpiv_state) -
     }
     if rc != 0x0isize {
         if (*state).verbose != 0 {
-            fprintf(
-                __stderrp,
-                (*b"error: Failed to begin pcsc transaction, rc=%08lx\n\0").as_ptr(),
-                rc,
-            );
+            eprintln!("error: Failed to begin pcsc transaction, rc={}", rc);
         }
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
-        Enum5::YKPIV_OK
+        ErrorKind::YKPIV_OK
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_end_transaction(mut state: *mut ykpiv_state) -> Enum5 {
+pub fn _ykpiv_end_transaction(mut state: *mut ykpiv_state) -> ErrorKind {
     let mut rc: isize = SCardEndTransaction((*state).card, 0x0u32) as (isize);
     if rc != 0x0isize && ((*state).verbose != 0) {
-        fprintf(
-            __stderrp,
-            (*b"error: Failed to end pcsc transaction, rc=%08lx\n\0").as_ptr(),
-            rc,
-        );
-        Enum5::YKPIV_PCSC_ERROR
+        eprintln!("error: Failed to end pcsc transaction, rc={}", rc);
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
-        Enum5::YKPIV_OK
+        ErrorKind::YKPIV_OK
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_transfer_data(
+pub fn _ykpiv_transfer_data(
     mut state: *mut ykpiv_state,
     mut templ: *const u8,
     mut in_data: *const u8,
@@ -1157,47 +1004,48 @@ pub unsafe extern "C" fn _ykpiv_transfer_data(
     mut out_data: *mut u8,
     mut out_len: *mut usize,
     mut sw: *mut i32,
-) -> Enum5 {
+) -> ErrorKind {
     let mut _currentBlock;
     let mut in_ptr: *const u8 = in_data;
     let mut max_out: usize = *out_len;
-    let mut res: Enum5;
+    let mut res: ErrorKind;
+    let mut recv_len: u32;
     *out_len = 0usize;
     'loop1: loop {
         let mut this_size: usize = 0xffusize;
         let mut data: [u8; 261];
-        let mut recv_len: u32 = ::std::mem::size_of::<[u8; 261]>() as (u32);
-        let mut apdu: u_APDU;
-        // FIXME(tarcieri): translate APDU code
-        /*
-        memset(apdu.raw, 0, sizeof(apdu.raw));
-        memcpy(apdu.raw, templ, 4);
-        if(in_ptr + 0xff < in_data + in_len) {
-          apdu.st.cla = 0x10;
+        recv_len = mem::size_of::<[u8; 261]>() as (u32);
+        let mut apdu = APDU::default();
+        apdu.cla = *templ;
+        apdu.ins = *templ.offset(1);
+        apdu.p1 = *templ.offset(2);
+        apdu.p2 = *templ.offset(3);
+
+        if in_ptr.offset(0xff) < in_data.offset(in_len) {
+            apdu.cla = 0x10;
         } else {
-          this_size = (size_t)((in_data + in_len) - in_ptr);
+            this_size = in_data.offset(in_len) as usize - in_ptr as usize;
         }
-        */
+
         if (*state).verbose > 2i32 {
-            fprintf(
-                __stderrp,
-                (*b"Going to send %lu bytes in this go.\n\0").as_ptr(),
-                this_size,
-            );
+            eprintln!("Going to send {} bytes in this go.", this_size);
         }
-        // FIXME(tarcieri): translate APDU code
-        /*
-        apdu.st.lc = (unsigned char)this_size;
-        memcpy(apdu.st.data, in_ptr, this_size);
-        */
+
+        apdu.lc = this_size.try_into().unwrap();
+        memcpy(
+            apdu.data.as_mut_ptr() as *mut c_void,
+            in_ptr as *const c_void,
+            this_size,
+        );
+
         res = _send_data(
             state,
-            &mut apdu as (*mut u_APDU),
+            &mut apdu as (*mut APDU),
             data.as_mut_ptr(),
             &mut recv_len as (*mut u32),
             sw,
         );
-        if res as (i32) != Enum5::YKPIV_OK as (i32) {
+        if res as (i32) != ErrorKind::YKPIV_OK as (i32) {
             _currentBlock = 24;
             break;
         }
@@ -1215,8 +1063,8 @@ pub unsafe extern "C" fn _ykpiv_transfer_data(
         }
         if !out_data.is_null() {
             memcpy(
-                out_data as (*mut ::std::os::raw::c_void),
-                data.as_mut_ptr() as (*const ::std::os::raw::c_void),
+                out_data as (*mut c_void),
+                data.as_mut_ptr() as (*const c_void),
                 recv_len.wrapping_sub(2u32) as (usize),
             );
             out_data = out_data.offset(recv_len.wrapping_sub(2u32) as (isize));
@@ -1234,29 +1082,25 @@ pub unsafe extern "C" fn _ykpiv_transfer_data(
                 _currentBlock = 24;
                 break;
             }
-            let mut apdu: u_APDU;
             let mut data: [u8; 261];
-            let mut recv_len: u32 = ::std::mem::size_of::<[u8; 261]>() as (u32);
+            recv_len = mem::size_of::<[u8; 261]>() as (u32);
             if (*state).verbose > 2i32 {
-                fprintf(
-                    __stderrp,
-                    (*b"The card indicates there is %d bytes more data for us.\n\0").as_ptr(),
-                    *sw & 0xffi32,
+                eprintln!(
+                    "The card indicates there is {} bytes more data for us.",
+                    *sw & 0xffi32
                 );
             }
-            // FIXME(tarcieri): translate APDU code
-            /*
-            memset(apdu.raw, 0, sizeof(apdu.raw));
-            apdu.st.ins = YKPIV_INS_GET_RESPONSE_APDU;
-            */
+
+            let mut apdu = APDU::default();
+            apdu.ins = YKPIV_INS_GET_RESPONSE_APDU;
             res = _send_data(
                 state,
-                &mut apdu as (*mut u_APDU),
+                &mut apdu as (*mut APDU),
                 data.as_mut_ptr(),
                 &mut recv_len as (*mut u32),
                 sw,
             );
-            if res as (i32) != Enum5::YKPIV_OK as (i32) {
+            if res as (i32) != ErrorKind::YKPIV_OK as (i32) {
                 _currentBlock = 24;
                 break;
             }
@@ -1276,8 +1120,8 @@ pub unsafe extern "C" fn _ykpiv_transfer_data(
                 continue;
             }
             memcpy(
-                out_data as (*mut ::std::os::raw::c_void),
-                data.as_mut_ptr() as (*const ::std::os::raw::c_void),
+                out_data as (*mut c_void),
+                data.as_mut_ptr() as (*const c_void),
                 recv_len.wrapping_sub(2u32) as (usize),
             );
             out_data = out_data.offset(recv_len.wrapping_sub(2u32) as (isize));
@@ -1286,35 +1130,32 @@ pub unsafe extern "C" fn _ykpiv_transfer_data(
         if _currentBlock == 24 {
         } else {
             if (*state).verbose != 0 {
-                fprintf(
-                    __stderrp,
-                    (*b"Output buffer to small, wanted to write %lu, max was %lu.\0").as_ptr(),
+                eprintln!(
+                    "Output buffer to small, wanted to write {}, max was {}.",
                     (*out_len)
                         .wrapping_add(recv_len as (usize))
                         .wrapping_sub(2usize),
-                    max_out,
+                    max_out
                 );
             }
-            res = Enum5::YKPIV_SIZE_ERROR;
+            res = ErrorKind::YKPIV_SIZE_ERROR;
         }
     } else if _currentBlock == 21 {
         if (*state).verbose != 0 {
-            fprintf(
-                __stderrp,
-                (*b"Output buffer to small, wanted to write %lu, max was %lu.\n\0").as_ptr(),
+            eprintln!(
+                "Output buffer to small, wanted to write {}, max was {}.",
                 (*out_len)
                     .wrapping_add(recv_len as (usize))
                     .wrapping_sub(2usize),
-                max_out,
+                max_out
             );
         }
-        res = Enum5::YKPIV_SIZE_ERROR;
+        res = ErrorKind::YKPIV_SIZE_ERROR;
     }
     res
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_transfer_data(
+pub fn ykpiv_transfer_data(
     mut state: *mut ykpiv_state,
     mut templ: *const u8,
     mut in_data: *const u8,
@@ -1322,16 +1163,16 @@ pub unsafe extern "C" fn ykpiv_transfer_data(
     mut out_data: *mut u8,
     mut out_len: *mut usize,
     mut sw: *mut i32,
-) -> Enum5 {
-    let mut res: Enum5;
+) -> ErrorKind {
+    let mut res: ErrorKind;
     if {
         res = _ykpiv_begin_transaction(state);
         res
     } as (i32)
-        != Enum5::YKPIV_OK as (i32)
+        != ErrorKind::YKPIV_OK as (i32)
     {
         *out_len = 0usize;
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
         res = _ykpiv_transfer_data(state, templ, in_data, in_len, out_data, out_len, sw);
         _ykpiv_end_transaction(state);
@@ -1339,30 +1180,25 @@ pub unsafe extern "C" fn ykpiv_transfer_data(
     }
 }
 
-unsafe extern "C" fn dump_hex(mut buf: *const u8, mut len: u32) {
+unsafe fn dump_hex(mut buf: *const u8, mut len: u32) {
     let mut i: u32;
     i = 0u32;
     'loop1: loop {
         if !(i < len) {
             break;
         }
-        fprintf(
-            __stderrp,
-            (*b"%02x \0").as_ptr(),
-            *buf.offset(i as (isize)) as (i32),
-        );
+        eprintln!("{:02x} ", *buf.offset(i as (isize)) as (i32));
         i = i.wrapping_add(1u32);
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _send_data(
+pub fn _send_data(
     mut state: *mut ykpiv_state,
-    mut apdu: *mut u_APDU,
+    mut apdu: *mut APDU,
     mut data: *mut u8,
     mut recv_len: *mut u32,
     mut sw: *mut i32,
-) -> Enum5 {
+) -> ErrorKind {
     let mut rc: isize;
     // FIXME(tarcieri): `send_len` is NOT supposed to be 0. Translate C code
     let mut send_len: u32 = 0u32; // (unsigned int)apdu->st.lc + 5;
@@ -1387,9 +1223,9 @@ pub unsafe extern "C" fn _send_data(
 
     *recv_len = tmp_len;
     if (*state).verbose > 1i32 {
-        fprintf(__stderrp, (*b"< \0").as_ptr());
+        eprint!("< ");
         dump_hex(data as (*const u8), *recv_len);
-        fprintf(__stderrp, (*b"\n\0").as_ptr());
+        eprintln!();
     }
     if *recv_len >= 2u32 {
         *sw = *data.offset((*recv_len).wrapping_sub(2u32) as (isize)) as (i32) << 8i32
@@ -1397,11 +1233,12 @@ pub unsafe extern "C" fn _send_data(
     } else {
         *sw = 0i32;
     }
-    Enum5::YKPIV_OK
+    ErrorKind::YKPIV_OK
 }
 
 #[derive(Clone, Copy)]
 #[repr(i32)]
+#[allow(non_camel_case_types)]
 pub enum Enum6 {
     DES_OK = 0i32,
     DES_INVALID_PARAMETER = -1i32,
@@ -1410,35 +1247,31 @@ pub enum Enum6 {
     DES_GENERAL_ERROR = -4i32,
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_authenticate(
-    mut state: *mut ykpiv_state,
-    mut key: *const u8,
-) -> Enum5 {
-    let mut apdu: u_APDU;
+pub fn ykpiv_authenticate(mut state: *mut ykpiv_state, mut key: *const u8) -> ErrorKind {
+    let mut apdu: APDU;
     let mut data: [u8; 261];
     let mut challenge: [u8; 8];
-    let mut recv_len: u32 = ::std::mem::size_of::<[u8; 261]>() as (u32);
+    let mut recv_len: u32 = mem::size_of::<[u8; 261]>() as (u32);
     let mut sw: i32;
-    let mut res: Enum5;
+    let mut res: ErrorKind;
     let mut drc: Enum6 = Enum6::DES_OK;
-    let mut mgm_key: *mut des_key = 0i32 as (*mut ::std::os::raw::c_void) as (*mut des_key);
+    let mut mgm_key: *mut DesKey = 0i32 as (*mut c_void) as (*mut DesKey);
     let mut out_len: usize = 0usize;
-    if 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state) == state {
-        Enum5::YKPIV_GENERIC_ERROR
-    } else if Enum5::YKPIV_OK as (i32) != {
+    if 0i32 as (*mut c_void) as (*mut ykpiv_state) == state {
+        ErrorKind::YKPIV_GENERIC_ERROR
+    } else if ErrorKind::YKPIV_OK as (i32) != {
         res = _ykpiv_begin_transaction(state);
         res
     } as (i32)
     {
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
-        if !(Enum5::YKPIV_OK as (i32) != {
+        if !(ErrorKind::YKPIV_OK as (i32) != {
             res = _ykpiv_ensure_application_selected(state);
             res
         } as (i32))
         {
-            if 0i32 as (*mut ::std::os::raw::c_void) as (*const u8) == key {
+            if 0i32 as (*mut c_void) as (*const u8) == key {
                 key = (*b"\x01\x02\x03\x04\x05\x06\x07\x08\x01\x02\x03\x04\x05\x06\x07\x08\x01\x02\x03\x04\x05\x06\x07\x08\0").as_ptr(
                       );
             }
@@ -1447,10 +1280,10 @@ pub unsafe extern "C" fn ykpiv_authenticate(
                     1i32,
                     key,
                     (8i32 * 3i32) as (usize),
-                    &mut mgm_key as (*mut *mut des_key),
+                    &mut mgm_key as (*mut *mut DesKey),
                 ) as (i32)
             {
-                res = Enum5::YKPIV_ALGORITHM_ERROR;
+                res = ErrorKind::YKPIV_ALGORITHM_ERROR;
             } else {
                 // get a challenge from the card
                 // FIXME(tarcieri): Translate C code below
@@ -1522,25 +1355,25 @@ pub unsafe extern "C" fn ykpiv_authenticate(
                   }
                 */
                 let mut response: [u8; 8];
-                out_len = ::std::mem::size_of::<[u8; 8]>();
+                out_len = mem::size_of::<[u8; 8]>();
                 drc = des_encrypt(
                     mgm_key,
                     challenge.as_mut_ptr() as (*const u8),
-                    ::std::mem::size_of::<[u8; 8]>(),
+                    mem::size_of::<[u8; 8]>(),
                     response.as_mut_ptr(),
                     &mut out_len as (*mut usize),
                 );
                 if drc as (i32) != Enum6::DES_OK as (i32) {
-                    res = Enum5::YKPIV_AUTHENTICATION_ERROR;
+                    res = ErrorKind::YKPIV_AUTHENTICATION_ERROR;
                 } else if memcmp(
-                    response.as_mut_ptr() as (*const ::std::os::raw::c_void),
-                    data.as_mut_ptr().offset(4isize) as (*const ::std::os::raw::c_void),
+                    response.as_mut_ptr() as (*const c_void),
+                    data.as_mut_ptr().offset(4isize) as (*const c_void),
                     8usize,
                 ) == 0i32
                 {
-                    res = Enum5::YKPIV_OK;
+                    res = ErrorKind::YKPIV_OK;
                 } else {
-                    res = Enum5::YKPIV_AUTHENTICATION_ERROR;
+                    res = ErrorKind::YKPIV_AUTHENTICATION_ERROR;
                 }
             }
         }
@@ -1552,159 +1385,143 @@ pub unsafe extern "C" fn ykpiv_authenticate(
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_set_mgmkey(
-    mut state: *mut ykpiv_state,
-    mut new_key: *const u8,
-) -> Enum5 {
+pub fn ykpiv_set_mgmkey(mut state: *mut ykpiv_state, mut new_key: *const u8) -> ErrorKind {
     ykpiv_set_mgmkey2(state, new_key, 0u8)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_set_mgmkey2(
+pub fn ykpiv_set_mgmkey2(
     mut state: *mut ykpiv_state,
     mut new_key: *const u8,
     touch: u8,
-) -> Enum5 {
-    let mut apdu: u_APDU;
+) -> ErrorKind {
     let mut data: [u8; 261];
-    let mut recv_len: u32 = ::std::mem::size_of::<[u8; 261]>() as (u32);
+    let mut recv_len: u32 = mem::size_of::<[u8; 261]>() as (u32);
     let mut sw: i32;
-    let mut res: Enum5 = Enum5::YKPIV_OK;
-    if Enum5::YKPIV_OK as (i32) != {
-        res = _ykpiv_begin_transaction(state);
-        res
-    } as (i32)
-    {
-        Enum5::YKPIV_PCSC_ERROR
-    } else {
-        if !(Enum5::YKPIV_OK as (i32) != {
-            res = _ykpiv_ensure_application_selected(state);
-            res
-        } as (i32))
-        {
-            if yk_des_is_weak_key(new_key, (8i32 * 3i32) as (usize)) {
-                if (*state).verbose != 0 {
-                    fprintf(__stderrp, (*b"Won\'t set new key \'\0").as_ptr());
-                    dump_hex(new_key, (8i32 * 3i32) as (u32));
-                    fprintf(
-                        __stderrp,
-                        (*b"\' since it\'s weak (with odd parity).\n\0").as_ptr(),
-                    );
-                }
-                res = Enum5::YKPIV_KEY_ERROR;
-            // FIXME(tarcieri): Translate C code below (should go after else clause)
-            /*
-                memset(apdu.raw, 0, sizeof(apdu));
-                apdu.st.ins = YKPIV_INS_SET_MGMKEY;
-                apdu.st.p1 = 0xff;
-                if (touch == 0) {
-                  apdu.st.p2 = 0xff;
-                }
-                else if (touch == 1) {
-                  apdu.st.p2 = 0xfe;
-                }
-                else {
-                  res = YKPIV_GENERIC_ERROR;
-                  goto Cleanup;
-                }
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
+    let mut apdu = APDU::default();
 
-                apdu.st.lc = DES_LEN_3DES + 3;
-                apdu.st.data[0] = YKPIV_ALGO_3DES;
-                apdu.st.data[1] = YKPIV_KEY_CARDMGM;
-                apdu.st.data[2] = DES_LEN_3DES;
-                memcpy(apdu.st.data + 3, new_key, DES_LEN_3DES);
-            */
-            } else if !({
-                res = _send_data(
-                    state,
-                    &mut apdu as (*mut u_APDU),
-                    data.as_mut_ptr(),
-                    &mut recv_len as (*mut u32),
-                    &mut sw as (*mut i32),
-                );
-                res
-            } as (i32)
-                != Enum5::YKPIV_OK as (i32))
-            {
+    if _ykpiv_begin_transaction(state) != ErrorKind::YKPIV_OK {
+        return ErrorKind::YKPIV_PCSC_ERROR;
+    }
+
+    if _ykpiv_ensure_application_selected(state) == ErrorKind::YKPIV_OK {
+        if yk_des_is_weak_key(new_key, (8i32 * 3i32) as (usize)) {
+            if (*state).verbose != 0 {
+                // TODO(tarcieri): format string
+                eprint!("Won\'t set new key \'");
+                dump_hex(new_key, DES_LEN_3DES as u32);
+                eprintln!("\' since it\'s weak (with odd parity).");
+            }
+            res = ErrorKind::YKPIV_KEY_ERROR;
+            apdu.ins = YKPIV_INS_SET_MGMKEY;
+            apdu.p1 = 0xff;
+
+            apdu.p2 = match touch {
+                0 => 0xff,
+                1 => 0xfe,
+                _ => {
+                    _ykpiv_end_transaction(state);
+                    return ErrorKind::YKPIV_GENERIC_ERROR;
+                }
+            };
+
+            apdu.lc = DES_LEN_3DES as u8 + 3;
+            apdu.data[0] = YKPIV_ALGO_3DES;
+            apdu.data[1] = YKPIV_KEY_CARDMGM;
+            apdu.data[2] = DES_LEN_3DES as u8;
+            memcpy(
+                apdu.data.as_mut_ptr().offset(3) as *mut c_void,
+                new_key as *const c_void,
+                DES_LEN_3DES,
+            );
+        } else {
+            res = _send_data(
+                state,
+                &mut apdu as (*mut APDU),
+                data.as_mut_ptr(),
+                &mut recv_len as (*mut u32),
+                &mut sw as (*mut i32),
+            );
+
+            if res != ErrorKind::YKPIV_OK {
                 if !(sw == 0x9000i32) {
-                    res = Enum5::YKPIV_GENERIC_ERROR;
+                    res = ErrorKind::YKPIV_GENERIC_ERROR;
                 }
             }
         }
-        memset_s(
-            &mut apdu as (*mut u_APDU) as (*mut ::std::os::raw::c_void),
-            ::std::mem::size_of::<u_APDU>(),
-            0i32,
-            ::std::mem::size_of::<u_APDU>(),
-        );
-        _ykpiv_end_transaction(state);
-        res
     }
+
+    apdu.zeroize();
+    _ykpiv_end_transaction(state);
+    res
 }
 
-static mut hex_translate: *mut u8 = (*b"0123456789abcdef\0").as_ptr() as (*mut u8);
+const HEX_TABLE: &[u8] = b"0123456789abcdef";
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_hex_decode(
+pub fn ykpiv_hex_decode(
     mut hex_in: *const u8,
     mut in_len: usize,
     mut hex_out: *mut u8,
     mut out_len: *mut usize,
-) -> Enum5 {
+) -> ErrorKind {
     let mut _currentBlock;
     let mut i: usize;
     let mut first: bool = true;
-    if *out_len < in_len.wrapping_div(2usize) {
-        Enum5::YKPIV_SIZE_ERROR
-    } else if in_len.wrapping_rem(2usize) != 0usize {
-        Enum5::YKPIV_SIZE_ERROR
-    } else {
-        *out_len = in_len.wrapping_div(2usize);
-        i = 0usize;
-        'loop3: loop {
-            if !(i < in_len) {
-                _currentBlock = 4;
-                break;
-            }
-            let mut ind_ptr: *mut u8 = strchr(
-                hex_translate as (*const u8),
-                tolower(*{
-                    let _old = hex_in;
-                    hex_in = hex_in.offset(1isize);
-                    _old
-                } as (i32)),
-            );
-            let mut index: i32 = 0i32;
-            if ind_ptr.is_null() {
-                _currentBlock = 6;
-                break;
-            }
-            index = ((ind_ptr as (isize)).wrapping_sub(hex_translate as (isize))
-                / ::std::mem::size_of::<u8>() as (isize)) as (i32);
-            if first {
-                *hex_out = (index << 4i32) as (u8);
-            } else {
-                let _rhs = index;
-                let _lhs = &mut *{
-                    let _old = hex_out;
-                    hex_out = hex_out.offset(1isize);
-                    _old
-                };
-                *_lhs = (*_lhs as (i32) | _rhs) as (u8);
-            }
-            first = !first;
-            i = i.wrapping_add(1usize);
+
+    if *out_len < in_len.wrapping_div(2) {
+        return ErrorKind::YKPIV_SIZE_ERROR;
+    }
+
+    if in_len.wrapping_rem(2) != 0 {
+        return ErrorKind::YKPIV_SIZE_ERROR;
+    }
+
+    *out_len = in_len.wrapping_div(2usize);
+    i = 0usize;
+
+    while i < in_len {
+        let mut ind_ptr: *mut c_char = strchr(
+            HEX_TABLE.as_ptr() as *const c_char,
+            tolower(*{
+                let _old = hex_in;
+                hex_in = hex_in.offset(1isize);
+                _old
+            } as (i32)),
+        );
+
+        if ind_ptr.is_null() {
+            _currentBlock = 6;
+            break;
         }
-        (if _currentBlock == 4 {
-            Enum5::YKPIV_OK
+
+        let index = ind_ptr as usize - HEX_TABLE.as_ptr() as usize;
+
+        if first {
+            *hex_out = (index << 4i32) as (u8);
         } else {
-            Enum5::YKPIV_PARSE_ERROR
-        })
+            let _rhs = index;
+
+            let _lhs = &mut *{
+                let _old = hex_out;
+                hex_out = hex_out.offset(1isize);
+                _old
+            };
+
+            *_lhs = (*_lhs as usize | _rhs) as (u8);
+        }
+
+        first = !first;
+        i = i.wrapping_add(1usize);
+    }
+
+    if _currentBlock == 4 {
+        ErrorKind::YKPIV_OK
+    } else {
+        ErrorKind::YKPIV_PARSE_ERROR
     }
 }
 
-unsafe extern "C" fn _general_authenticate(
+unsafe fn _general_authenticate(
     mut state: *mut ykpiv_state,
     mut sign_in: *const u8,
     mut in_len: usize,
@@ -1713,18 +1530,18 @@ unsafe extern "C" fn _general_authenticate(
     mut algorithm: u8,
     mut key: u8,
     mut decipher: bool,
-) -> Enum5 {
+) -> ErrorKind {
     let mut _currentBlock;
     let mut indata: [u8; 1024];
     let mut dataptr: *mut u8 = indata.as_mut_ptr();
     let mut data: [u8; 1024];
     let mut templ: *mut u8 = 0i32 as (*mut u8);
-    let mut recv_len: usize = ::std::mem::size_of::<[u8; 1024]>();
+    let mut recv_len: usize = mem::size_of::<[u8; 1024]>();
     let mut key_len: usize = 0usize;
     let mut sw: i32 = 0i32;
     let mut bytes: usize;
     let mut len: usize = 0usize;
-    let mut res: Enum5;
+    let mut res: ErrorKind;
     if algorithm as (i32) == 0x14i32 {
         _currentBlock = 12;
     } else if algorithm as (i32) == 0x11i32 {
@@ -1735,14 +1552,14 @@ unsafe extern "C" fn _general_authenticate(
             if algorithm as (i32) == 0x6i32 {
                 key_len = 128usize;
             } else {
-                return Enum5::YKPIV_ALGORITHM_ERROR;
+                return ErrorKind::YKPIV_ALGORITHM_ERROR;
             }
         }
         if key_len == 0usize {
             key_len = 256usize;
         }
         if in_len != key_len {
-            return Enum5::YKPIV_SIZE_ERROR;
+            return ErrorKind::YKPIV_SIZE_ERROR;
         } else {
             _currentBlock = 16;
         }
@@ -1752,9 +1569,9 @@ unsafe extern "C" fn _general_authenticate(
             key_len = 48usize;
         }
         if !decipher && (in_len > key_len) {
-            return Enum5::YKPIV_SIZE_ERROR;
+            return ErrorKind::YKPIV_SIZE_ERROR;
         } else if decipher && (in_len != key_len.wrapping_mul(2usize).wrapping_add(1usize)) {
-            return Enum5::YKPIV_SIZE_ERROR;
+            return ErrorKind::YKPIV_SIZE_ERROR;
         }
     }
     if in_len < 0x80usize {
@@ -1793,11 +1610,7 @@ unsafe extern "C" fn _general_authenticate(
         0x81i32
     } as (u8);
     dataptr = dataptr.offset(_ykpiv_set_length(dataptr, in_len) as (isize));
-    memcpy(
-        dataptr as (*mut ::std::os::raw::c_void),
-        sign_in as (*const ::std::os::raw::c_void),
-        in_len,
-    );
+    memcpy(dataptr as (*mut c_void), sign_in as (*const c_void), in_len);
     dataptr = dataptr.offset(in_len as (isize));
     if {
         res = ykpiv_transfer_data(
@@ -1805,81 +1618,60 @@ unsafe extern "C" fn _general_authenticate(
             templ as (*const u8),
             indata.as_mut_ptr() as (*const u8),
             (dataptr as (isize)).wrapping_sub(indata.as_mut_ptr() as (isize))
-                / ::std::mem::size_of::<u8>() as (isize),
+                / mem::size_of::<u8>() as (isize),
             data.as_mut_ptr(),
             &mut recv_len as (*mut usize),
             &mut sw as (*mut i32),
         );
         res
     } as (i32)
-        != Enum5::YKPIV_OK as (i32)
+        != ErrorKind::YKPIV_OK as (i32)
     {
         if (*state).verbose != 0 {
-            fprintf(
-                __stderrp,
-                (*b"Sign command failed to communicate.\n\0").as_ptr(),
-            );
+            eprintln!("Sign command failed to communicate.");
         }
         res
     } else if sw != 0x9000i32 {
         if (*state).verbose != 0 {
-            fprintf(
-                __stderrp,
-                (*b"Failed sign command with code %x.\n\0").as_ptr(),
-                sw,
-            );
+            eprintln!("Failed sign command with code {:x}.\n\0", sw);
         }
         (if sw == 0x6982i32 {
-            Enum5::YKPIV_AUTHENTICATION_ERROR
+            ErrorKind::YKPIV_AUTHENTICATION_ERROR
         } else {
-            Enum5::YKPIV_GENERIC_ERROR
+            ErrorKind::YKPIV_GENERIC_ERROR
         })
     } else if data[0usize] as (i32) != 0x7ci32 {
         if (*state).verbose != 0 {
-            fprintf(
-                __stderrp,
-                (*b"Failed parsing signature reply.\n\0").as_ptr(),
-            );
+            eprintln!("Failed parsing signature reply.");
         }
-        Enum5::YKPIV_PARSE_ERROR
+        ErrorKind::YKPIV_PARSE_ERROR
     } else {
         dataptr = data.as_mut_ptr().offset(1isize);
-        dataptr = dataptr
-            .offset(_ykpiv_get_length(dataptr as (*const u8), &mut len as (*mut usize)) as (isize));
+        dataptr = dataptr.offset(_ykpiv_get_length(dataptr, &mut len as (*mut usize)) as (isize));
         (if *dataptr as (i32) != 0x82i32 {
             if (*state).verbose != 0 {
-                fprintf(
-                    __stderrp,
-                    (*b"Failed parsing signature reply.\n\0").as_ptr(),
-                );
+                eprintln!("Failed parsing signature reply.");
             }
-            Enum5::YKPIV_PARSE_ERROR
+            ErrorKind::YKPIV_PARSE_ERROR
         } else {
             dataptr = dataptr.offset(1isize);
-            dataptr = dataptr
-                .offset(
-                    _ykpiv_get_length(dataptr as (*const u8), &mut len as (*mut usize)) as (isize),
-                );
+            dataptr =
+                dataptr.offset(_ykpiv_get_length(dataptr, &mut len as (*mut usize)) as (isize));
             (if len > *out_len {
                 if (*state).verbose != 0 {
-                    fprintf(__stderrp, (*b"Wrong size on output buffer.\n\0").as_ptr());
+                    eprintln!("Wrong size on output buffer.");
                 }
-                Enum5::YKPIV_SIZE_ERROR
+                ErrorKind::YKPIV_SIZE_ERROR
             } else {
                 *out_len = len;
-                memcpy(
-                    out as (*mut ::std::os::raw::c_void),
-                    dataptr as (*const ::std::os::raw::c_void),
-                    len,
-                );
-                Enum5::YKPIV_OK
+                memcpy(out as (*mut c_void), dataptr as (*const c_void), len);
+                ErrorKind::YKPIV_OK
             })
         })
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_sign_data(
+pub fn ykpiv_sign_data(
     mut state: *mut ykpiv_state,
     mut raw_in: *const u8,
     mut in_len: usize,
@@ -1887,16 +1679,16 @@ pub unsafe extern "C" fn ykpiv_sign_data(
     mut out_len: *mut usize,
     mut algorithm: u8,
     mut key: u8,
-) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_OK;
-    if 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state) == state {
-        Enum5::YKPIV_GENERIC_ERROR
-    } else if Enum5::YKPIV_OK as (i32) != {
+) -> ErrorKind {
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
+    if 0i32 as (*mut c_void) as (*mut ykpiv_state) == state {
+        ErrorKind::YKPIV_GENERIC_ERROR
+    } else if ErrorKind::YKPIV_OK as (i32) != {
         res = _ykpiv_begin_transaction(state);
         res
     } as (i32)
     {
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
         res = _general_authenticate(
             state, raw_in, in_len, sign_out, out_len, algorithm, key, false,
@@ -1906,8 +1698,7 @@ pub unsafe extern "C" fn ykpiv_sign_data(
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_decipher_data(
+pub fn ykpiv_decipher_data(
     mut state: *mut ykpiv_state,
     mut in_: *const u8,
     mut in_len: usize,
@@ -1915,16 +1706,16 @@ pub unsafe extern "C" fn ykpiv_decipher_data(
     mut out_len: *mut usize,
     mut algorithm: u8,
     mut key: u8,
-) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_OK;
-    if 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state) == state {
-        Enum5::YKPIV_GENERIC_ERROR
-    } else if Enum5::YKPIV_OK as (i32) != {
+) -> ErrorKind {
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
+    if 0i32 as (*mut c_void) as (*mut ykpiv_state) == state {
+        ErrorKind::YKPIV_GENERIC_ERROR
+    } else if ErrorKind::YKPIV_OK as (i32) != {
         res = _ykpiv_begin_transaction(state);
         res
     } as (i32)
     {
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
         res = _general_authenticate(state, in_, in_len, out, out_len, algorithm, key, true);
         _ykpiv_end_transaction(state);
@@ -1932,26 +1723,26 @@ pub unsafe extern "C" fn ykpiv_decipher_data(
     }
 }
 
-unsafe extern "C" fn _ykpiv_get_version(
+unsafe fn _ykpiv_get_version(
     mut state: *mut ykpiv_state,
     mut p_version: *mut _ykpiv_version_t,
-) -> Enum5 {
-    let mut apdu: u_APDU;
+) -> ErrorKind {
+    let mut apdu: APDU;
     let mut data: [u8; 261];
-    let mut recv_len: u32 = ::std::mem::size_of::<[u8; 261]>() as (u32);
+    let mut recv_len: u32 = mem::size_of::<[u8; 261]>() as (u32);
     let mut sw: i32;
-    let mut res: Enum5;
+    let mut res: ErrorKind;
     if state.is_null() {
-        Enum5::YKPIV_ARGUMENT_ERROR
+        ErrorKind::YKPIV_ARGUMENT_ERROR
     } else if (*state).ver.major != 0 || (*state).ver.minor != 0 || (*state).ver.patch != 0 {
         if !p_version.is_null() {
             memcpy(
-                p_version as (*mut ::std::os::raw::c_void),
-                &mut (*state).ver as (*mut _ykpiv_version_t) as (*const ::std::os::raw::c_void),
-                ::std::mem::size_of::<_ykpiv_version_t>(),
+                p_version as (*mut c_void),
+                &mut (*state).ver as (*mut _ykpiv_version_t) as (*const c_void),
+                mem::size_of::<_ykpiv_version_t>(),
             );
         }
-        Enum5::YKPIV_OK
+        ErrorKind::YKPIV_OK
     // get version from device
     // FIXME(tarcieri): Translate C code below (should go after the else clause)
     /*
@@ -1961,47 +1752,45 @@ unsafe extern "C" fn _ykpiv_get_version(
     } else if {
         res = _send_data(
             state,
-            &mut apdu as (*mut u_APDU),
+            &mut apdu as (*mut APDU),
             data.as_mut_ptr(),
             &mut recv_len as (*mut u32),
             &mut sw as (*mut i32),
         );
         res
     } as (i32)
-        != Enum5::YKPIV_OK as (i32)
+        != ErrorKind::YKPIV_OK as (i32)
     {
         res
     } else {
         if sw == 0x9000i32 {
             if recv_len < 3u32 {
-                return Enum5::YKPIV_SIZE_ERROR;
+                return ErrorKind::YKPIV_SIZE_ERROR;
             } else {
                 (*state).ver.major = data[0usize];
                 (*state).ver.minor = data[1usize];
                 (*state).ver.patch = data[2usize];
                 if !p_version.is_null() {
                     memcpy(
-                        p_version as (*mut ::std::os::raw::c_void),
-                        &mut (*state).ver as (*mut _ykpiv_version_t)
-                            as (*const ::std::os::raw::c_void),
-                        ::std::mem::size_of::<_ykpiv_version_t>(),
+                        p_version as (*mut c_void),
+                        &mut (*state).ver as (*mut _ykpiv_version_t) as (*const c_void),
+                        mem::size_of::<_ykpiv_version_t>(),
                     );
                 }
             }
         } else {
-            res = Enum5::YKPIV_GENERIC_ERROR;
+            res = ErrorKind::YKPIV_GENERIC_ERROR;
         }
         res
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_get_version(
+pub fn ykpiv_get_version(
     mut state: *mut ykpiv_state,
     mut version: *mut u8,
     mut len: usize,
-) -> Enum5 {
-    let mut res: Enum5;
+) -> ErrorKind {
+    let mut res: ErrorKind;
     let mut result: i32 = 0i32;
     let mut ver: _ykpiv_version_t = _ykpiv_version_t {
         major: 0u8,
@@ -2012,21 +1801,21 @@ pub unsafe extern "C" fn ykpiv_get_version(
         res = _ykpiv_begin_transaction(state);
         res
     } as (i32)
-        < Enum5::YKPIV_OK as (i32)
+        < ErrorKind::YKPIV_OK as (i32)
     {
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
         if !({
             res = _ykpiv_ensure_application_selected(state);
             res
         } as (i32)
-            < Enum5::YKPIV_OK as (i32))
+            < ErrorKind::YKPIV_OK as (i32))
         {
             if {
                 res = _ykpiv_get_version(state, &mut ver as (*mut _ykpiv_version_t));
                 res
             } as (i32)
-                >= Enum5::YKPIV_OK as (i32)
+                >= ErrorKind::YKPIV_OK as (i32)
             {
                 result = snprintf(
                     version,
@@ -2037,7 +1826,7 @@ pub unsafe extern "C" fn ykpiv_get_version(
                     ver.patch as (i32),
                 );
                 if result < 0i32 {
-                    res = Enum5::YKPIV_SIZE_ERROR;
+                    res = ErrorKind::YKPIV_SIZE_ERROR;
                 }
             }
         }
@@ -2046,30 +1835,30 @@ pub unsafe extern "C" fn ykpiv_get_version(
     }
 }
 
-unsafe extern "C" fn _ykpiv_get_serial(
+unsafe fn _ykpiv_get_serial(
     mut state: *mut ykpiv_state,
     mut p_serial: *mut u32,
     mut f_force: bool,
-) -> Enum5 {
+) -> ErrorKind {
     let mut _currentBlock;
-    let mut res: Enum5 = Enum5::YKPIV_OK;
-    let mut apdu: u_APDU;
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
+    let mut apdu: APDU;
     let mut yk_applet: *const u8 = 0xa0i32 as (*const u8);
     let mut data: [u8; 255];
-    let mut recv_len: u32 = ::std::mem::size_of::<[u8; 255]>() as (u32);
+    let mut recv_len: u32 = mem::size_of::<[u8; 255]>() as (u32);
     let mut sw: i32;
-    let mut p_temp: *mut u8 = 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8);
+    let mut p_temp: *mut u8 = 0i32 as (*mut c_void) as (*mut u8);
     if state.is_null() {
-        Enum5::YKPIV_ARGUMENT_ERROR
+        ErrorKind::YKPIV_ARGUMENT_ERROR
     } else if !f_force && ((*state).serial != 0u32) {
         if !p_serial.is_null() {
             *p_serial = (*state).serial;
         }
-        Enum5::YKPIV_OK
+        ErrorKind::YKPIV_OK
     } else {
         if (*state).ver.major as (i32) < 5i32 {
             let mut temp: [u8; 255];
-            recv_len = ::std::mem::size_of::<[u8; 255]>() as (u32);
+            recv_len = mem::size_of::<[u8; 255]>() as (u32);
             // FIXME(tarcieri): Translate C code below
             /*
                 memset(apdu.raw, 0, sizeof(apdu));
@@ -2081,20 +1870,19 @@ unsafe extern "C" fn _ykpiv_get_serial(
             if {
                 res = _send_data(
                     state,
-                    &mut apdu as (*mut u_APDU),
+                    &mut apdu as (*mut APDU),
                     temp.as_mut_ptr(),
                     &mut recv_len as (*mut u32),
                     &mut sw as (*mut i32),
                 );
                 res
             } as (i32)
-                < Enum5::YKPIV_OK as (i32)
+                < ErrorKind::YKPIV_OK as (i32)
             {
                 if (*state).verbose != 0 {
-                    fprintf(
-                        __stderrp,
-                        (*b"Failed communicating with card: \'%s\'\n\0").as_ptr(),
-                        ykpiv_strerror(res),
+                    eprintln!(
+                        "Failed communicating with card: \'{}\'",
+                        ykpiv_strerror(res)
                     );
                     _currentBlock = 37;
                 } else {
@@ -2102,16 +1890,12 @@ unsafe extern "C" fn _ykpiv_get_serial(
                 }
             } else if sw != 0x9000i32 {
                 if (*state).verbose != 0 {
-                    fprintf(
-                        __stderrp,
-                        (*b"Failed selecting yk application: %04x\n\0").as_ptr(),
-                        sw,
-                    );
+                    eprintln!("Failed selecting yk application: {:04x}", sw);
                 }
-                res = Enum5::YKPIV_GENERIC_ERROR;
+                res = ErrorKind::YKPIV_GENERIC_ERROR;
                 _currentBlock = 37;
             } else {
-                recv_len = ::std::mem::size_of::<[u8; 255]>() as (u32);
+                recv_len = mem::size_of::<[u8; 255]>() as (u32);
                 // FIXME(tarcieri): Translate C code below
                 /*
                   memset(apdu.raw, 0, sizeof(apdu));
@@ -2122,20 +1906,19 @@ unsafe extern "C" fn _ykpiv_get_serial(
                 if {
                     res = _send_data(
                         state,
-                        &mut apdu as (*mut u_APDU),
+                        &mut apdu as (*mut APDU),
                         data.as_mut_ptr(),
                         &mut recv_len as (*mut u32),
                         &mut sw as (*mut i32),
                     );
                     res
                 } as (i32)
-                    < Enum5::YKPIV_OK as (i32)
+                    < ErrorKind::YKPIV_OK as (i32)
                 {
                     if (*state).verbose != 0 {
-                        fprintf(
-                            __stderrp,
-                            (*b"Failed communicating with card: \'%s\'\n\0").as_ptr(),
-                            ykpiv_strerror(res),
+                        eprintln!(
+                            "Failed communicating with card: \'{}\'",
+                            ykpiv_strerror(res)
                         );
                         _currentBlock = 37;
                     } else {
@@ -2143,16 +1926,12 @@ unsafe extern "C" fn _ykpiv_get_serial(
                     }
                 } else if sw != 0x9000i32 {
                     if (*state).verbose != 0 {
-                        fprintf(
-                            __stderrp,
-                            (*b"Failed retrieving serial number: %04x\n\0").as_ptr(),
-                            sw,
-                        );
+                        eprintln!("Failed retrieving serial number: {:04x}", sw);
                     }
-                    res = Enum5::YKPIV_GENERIC_ERROR;
+                    res = ErrorKind::YKPIV_GENERIC_ERROR;
                     _currentBlock = 37;
                 } else {
-                    recv_len = ::std::mem::size_of::<[u8; 255]>() as (u32);
+                    recv_len = mem::size_of::<[u8; 255]>() as (u32);
                     // FIXME(tarcieri): Translate C code below
                     /*
                       memset(apdu.raw, 0, sizeof(apdu));
@@ -2164,32 +1943,27 @@ unsafe extern "C" fn _ykpiv_get_serial(
                     if {
                         res = _send_data(
                             state,
-                            &mut apdu as (*mut u_APDU),
+                            &mut apdu as (*mut APDU),
                             temp.as_mut_ptr(),
                             &mut recv_len as (*mut u32),
                             &mut sw as (*mut i32),
                         );
                         res
                     } as (i32)
-                        < Enum5::YKPIV_OK as (i32)
+                        < ErrorKind::YKPIV_OK as (i32)
                     {
                         if (*state).verbose != 0 {
-                            fprintf(
-                                __stderrp,
-                                (*b"Failed communicating with card: \'%s\'\n\0").as_ptr(),
-                                ykpiv_strerror(res),
+                            eprintln!(
+                                "Failed communicating with card: \'{}\'",
+                                ykpiv_strerror(res)
                             );
                         }
                         return res;
                     } else if sw != 0x9000i32 {
                         if (*state).verbose != 0 {
-                            fprintf(
-                                __stderrp,
-                                (*b"Failed selecting application: %04x\n\0").as_ptr(),
-                                sw,
-                            );
+                            eprintln!("Failed selecting application: {:04x}", sw);
                         }
-                        return Enum5::YKPIV_GENERIC_ERROR;
+                        return ErrorKind::YKPIV_GENERIC_ERROR;
                     }
                     _currentBlock = 17;
                 }
@@ -2205,38 +1979,33 @@ unsafe extern "C" fn _ykpiv_get_serial(
             if {
                 res = _send_data(
                     state,
-                    &mut apdu as (*mut u_APDU),
+                    &mut apdu as (*mut APDU),
                     data.as_mut_ptr(),
                     &mut recv_len as (*mut u32),
                     &mut sw as (*mut i32),
                 );
                 res
             } as (i32)
-                != Enum5::YKPIV_OK as (i32)
+                != ErrorKind::YKPIV_OK as (i32)
             {
                 if (*state).verbose != 0 {
-                    fprintf(
-                        __stderrp,
-                        (*b"Failed communicating with card: \'%s\'\n\0").as_ptr(),
-                        ykpiv_strerror(res),
+                    eprintln!(
+                        "Failed communicating with card: \'{}\'",
+                        ykpiv_strerror(res)
                     );
                 }
                 return res;
             } else if sw != 0x9000i32 {
                 if (*state).verbose != 0 {
-                    fprintf(
-                        __stderrp,
-                        (*b"Failed retrieving serial number: %04x\n\0").as_ptr(),
-                        sw,
-                    );
+                    eprintln!("Failed retrieving serial number: {:04x}", sw);
                 }
-                return Enum5::YKPIV_GENERIC_ERROR;
+                return ErrorKind::YKPIV_GENERIC_ERROR;
             }
             _currentBlock = 17;
         }
         if _currentBlock == 17 {
             if recv_len < 4u32 {
-                return Enum5::YKPIV_SIZE_ERROR;
+                return ErrorKind::YKPIV_SIZE_ERROR;
             } else {
                 p_temp = &mut (*state).serial as (*mut u32) as (*mut u8);
                 *{
@@ -2268,25 +2037,21 @@ unsafe extern "C" fn _ykpiv_get_serial(
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_get_serial(
-    mut state: *mut ykpiv_state,
-    mut p_serial: *mut u32,
-) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_OK;
+pub fn ykpiv_get_serial(mut state: *mut ykpiv_state, mut p_serial: *mut u32) -> ErrorKind {
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
     if {
         res = _ykpiv_begin_transaction(state);
         res
     } as (i32)
-        != Enum5::YKPIV_OK as (i32)
+        != ErrorKind::YKPIV_OK as (i32)
     {
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
         if !({
             res = _ykpiv_ensure_application_selected(state);
             res
         } as (i32)
-            != Enum5::YKPIV_OK as (i32))
+            != ErrorKind::YKPIV_OK as (i32))
         {
             res = _ykpiv_get_serial(state, p_serial, false);
         }
@@ -2295,75 +2060,69 @@ pub unsafe extern "C" fn ykpiv_get_serial(
     }
 }
 
-unsafe extern "C" fn _cache_pin(
+unsafe fn _cache_pin(
     mut state: *mut ykpiv_state,
-    mut pin: *const u8,
+    mut pin: *const c_char,
     mut len: usize,
-) -> Enum5 {
+) -> ErrorKind {
     if state.is_null() {
-        Enum5::YKPIV_ARGUMENT_ERROR
-    } else if !pin.is_null() && ((*state).pin as (*const u8) == pin) {
-        Enum5::YKPIV_OK
-    } else {
-        if !(*state).pin.is_null() {
-            memset_s(
-                (*state).pin as (*mut ::std::os::raw::c_void),
-                strnlen((*state).pin as (*const u8), 8usize),
-                0i32,
-                strnlen((*state).pin as (*const u8), 8usize),
-            );
-            _ykpiv_free(state, (*state).pin as (*mut ::std::os::raw::c_void));
-            (*state).pin = 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8);
-        }
-        if !pin.is_null() && (len > 0usize) {
-            (*state).pin = _ykpiv_alloc(
-                state,
-                len.wrapping_mul(::std::mem::size_of::<u8>())
-                    .wrapping_add(1usize),
-            ) as (*mut u8);
-            if (*state).pin == 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8) {
-                return Enum5::YKPIV_MEMORY_ERROR;
-            } else {
-                memcpy(
-                    (*state).pin as (*mut ::std::os::raw::c_void),
-                    pin as (*const ::std::os::raw::c_void),
-                    len,
-                );
-                *(*state).pin.offset(len as (isize)) = 0u8;
-            }
-        }
-        Enum5::YKPIV_OK
+        return ErrorKind::YKPIV_ARGUMENT_ERROR;
     }
+
+    if !pin.is_null() && ((*state).pin as *const c_char == pin) {
+        return ErrorKind::YKPIV_OK;
+    }
+
+    if !(*state).pin.is_null() {
+        memset_s(
+            (*state).pin as (*mut c_void),
+            strnlen((*state).pin as *const c_char, 8),
+            0,
+            strnlen((*state).pin as *const c_char, 8),
+        );
+        free((*state).pin as (*mut c_void));
+        (*state).pin = ptr::null_mut();
+    }
+    if !pin.is_null() && (len > 0) {
+        (*state).pin = malloc(len + 1) as (*mut u8);
+        if (*state).pin == 0i32 as (*mut c_void) as (*mut u8) {
+            return ErrorKind::YKPIV_MEMORY_ERROR;
+        } else {
+            memcpy((*state).pin as (*mut c_void), pin as (*const c_void), len);
+            *(*state).pin.offset(len as (isize)) = 0u8;
+        }
+    }
+
+    ErrorKind::YKPIV_OK
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_verify(
+pub fn ykpiv_verify(
     mut state: *mut ykpiv_state,
-    mut pin: *const u8,
+    mut pin: *const c_char,
     mut tries: *mut i32,
-) -> Enum5 {
+) -> ErrorKind {
     ykpiv_verify_select(
         state,
         pin,
-        if !pin.is_null() { strlen(pin) } else { 0usize },
+        if !pin.is_null() { strlen(pin) } else { 0 },
         tries,
         false,
     )
 }
 
-unsafe extern "C" fn _verify(
+unsafe fn _verify(
     mut state: *mut ykpiv_state,
-    mut pin: *const u8,
+    mut pin: *const c_char,
     pin_len: usize,
     mut tries: *mut i32,
-) -> Enum5 {
-    let mut apdu: u_APDU;
+) -> ErrorKind {
+    let mut apdu: APDU;
     let mut data: [u8; 261];
-    let mut recv_len: u32 = ::std::mem::size_of::<[u8; 261]>() as (u32);
+    let mut recv_len: u32 = mem::size_of::<[u8; 261]>() as (u32);
     let mut sw: i32;
-    let mut res: Enum5;
+    let mut res: ErrorKind;
     if pin_len > 8usize {
-        Enum5::YKPIV_SIZE_ERROR
+        ErrorKind::YKPIV_SIZE_ERROR
     } else {
         // FIXME(tarcieri): Translate C code below
         /*
@@ -2381,18 +2140,18 @@ unsafe extern "C" fn _verify(
         */
         res = _send_data(
             state,
-            &mut apdu as (*mut u_APDU),
+            &mut apdu as (*mut APDU),
             data.as_mut_ptr(),
             &mut recv_len as (*mut u32),
             &mut sw as (*mut i32),
         );
         memset_s(
-            &mut apdu as (*mut u_APDU) as (*mut ::std::os::raw::c_void),
-            ::std::mem::size_of::<u_APDU>(),
+            &mut apdu as (*mut APDU) as (*mut c_void),
+            mem::size_of::<APDU>(),
             0i32,
-            ::std::mem::size_of::<u_APDU>(),
+            mem::size_of::<APDU>(),
         );
-        (if res as (i32) != Enum5::YKPIV_OK as (i32) {
+        (if res as (i32) != ErrorKind::YKPIV_OK as (i32) {
             res
         } else if sw == 0x9000i32 {
             if !pin.is_null() && (pin_len != 0) {
@@ -2401,42 +2160,41 @@ unsafe extern "C" fn _verify(
             if !tries.is_null() {
                 *tries = sw & 0xfi32;
             }
-            Enum5::YKPIV_OK
+            ErrorKind::YKPIV_OK
         } else if sw >> 8i32 == 0x63i32 {
             if !tries.is_null() {
                 *tries = sw & 0xfi32;
             }
-            Enum5::YKPIV_WRONG_PIN
+            ErrorKind::YKPIV_WRONG_PIN
         } else if sw == 0x6983i32 {
             if !tries.is_null() {
                 *tries = 0i32;
             }
-            Enum5::YKPIV_WRONG_PIN
+            ErrorKind::YKPIV_WRONG_PIN
         } else {
-            Enum5::YKPIV_GENERIC_ERROR
+            ErrorKind::YKPIV_GENERIC_ERROR
         })
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_verify_select(
+pub fn ykpiv_verify_select(
     mut state: *mut ykpiv_state,
-    mut pin: *const u8,
+    mut pin: *const c_char,
     pin_len: usize,
     mut tries: *mut i32,
     mut force_select: bool,
-) -> Enum5 {
+) -> ErrorKind {
     let mut _currentBlock;
-    let mut res: Enum5 = Enum5::YKPIV_OK;
-    if Enum5::YKPIV_OK as (i32) != {
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
+    if ErrorKind::YKPIV_OK as (i32) != {
         res = _ykpiv_begin_transaction(state);
         res
     } as (i32)
     {
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
         if force_select {
-            if Enum5::YKPIV_OK as (i32) != {
+            if ErrorKind::YKPIV_OK as (i32) != {
                 res = _ykpiv_ensure_application_selected(state);
                 res
             } as (i32)
@@ -2456,62 +2214,54 @@ pub unsafe extern "C" fn ykpiv_verify_select(
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_get_pin_retries(
-    mut state: *mut ykpiv_state,
-    mut tries: *mut i32,
-) -> Enum5 {
-    let mut res: Enum5;
-    let mut ykrc: Enum5;
-    if 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state) == state
-        || 0i32 as (*mut ::std::os::raw::c_void) as (*mut i32) == tries
-    {
-        Enum5::YKPIV_ARGUMENT_ERROR
+pub fn ykpiv_get_pin_retries(mut state: *mut ykpiv_state, mut tries: *mut i32) -> ErrorKind {
+    let mut res: ErrorKind;
+    let mut ykrc: ErrorKind;
+
+    if state.is_null() || tries.is_null() {
+        return ErrorKind::YKPIV_ARGUMENT_ERROR;
+    }
+
+    res = _ykpiv_select_application(state);
+
+    if res != ErrorKind::YKPIV_OK {
+        return res;
+    }
+
+    ykrc = ykpiv_verify(state, ptr::null(), tries);
+
+    if ykrc == ErrorKind::YKPIV_WRONG_PIN {
+        ErrorKind::YKPIV_OK
     } else {
-        res = _ykpiv_select_application(state);
-        (if res as (i32) != Enum5::YKPIV_OK as (i32) {
-            res
-        } else {
-            ykrc = ykpiv_verify(
-                state,
-                0i32 as (*mut ::std::os::raw::c_void) as (*const u8),
-                tries,
-            );
-            (if ykrc as (i32) == Enum5::YKPIV_WRONG_PIN as (i32) {
-                Enum5::YKPIV_OK as (i32)
-            } else {
-                ykrc as (i32)
-            }) as (Enum5)
-        })
+        ykrc
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_set_pin_retries(
+pub fn ykpiv_set_pin_retries(
     mut state: *mut ykpiv_state,
     mut pin_tries: i32,
     mut puk_tries: i32,
-) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_OK;
+) -> ErrorKind {
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
     let mut templ: *mut u8 = 0i32 as (*mut u8);
     let mut data: [u8; 255];
-    let mut recv_len: usize = ::std::mem::size_of::<[u8; 255]>();
+    let mut recv_len: usize = mem::size_of::<[u8; 255]>();
     let mut sw: i32 = 0i32;
     if pin_tries == 0i32 || puk_tries == 0i32 {
-        Enum5::YKPIV_OK
+        ErrorKind::YKPIV_OK
     } else if pin_tries > 0xffi32 || puk_tries > 0xffi32 || pin_tries < 1i32 || puk_tries < 1i32 {
-        Enum5::YKPIV_RANGE_ERROR
+        ErrorKind::YKPIV_RANGE_ERROR
     } else {
         *templ.offset(2isize) = pin_tries as (u8);
         *templ.offset(3isize) = puk_tries as (u8);
-        (if Enum5::YKPIV_OK as (i32) != {
+        (if ErrorKind::YKPIV_OK as (i32) != {
             res = _ykpiv_begin_transaction(state);
             res
         } as (i32)
         {
-            Enum5::YKPIV_PCSC_ERROR
+            ErrorKind::YKPIV_PCSC_ERROR
         } else {
-            if !(Enum5::YKPIV_OK as (i32) != {
+            if !(ErrorKind::YKPIV_OK as (i32) != {
                 res = _ykpiv_ensure_application_selected(state);
                 res
             } as (i32))
@@ -2519,20 +2269,20 @@ pub unsafe extern "C" fn ykpiv_set_pin_retries(
                 res = ykpiv_transfer_data(
                     state,
                     templ as (*const u8),
-                    0i32 as (*mut ::std::os::raw::c_void) as (*const u8),
+                    0i32 as (*mut c_void) as (*const u8),
                     0isize,
                     data.as_mut_ptr(),
                     &mut recv_len as (*mut usize),
                     &mut sw as (*mut i32),
                 );
-                if Enum5::YKPIV_OK as (i32) == res as (i32) {
+                if ErrorKind::YKPIV_OK as (i32) == res as (i32) {
                     if !(0x9000i32 == sw) {
                         if sw == 0x6983i32 {
-                            res = Enum5::YKPIV_AUTHENTICATION_ERROR;
+                            res = ErrorKind::YKPIV_AUTHENTICATION_ERROR;
                         } else if sw == 0x6982i32 {
-                            res = Enum5::YKPIV_AUTHENTICATION_ERROR;
+                            res = ErrorKind::YKPIV_AUTHENTICATION_ERROR;
                         } else {
-                            res = Enum5::YKPIV_GENERIC_ERROR;
+                            res = ErrorKind::YKPIV_GENERIC_ERROR;
                         }
                     }
                 }
@@ -2543,25 +2293,25 @@ pub unsafe extern "C" fn ykpiv_set_pin_retries(
     }
 }
 
-unsafe extern "C" fn _ykpiv_change_pin(
+unsafe fn _ykpiv_change_pin(
     mut state: *mut ykpiv_state,
     mut action: i32,
-    mut current_pin: *const u8,
+    mut current_pin: *const c_char,
     mut current_pin_len: usize,
-    mut new_pin: *const u8,
+    mut new_pin: *const c_char,
     mut new_pin_len: usize,
     mut tries: *mut i32,
-) -> Enum5 {
+) -> ErrorKind {
     let mut sw: i32;
     let mut templ: *mut u8 = 0i32 as (*mut u8);
     let mut indata: [u8; 16];
     let mut data: [u8; 255];
-    let mut recv_len: usize = ::std::mem::size_of::<[u8; 255]>();
-    let mut res: Enum5;
+    let mut recv_len: usize = mem::size_of::<[u8; 255]>();
+    let mut res: ErrorKind;
     if current_pin_len > 8usize {
-        Enum5::YKPIV_SIZE_ERROR
+        ErrorKind::YKPIV_SIZE_ERROR
     } else if new_pin_len > 8usize {
-        Enum5::YKPIV_SIZE_ERROR
+        ErrorKind::YKPIV_SIZE_ERROR
     } else {
         if action == 1i32 {
             *templ.offset(1isize) = 0x2cu8;
@@ -2569,21 +2319,20 @@ unsafe extern "C" fn _ykpiv_change_pin(
             *templ.offset(3isize) = 0x81u8;
         }
         memcpy(
-            indata.as_mut_ptr() as (*mut ::std::os::raw::c_void),
-            current_pin as (*const ::std::os::raw::c_void),
+            indata.as_mut_ptr() as (*mut c_void),
+            current_pin as (*const c_void),
             current_pin_len,
         );
         if current_pin_len < 8usize {
             memset(
-                indata.as_mut_ptr().offset(current_pin_len as (isize))
-                    as (*mut ::std::os::raw::c_void),
+                indata.as_mut_ptr().offset(current_pin_len as (isize)) as (*mut c_void),
                 0xffi32,
                 8usize.wrapping_sub(current_pin_len),
             );
         }
         memcpy(
-            indata.as_mut_ptr().offset(8isize) as (*mut ::std::os::raw::c_void),
-            new_pin as (*const ::std::os::raw::c_void),
+            indata.as_mut_ptr().offset(8isize) as (*mut c_void),
+            new_pin as (*const c_void),
             new_pin_len,
         );
         if new_pin_len < 8usize {
@@ -2591,8 +2340,7 @@ unsafe extern "C" fn _ykpiv_change_pin(
                 indata
                     .as_mut_ptr()
                     .offset(8isize)
-                    .offset(new_pin_len as (isize))
-                    as (*mut ::std::os::raw::c_void),
+                    .offset(new_pin_len as (isize)) as (*mut c_void),
                 0xffi32,
                 8usize.wrapping_sub(new_pin_len),
             );
@@ -2601,140 +2349,120 @@ unsafe extern "C" fn _ykpiv_change_pin(
             state,
             templ as (*const u8),
             indata.as_mut_ptr() as (*const u8),
-            ::std::mem::size_of::<[u8; 16]>() as (isize),
+            mem::size_of::<[u8; 16]>() as (isize),
             data.as_mut_ptr(),
             &mut recv_len as (*mut usize),
             &mut sw as (*mut i32),
         );
         memset_s(
-            indata.as_mut_ptr() as (*mut ::std::os::raw::c_void),
-            ::std::mem::size_of::<[u8; 16]>(),
+            indata.as_mut_ptr() as (*mut c_void),
+            mem::size_of::<[u8; 16]>(),
             0i32,
-            ::std::mem::size_of::<[u8; 16]>(),
+            mem::size_of::<[u8; 16]>(),
         );
-        (if res as (i32) != Enum5::YKPIV_OK as (i32) {
+        (if res as (i32) != ErrorKind::YKPIV_OK as (i32) {
             res
         } else if sw != 0x9000i32 {
             (if sw >> 8i32 == 0x63i32 {
                 if !tries.is_null() {
                     *tries = sw & 0xfi32;
                 }
-                Enum5::YKPIV_WRONG_PIN
+                ErrorKind::YKPIV_WRONG_PIN
             } else if sw == 0x6983i32 {
-                Enum5::YKPIV_PIN_LOCKED
+                ErrorKind::YKPIV_PIN_LOCKED
             } else {
                 if (*state).verbose != 0 {
-                    fprintf(
-                        __stderrp,
-                        (*b"Failed changing pin, token response code: %x.\n\0").as_ptr(),
-                        sw,
-                    );
+                    eprintln!("Failed changing pin, token response code: {:x}.", sw);
                 }
-                Enum5::YKPIV_GENERIC_ERROR
+                ErrorKind::YKPIV_GENERIC_ERROR
             })
         } else {
-            Enum5::YKPIV_OK
+            ErrorKind::YKPIV_OK
         })
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_change_pin(
+pub fn ykpiv_change_pin(
     mut state: *mut ykpiv_state,
-    mut current_pin: *const u8,
+    mut current_pin: *const c_char,
     mut current_pin_len: usize,
-    mut new_pin: *const u8,
+    mut new_pin: *const c_char,
     mut new_pin_len: usize,
     mut tries: *mut i32,
-) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_GENERIC_ERROR;
-    if Enum5::YKPIV_OK as (i32) != {
-        res = _ykpiv_begin_transaction(state);
-        res
-    } as (i32)
-    {
-        Enum5::YKPIV_PCSC_ERROR
-    } else {
-        if !(Enum5::YKPIV_OK as (i32) != {
-            res = _ykpiv_ensure_application_selected(state);
-            res
-        } as (i32))
-        {
-            res = _ykpiv_change_pin(
-                state,
-                0i32,
-                current_pin,
-                current_pin_len,
-                new_pin,
-                new_pin_len,
-                tries,
-            );
-            if res as (i32) == Enum5::YKPIV_OK as (i32)
-                && (new_pin != 0i32 as (*mut ::std::os::raw::c_void) as (*const u8))
-            {
-                _cache_pin(state, new_pin, new_pin_len);
-            }
-        }
-        _ykpiv_end_transaction(state);
-        res
+) -> ErrorKind {
+    let mut res: ErrorKind = ErrorKind::YKPIV_GENERIC_ERROR;
+
+    if _ykpiv_begin_transaction(state) != ErrorKind::YKPIV_OK {
+        return ErrorKind::YKPIV_PCSC_ERROR;
     }
+
+    if _ykpiv_ensure_application_selected(state) == ErrorKind::YKPIV_OK {
+        res = _ykpiv_change_pin(
+            state,
+            0i32,
+            current_pin,
+            current_pin_len,
+            new_pin,
+            new_pin_len,
+            tries,
+        );
+
+        if res == ErrorKind::YKPIV_OK && !new_pin.is_null() {
+            _cache_pin(state, new_pin, new_pin_len);
+        }
+    }
+
+    _ykpiv_end_transaction(state);
+    res
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_change_puk(
+pub fn ykpiv_change_puk(
     mut state: *mut ykpiv_state,
-    mut current_puk: *const u8,
+    mut current_puk: *const c_char,
     mut current_puk_len: usize,
-    mut new_puk: *const u8,
+    mut new_puk: *const c_char,
     mut new_puk_len: usize,
     mut tries: *mut i32,
-) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_GENERIC_ERROR;
-    if Enum5::YKPIV_OK as (i32) != {
-        res = _ykpiv_begin_transaction(state);
-        res
-    } as (i32)
-    {
-        Enum5::YKPIV_PCSC_ERROR
-    } else {
-        if !(Enum5::YKPIV_OK as (i32) != {
-            res = _ykpiv_ensure_application_selected(state);
-            res
-        } as (i32))
-        {
-            res = _ykpiv_change_pin(
-                state,
-                2i32,
-                current_puk,
-                current_puk_len,
-                new_puk,
-                new_puk_len,
-                tries,
-            );
-        }
-        _ykpiv_end_transaction(state);
-        res
+) -> ErrorKind {
+    let mut res = ErrorKind::YKPIV_GENERIC_ERROR;
+
+    if _ykpiv_begin_transaction(state) != ErrorKind::YKPIV_OK {
+        return ErrorKind::YKPIV_PCSC_ERROR;
     }
+
+    if _ykpiv_ensure_application_selected(state) == ErrorKind::YKPIV_OK {
+        res = _ykpiv_change_pin(
+            state,
+            2,
+            current_puk,
+            current_puk_len,
+            new_puk,
+            new_puk_len,
+            tries,
+        );
+    }
+
+    _ykpiv_end_transaction(state);
+    res
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_unblock_pin(
+pub fn ykpiv_unblock_pin(
     mut state: *mut ykpiv_state,
-    mut puk: *const u8,
+    mut puk: *const c_char,
     mut puk_len: usize,
-    mut new_pin: *const u8,
+    mut new_pin: *const c_char,
     mut new_pin_len: usize,
     mut tries: *mut i32,
-) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_GENERIC_ERROR;
-    if Enum5::YKPIV_OK as (i32) != {
+) -> ErrorKind {
+    let mut res: ErrorKind = ErrorKind::YKPIV_GENERIC_ERROR;
+    if ErrorKind::YKPIV_OK as (i32) != {
         res = _ykpiv_begin_transaction(state);
         res
     } as (i32)
     {
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
-        if !(Enum5::YKPIV_OK as (i32) != {
+        if !(ErrorKind::YKPIV_OK as (i32) != {
             res = _ykpiv_ensure_application_selected(state);
             res
         } as (i32))
@@ -2746,22 +2474,21 @@ pub unsafe extern "C" fn ykpiv_unblock_pin(
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_fetch_object(
+pub fn ykpiv_fetch_object(
     mut state: *mut ykpiv_state,
     mut object_id: i32,
     mut data: *mut u8,
     mut len: *mut usize,
-) -> Enum5 {
-    let mut res: Enum5;
-    if Enum5::YKPIV_OK as (i32) != {
+) -> ErrorKind {
+    let mut res: ErrorKind;
+    if ErrorKind::YKPIV_OK as (i32) != {
         res = _ykpiv_begin_transaction(state);
         res
     } as (i32)
     {
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
-        if !(Enum5::YKPIV_OK as (i32) != {
+        if !(ErrorKind::YKPIV_OK as (i32) != {
             res = _ykpiv_ensure_application_selected(state);
             res
         } as (i32))
@@ -2773,7 +2500,7 @@ pub unsafe extern "C" fn ykpiv_fetch_object(
     }
 }
 
-unsafe extern "C" fn set_object(mut object_id: i32, mut buffer: *mut u8) -> *mut u8 {
+unsafe fn set_object(mut object_id: i32, mut buffer: *mut u8) -> *mut u8 {
     *{
         let _old = buffer;
         buffer = buffer.offset(1isize);
@@ -2815,35 +2542,34 @@ unsafe extern "C" fn set_object(mut object_id: i32, mut buffer: *mut u8) -> *mut
     buffer
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_fetch_object(
+pub fn _ykpiv_fetch_object(
     mut state: *mut ykpiv_state,
     mut object_id: i32,
     mut data: *mut u8,
     mut len: *mut usize,
-) -> Enum5 {
+) -> ErrorKind {
     let mut sw: i32;
     let mut indata: [u8; 5];
     let mut inptr: *mut u8 = indata.as_mut_ptr();
     let mut templ: *mut u8 = 0i32 as (*mut u8);
-    let mut res: Enum5;
+    let mut res: ErrorKind;
     inptr = set_object(object_id, inptr);
-    if inptr == 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8) {
-        Enum5::YKPIV_INVALID_OBJECT
+    if inptr == 0i32 as (*mut c_void) as (*mut u8) {
+        ErrorKind::YKPIV_INVALID_OBJECT
     } else if {
         res = ykpiv_transfer_data(
             state,
             templ as (*const u8),
             indata.as_mut_ptr() as (*const u8),
             (inptr as (isize)).wrapping_sub(indata.as_mut_ptr() as (isize))
-                / ::std::mem::size_of::<u8>() as (isize),
+                / mem::size_of::<u8>() as (isize),
             data,
             len,
             &mut sw as (*mut i32),
         );
         res
     } as (i32)
-        != Enum5::YKPIV_OK as (i32)
+        != ErrorKind::YKPIV_OK as (i32)
     {
         res
     } else if sw == 0x9000i32 {
@@ -2855,56 +2581,53 @@ pub unsafe extern "C" fn _ykpiv_fetch_object(
                 (*len).wrapping_sub(1usize),
             )
         {
-            Enum5::YKPIV_SIZE_ERROR
+            ErrorKind::YKPIV_SIZE_ERROR
         } else {
             offs = _ykpiv_get_length(
                 data.offset(1isize) as (*const u8),
                 &mut outlen as (*mut usize),
             );
             (if offs == 0u32 {
-                Enum5::YKPIV_SIZE_ERROR
+                ErrorKind::YKPIV_SIZE_ERROR
             } else if outlen.wrapping_add(offs as (usize)).wrapping_add(1usize) != *len {
                 if (*state).verbose != 0 {
-                    fprintf(
-                          __stderrp,
-                          (*b"Invalid length indicated in object, total objlen is %lu, indicated length is %lu.\0").as_ptr(
-                          ),
+                    eprintln!(
+                          "Invalid length indicated in object, total objlen is {}, indicated length is {}.",
                           *len,
                           outlen
                       );
                 }
-                Enum5::YKPIV_SIZE_ERROR
+                ErrorKind::YKPIV_SIZE_ERROR
             } else {
                 memmove(
-                    data as (*mut ::std::os::raw::c_void),
-                    data.offset(1isize).offset(offs as (isize)) as (*const ::std::os::raw::c_void),
+                    data as (*mut c_void),
+                    data.offset(1isize).offset(offs as (isize)) as (*const c_void),
                     outlen,
                 );
                 *len = outlen;
-                Enum5::YKPIV_OK
+                ErrorKind::YKPIV_OK
             })
         })
     } else {
-        Enum5::YKPIV_GENERIC_ERROR
+        ErrorKind::YKPIV_GENERIC_ERROR
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_save_object(
+pub fn ykpiv_save_object(
     mut state: *mut ykpiv_state,
     mut object_id: i32,
     mut indata: *mut u8,
     mut len: usize,
-) -> Enum5 {
-    let mut res: Enum5;
-    if Enum5::YKPIV_OK as (i32) != {
+) -> ErrorKind {
+    let mut res: ErrorKind;
+    if ErrorKind::YKPIV_OK as (i32) != {
         res = _ykpiv_begin_transaction(state);
         res
     } as (i32)
     {
-        Enum5::YKPIV_PCSC_ERROR
+        ErrorKind::YKPIV_PCSC_ERROR
     } else {
-        if !(Enum5::YKPIV_OK as (i32) != {
+        if !(ErrorKind::YKPIV_OK as (i32) != {
             res = _ykpiv_ensure_application_selected(state);
             res
         } as (i32))
@@ -2916,25 +2639,24 @@ pub unsafe extern "C" fn ykpiv_save_object(
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _ykpiv_save_object(
+pub fn _ykpiv_save_object(
     mut state: *mut ykpiv_state,
     mut object_id: i32,
     mut indata: *mut u8,
     mut len: usize,
-) -> Enum5 {
+) -> ErrorKind {
     let mut data: [u8; 3072];
     let mut dataptr: *mut u8 = data.as_mut_ptr();
     let mut templ: *mut u8 = 0i32 as (*mut u8);
     let mut sw: i32;
-    let mut res: Enum5;
+    let mut res: ErrorKind;
     let mut outlen: usize = 0usize;
-    if len > ::std::mem::size_of::<[u8; 3072]>().wrapping_sub(9usize) {
-        Enum5::YKPIV_SIZE_ERROR
+    if len > mem::size_of::<[u8; 3072]>().wrapping_sub(9usize) {
+        ErrorKind::YKPIV_SIZE_ERROR
     } else {
         dataptr = set_object(object_id, dataptr);
-        (if dataptr == 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8) {
-            Enum5::YKPIV_INVALID_OBJECT
+        (if dataptr == 0i32 as (*mut c_void) as (*mut u8) {
+            ErrorKind::YKPIV_INVALID_OBJECT
         } else {
             *{
                 let _old = dataptr;
@@ -2942,11 +2664,7 @@ pub unsafe extern "C" fn _ykpiv_save_object(
                 _old
             } = 0x53u8;
             dataptr = dataptr.offset(_ykpiv_set_length(dataptr, len) as (isize));
-            memcpy(
-                dataptr as (*mut ::std::os::raw::c_void),
-                indata as (*const ::std::os::raw::c_void),
-                len,
-            );
+            memcpy(dataptr as (*mut c_void), indata as (*const c_void), len);
             dataptr = dataptr.offset(len as (isize));
             (if {
                 res = _ykpiv_transfer_data(
@@ -2954,29 +2672,28 @@ pub unsafe extern "C" fn _ykpiv_save_object(
                     templ as (*const u8),
                     data.as_mut_ptr() as (*const u8),
                     (dataptr as (isize)).wrapping_sub(data.as_mut_ptr() as (isize))
-                        / ::std::mem::size_of::<u8>() as (isize),
-                    0i32 as (*mut ::std::os::raw::c_void) as (*mut u8),
+                        / mem::size_of::<u8>() as (isize),
+                    0i32 as (*mut c_void) as (*mut u8),
                     &mut outlen as (*mut usize),
                     &mut sw as (*mut i32),
                 );
                 res
             } as (i32)
-                != Enum5::YKPIV_OK as (i32)
+                != ErrorKind::YKPIV_OK as (i32)
             {
                 res
             } else if 0x9000i32 == sw {
-                Enum5::YKPIV_OK
+                ErrorKind::YKPIV_OK
             } else if 0x6982i32 == sw {
-                Enum5::YKPIV_AUTHENTICATION_ERROR
+                ErrorKind::YKPIV_AUTHENTICATION_ERROR
             } else {
-                Enum5::YKPIV_GENERIC_ERROR
+                ErrorKind::YKPIV_GENERIC_ERROR
             })
         })
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_import_private_key(
+pub fn ykpiv_import_private_key(
     mut state: *mut ykpiv_state,
     key: u8,
     mut algorithm: u8,
@@ -2994,13 +2711,13 @@ pub unsafe extern "C" fn ykpiv_import_private_key(
     mut ec_data_len: u8,
     pin_policy: u8,
     touch_policy: u8,
-) -> Enum5 {
+) -> ErrorKind {
     let mut _currentBlock;
     let mut key_data: [u8; 1024];
     let mut in_ptr: *mut u8 = key_data.as_mut_ptr();
     let mut templ: *mut u8 = 0i32 as (*mut u8);
     let mut data: [u8; 256];
-    let mut recv_len: usize = ::std::mem::size_of::<[u8; 256]>();
+    let mut recv_len: usize = mem::size_of::<[u8; 256]>();
     let mut elem_len: u32;
     let mut sw: i32;
     let mut params: [*const u8; 5];
@@ -3009,27 +2726,27 @@ pub unsafe extern "C" fn ykpiv_import_private_key(
     let mut n_params: u8;
     let mut i: i32;
     let mut param_tag: i32;
-    let mut res: Enum5;
-    if state == 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state) {
-        Enum5::YKPIV_GENERIC_ERROR
+    let mut res: ErrorKind;
+    if state == 0i32 as (*mut c_void) as (*mut ykpiv_state) {
+        ErrorKind::YKPIV_GENERIC_ERROR
     } else if key as (i32) == 0x9bi32
         || key as (i32) < 0x82i32
         || key as (i32) > 0x95i32 && (key as (i32) < 0x9ai32)
         || key as (i32) > 0x9ei32 && (key as (i32) != 0xf9i32)
     {
-        Enum5::YKPIV_KEY_ERROR
+        ErrorKind::YKPIV_KEY_ERROR
     } else if pin_policy as (i32) != 0i32
         && (pin_policy as (i32) != 1i32)
         && (pin_policy as (i32) != 2i32)
         && (pin_policy as (i32) != 3i32)
     {
-        Enum5::YKPIV_GENERIC_ERROR
+        ErrorKind::YKPIV_GENERIC_ERROR
     } else if touch_policy as (i32) != 0i32
         && (touch_policy as (i32) != 1i32)
         && (touch_policy as (i32) != 2i32)
         && (touch_policy as (i32) != 3i32)
     {
-        Enum5::YKPIV_GENERIC_ERROR
+        ErrorKind::YKPIV_GENERIC_ERROR
     } else {
         if algorithm as (i32) == 0x6i32 || algorithm as (i32) == 0x7i32 {
             if p_len
@@ -3037,9 +2754,9 @@ pub unsafe extern "C" fn ykpiv_import_private_key(
                 .wrapping_add(dp_len)
                 .wrapping_add(dq_len)
                 .wrapping_add(qinv_len)
-                >= ::std::mem::size_of::<[u8; 1024]>()
+                >= mem::size_of::<[u8; 1024]>()
             {
-                return Enum5::YKPIV_SIZE_ERROR;
+                return ErrorKind::YKPIV_SIZE_ERROR;
             } else {
                 if algorithm as (i32) == 0x6i32 {
                     elem_len = 64u32;
@@ -3047,13 +2764,13 @@ pub unsafe extern "C" fn ykpiv_import_private_key(
                 if algorithm as (i32) == 0x7i32 {
                     elem_len = 128u32;
                 }
-                if p == 0i32 as (*mut ::std::os::raw::c_void) as (*const u8)
-                    || q == 0i32 as (*mut ::std::os::raw::c_void) as (*const u8)
-                    || dp == 0i32 as (*mut ::std::os::raw::c_void) as (*const u8)
-                    || dq == 0i32 as (*mut ::std::os::raw::c_void) as (*const u8)
-                    || qinv == 0i32 as (*mut ::std::os::raw::c_void) as (*const u8)
+                if p == 0i32 as (*mut c_void) as (*const u8)
+                    || q == 0i32 as (*mut c_void) as (*const u8)
+                    || dp == 0i32 as (*mut c_void) as (*const u8)
+                    || dq == 0i32 as (*mut c_void) as (*const u8)
+                    || qinv == 0i32 as (*mut c_void) as (*const u8)
                 {
-                    return Enum5::YKPIV_GENERIC_ERROR;
+                    return ErrorKind::YKPIV_GENERIC_ERROR;
                 } else {
                     params[0usize] = p;
                     lens[0usize] = p_len;
@@ -3070,8 +2787,8 @@ pub unsafe extern "C" fn ykpiv_import_private_key(
                 }
             }
         } else if algorithm as (i32) == 0x11i32 || algorithm as (i32) == 0x14i32 {
-            if ec_data_len as (usize) >= ::std::mem::size_of::<[u8; 1024]>() {
-                return Enum5::YKPIV_SIZE_ERROR;
+            if ec_data_len as (usize) >= mem::size_of::<[u8; 1024]>() {
+                return ErrorKind::YKPIV_SIZE_ERROR;
             } else {
                 if algorithm as (i32) == 0x11i32 {
                     elem_len = 32u32;
@@ -3079,8 +2796,8 @@ pub unsafe extern "C" fn ykpiv_import_private_key(
                 if algorithm as (i32) == 0x14i32 {
                     elem_len = 48u32;
                 }
-                if ec_data == 0i32 as (*mut ::std::os::raw::c_void) as (*const u8) {
-                    return Enum5::YKPIV_GENERIC_ERROR;
+                if ec_data == 0i32 as (*mut c_void) as (*const u8) {
+                    return ErrorKind::YKPIV_GENERIC_ERROR;
                 } else {
                     params[0usize] = ec_data;
                     lens[0usize] = ec_data_len as (usize);
@@ -3089,7 +2806,7 @@ pub unsafe extern "C" fn ykpiv_import_private_key(
                 }
             }
         } else {
-            return Enum5::YKPIV_ALGORITHM_ERROR;
+            return ErrorKind::YKPIV_ALGORITHM_ERROR;
         }
         i = 0i32;
         'loop24: loop {
@@ -3106,17 +2823,17 @@ pub unsafe extern "C" fn ykpiv_import_private_key(
             in_ptr = in_ptr.offset(_ykpiv_set_length(in_ptr, elem_len as (usize)) as (isize));
             padding = (elem_len as (usize)).wrapping_sub(lens[i as (usize)]);
             remaining = (key_data.as_mut_ptr() as (usize))
-                .wrapping_add(::std::mem::size_of::<[u8; 1024]>())
+                .wrapping_add(mem::size_of::<[u8; 1024]>())
                 .wrapping_sub(in_ptr as (usize));
             if padding > remaining {
                 _currentBlock = 39;
                 break;
             }
-            memset(in_ptr as (*mut ::std::os::raw::c_void), 0i32, padding);
+            memset(in_ptr as (*mut c_void), 0i32, padding);
             in_ptr = in_ptr.offset(padding as (isize));
             memcpy(
-                in_ptr as (*mut ::std::os::raw::c_void),
-                params[i as (usize)] as (*const ::std::os::raw::c_void),
+                in_ptr as (*mut c_void),
+                params[i as (usize)] as (*const c_void),
                 lens[i as (usize)],
             );
             in_ptr = in_ptr.offset(lens[i as (usize)] as (isize));
@@ -3157,13 +2874,13 @@ pub unsafe extern "C" fn ykpiv_import_private_key(
                     _old
                 } = touch_policy;
             }
-            if Enum5::YKPIV_OK as (i32) != {
+            if ErrorKind::YKPIV_OK as (i32) != {
                 res = _ykpiv_begin_transaction(state);
                 res
             } as (i32)
             {
-                return Enum5::YKPIV_PCSC_ERROR;
-            } else if !(Enum5::YKPIV_OK as (i32) != {
+                return ErrorKind::YKPIV_PCSC_ERROR;
+            } else if !(ErrorKind::YKPIV_OK as (i32) != {
                 res = _ykpiv_ensure_application_selected(state);
                 res
             } as (i32))
@@ -3174,274 +2891,239 @@ pub unsafe extern "C" fn ykpiv_import_private_key(
                         templ as (*const u8),
                         key_data.as_mut_ptr() as (*const u8),
                         (in_ptr as (isize)).wrapping_sub(key_data.as_mut_ptr() as (isize))
-                            / ::std::mem::size_of::<u8>() as (isize),
+                            / mem::size_of::<u8>() as (isize),
                         data.as_mut_ptr(),
                         &mut recv_len as (*mut usize),
                         &mut sw as (*mut i32),
                     );
                     res
                 } as (i32)
-                    != Enum5::YKPIV_OK as (i32))
+                    != ErrorKind::YKPIV_OK as (i32))
                 {
                     if 0x9000i32 != sw {
-                        res = Enum5::YKPIV_GENERIC_ERROR;
+                        res = ErrorKind::YKPIV_GENERIC_ERROR;
                         if sw == 0x6982i32 {
-                            res = Enum5::YKPIV_AUTHENTICATION_ERROR;
+                            res = ErrorKind::YKPIV_AUTHENTICATION_ERROR;
                         }
                     }
                 }
             }
         } else {
-            res = Enum5::YKPIV_ALGORITHM_ERROR;
+            res = ErrorKind::YKPIV_ALGORITHM_ERROR;
         }
         memset_s(
-            key_data.as_mut_ptr() as (*mut ::std::os::raw::c_void),
-            ::std::mem::size_of::<[u8; 1024]>(),
+            key_data.as_mut_ptr() as (*mut c_void),
+            mem::size_of::<[u8; 1024]>(),
             0i32,
-            ::std::mem::size_of::<[u8; 1024]>(),
+            mem::size_of::<[u8; 1024]>(),
         );
         _ykpiv_end_transaction(state);
         res
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_attest(
+pub fn ykpiv_attest(
     mut state: *mut ykpiv_state,
     key: u8,
     mut data: *mut u8,
     mut data_len: *mut usize,
-) -> Enum5 {
-    let mut res: Enum5;
+) -> ErrorKind {
+    let mut res = ErrorKind::YKPIV_GENERIC_ERROR;
     let mut templ: *mut u8 = 0i32 as (*mut u8);
     let mut sw: i32;
     let mut ul_data_len: usize;
-    if state == 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state)
-        || data == 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8)
-        || data_len == 0i32 as (*mut ::std::os::raw::c_void) as (*mut usize)
-    {
-        Enum5::YKPIV_ARGUMENT_ERROR
-    } else {
-        ul_data_len = *data_len;
-        (if Enum5::YKPIV_OK as (i32) != {
-            res = _ykpiv_begin_transaction(state);
-            res
-        } as (i32)
-        {
-            Enum5::YKPIV_PCSC_ERROR
-        } else {
-            if !(Enum5::YKPIV_OK as (i32) != {
-                res = _ykpiv_ensure_application_selected(state);
-                res
-            } as (i32))
-            {
-                if !({
-                    res = ykpiv_transfer_data(
-                        state,
-                        templ as (*const u8),
-                        0i32 as (*mut ::std::os::raw::c_void) as (*const u8),
-                        0isize,
-                        data,
-                        &mut ul_data_len as (*mut usize),
-                        &mut sw as (*mut i32),
-                    );
-                    res
-                } as (i32)
-                    != Enum5::YKPIV_OK as (i32))
-                {
-                    if 0x9000i32 != sw {
-                        res = Enum5::YKPIV_GENERIC_ERROR;
-                        if 0x6d00i32 == sw {
-                            res = Enum5::YKPIV_NOT_SUPPORTED;
-                        }
-                    } else if *data.offset(0isize) as (i32) != 0x30i32 {
-                        res = Enum5::YKPIV_GENERIC_ERROR;
-                    } else {
-                        *data_len = ul_data_len;
-                    }
-                }
-            }
-            _ykpiv_end_transaction(state);
-            res
-        })
+    if state.is_null() || data.is_null() || data_len.is_null() {
+        return ErrorKind::YKPIV_ARGUMENT_ERROR;
     }
+
+    ul_data_len = *data_len;
+
+    if _ykpiv_begin_transaction(state) != ErrorKind::YKPIV_OK {
+        return ErrorKind::YKPIV_PCSC_ERROR;
+    }
+
+    if _ykpiv_ensure_application_selected(state) == ErrorKind::YKPIV_OK {
+        res = ykpiv_transfer_data(
+            state,
+            templ as (*const u8),
+            0i32 as (*mut c_void) as (*const u8),
+            0isize,
+            data,
+            &mut ul_data_len as (*mut usize),
+            &mut sw as (*mut i32),
+        );
+
+        if res == ErrorKind::YKPIV_OK {
+            if 0x9000i32 != sw {
+                res = ErrorKind::YKPIV_GENERIC_ERROR;
+                if 0x6d00i32 == sw {
+                    res = ErrorKind::YKPIV_NOT_SUPPORTED;
+                }
+            } else if *data as i32 != 0x30 {
+                res = ErrorKind::YKPIV_GENERIC_ERROR;
+            } else {
+                *data_len = ul_data_len;
+            }
+        }
+    }
+
+    _ykpiv_end_transaction(state);
+    res
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_auth_getchallenge(
+pub fn ykpiv_auth_getchallenge(
     mut state: *mut ykpiv_state,
     mut challenge: *mut u8,
     challenge_len: usize,
-) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_OK;
-    let mut apdu: u_APDU = 0i32 as (u_APDU);
+) -> ErrorKind {
+    let mut res = ErrorKind::YKPIV_OK;
     let mut data = [0u8; 261];
-    let mut recv_len: u32 = ::std::mem::size_of::<[u8; 261]>() as (u32);
+    let mut recv_len: u32 = mem::size_of::<[u8; 261]>() as (u32);
     let mut sw: i32 = 0i32;
-    if 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state) == state {
-        Enum5::YKPIV_GENERIC_ERROR
-    } else if 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8) == challenge {
-        Enum5::YKPIV_GENERIC_ERROR
-    } else if 8usize != challenge_len {
-        Enum5::YKPIV_SIZE_ERROR
-    } else if Enum5::YKPIV_OK as (i32) != {
-        res = _ykpiv_begin_transaction(state);
-        res
-    } as (i32)
-    {
-        Enum5::YKPIV_PCSC_ERROR
-    } else {
-        if !(Enum5::YKPIV_OK as (i32) != {
-            res = _ykpiv_ensure_application_selected(state);
-            res
-        } as (i32))
-        {
-            // get a challenge from the card
-            // FIXME(tarcieri): Translate C code below
-            /*
-             memset(apdu.raw, 0, sizeof(apdu));
-             apdu.st.ins = YKPIV_INS_AUTHENTICATE;
-             apdu.st.p1 = YKPIV_ALGO_3DES; // triple des
-             apdu.st.p2 = YKPIV_KEY_CARDMGM; // management key
-             apdu.st.lc = 0x04;
-             apdu.st.data[0] = 0x7c;
-             apdu.st.data[1] = 0x02;
-             apdu.st.data[2] = 0x81; //0x80;
-            */
-            if !({
-                res = _send_data(
-                    state,
-                    &mut apdu as (*mut u_APDU),
-                    data.as_mut_ptr(),
-                    &mut recv_len as (*mut u32),
-                    &mut sw as (*mut i32),
+
+    if state.is_null() || challenge.is_null() {
+        return ErrorKind::YKPIV_GENERIC_ERROR;
+    }
+
+    if challenge_len != 8 {
+        return ErrorKind::YKPIV_SIZE_ERROR;
+    }
+
+    if _ykpiv_begin_transaction(state) != ErrorKind::YKPIV_OK {
+        return ErrorKind::YKPIV_PCSC_ERROR;
+    }
+
+    if _ykpiv_ensure_application_selected(state) == ErrorKind::YKPIV_OK {
+        let mut apdu = APDU::default();
+        apdu.ins = YKPIV_INS_AUTHENTICATE;
+        apdu.p1 = YKPIV_ALGO_3DES; // triple des
+        apdu.p2 = YKPIV_KEY_CARDMGM; // management key
+        apdu.lc = 0x04;
+        apdu.data[0] = 0x7c;
+        apdu.data[1] = 0x02;
+        apdu.data[2] = 0x81; //0x80;
+
+        res = _send_data(
+            state,
+            &mut apdu as (*mut APDU),
+            data.as_mut_ptr(),
+            &mut recv_len as (*mut u32),
+            &mut sw as (*mut i32),
+        );
+
+        if res != ErrorKind::YKPIV_OK {
+            if sw != 0x9000i32 {
+                res = ErrorKind::YKPIV_AUTHENTICATION_ERROR;
+            } else {
+                memcpy(
+                    challenge as (*mut c_void),
+                    data.as_mut_ptr().offset(4isize) as (*const c_void),
+                    8usize,
                 );
-                res
-            } as (i32)
-                != Enum5::YKPIV_OK as (i32))
-            {
-                if sw != 0x9000i32 {
-                    res = Enum5::YKPIV_AUTHENTICATION_ERROR;
-                } else {
-                    memcpy(
-                        challenge as (*mut ::std::os::raw::c_void),
-                        data.as_mut_ptr().offset(4isize) as (*const ::std::os::raw::c_void),
-                        8usize,
-                    );
-                }
             }
         }
-        _ykpiv_end_transaction(state);
-        res
     }
+    _ykpiv_end_transaction(state);
+    res
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_auth_verifyresponse(
+pub fn ykpiv_auth_verifyresponse(
     mut state: *mut ykpiv_state,
     mut response: *mut u8,
     response_len: usize,
-) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_OK;
-    let mut apdu: u_APDU = 0i32 as (u_APDU);
+) -> ErrorKind {
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
     let mut data = [0u8; 261];
-    let mut recv_len: u32 = ::std::mem::size_of::<[u8; 261]>() as (u32);
+    let mut recv_len = data.len() as u32;
     let mut sw: i32 = 0i32;
-    // FIXME(tarcieri): dataptr should NOT be 0! Translate C code below
-    let mut dataptr: *mut u8 = 0i32 as (*mut u8); // apdu.st.data
-    if 0i32 as (*mut ::std::os::raw::c_void) as (*mut ykpiv_state) == state {
-        Enum5::YKPIV_GENERIC_ERROR
-    } else if 0i32 as (*mut ::std::os::raw::c_void) as (*mut u8) == response {
-        Enum5::YKPIV_GENERIC_ERROR
-    } else if 8usize != response_len {
-        Enum5::YKPIV_SIZE_ERROR
-    } else if Enum5::YKPIV_OK as (i32) != {
-        res = _ykpiv_begin_transaction(state);
-        res
-    } as (i32)
-    {
-        Enum5::YKPIV_PCSC_ERROR
-    } else {
-        // send the response to the card and a challenge of our own.
-        recv_len = ::std::mem::size_of::<[u8; 261]>() as (u32);
-        // FIXME(tarcieri): Translate C code below
-        /*
-          memset(apdu.raw, 0, sizeof(apdu));
-          apdu.st.ins = YKPIV_INS_AUTHENTICATE;
-          apdu.st.p1 = YKPIV_ALGO_3DES; // triple des
-          apdu.st.p2 = YKPIV_KEY_CARDMGM; // management key
-        */
-        *{
-            let _old = dataptr;
-            dataptr = dataptr.offset(1isize);
-            _old
-        } = 0x7cu8;
-        *{
-            let _old = dataptr;
-            dataptr = dataptr.offset(1isize);
-            _old
-        } = 0xau8;
-        *{
-            let _old = dataptr;
-            dataptr = dataptr.offset(1isize);
-            _old
-        } = 0x82u8;
-        *{
-            let _old = dataptr;
-            dataptr = dataptr.offset(1isize);
-            _old
-        } = 8u8;
-        memcpy(
-            dataptr as (*mut ::std::os::raw::c_void),
-            response as (*const ::std::os::raw::c_void),
-            response_len,
-        );
-        dataptr = dataptr.offset(8isize);
-        // FIXME(tarcieri): Translate C code below
-        /* apdu.st.lc = (unsigned char)(dataptr - apdu.st.data); */
-        if !({
-            res = _send_data(
-                state,
-                &mut apdu as (*mut u_APDU),
-                data.as_mut_ptr(),
-                &mut recv_len as (*mut u32),
-                &mut sw as (*mut i32),
-            );
-            res
-        } as (i32)
-            != Enum5::YKPIV_OK as (i32))
-        {
-            if sw != 0x9000i32 {
-                res = Enum5::YKPIV_AUTHENTICATION_ERROR;
-            }
-        }
-        memset_s(
-            &mut apdu as (*mut u_APDU) as (*mut ::std::os::raw::c_void),
-            ::std::mem::size_of::<u_APDU>(),
-            0i32,
-            ::std::mem::size_of::<u_APDU>(),
-        );
-        _ykpiv_end_transaction(state);
-        res
+    let mut apdu = APDU::default();
+
+    let mut dataptr = apdu.data.as_mut_ptr();
+
+    if state.is_null() || response.is_null() {
+        return ErrorKind::YKPIV_GENERIC_ERROR;
     }
+
+    if response_len != 8 {
+        return ErrorKind::YKPIV_SIZE_ERROR;
+    }
+
+    if _ykpiv_begin_transaction(state) != ErrorKind::YKPIV_OK {
+        return ErrorKind::YKPIV_PCSC_ERROR;
+    }
+
+    // send the response to the card and a challenge of our own.
+    apdu.ins = YKPIV_INS_AUTHENTICATE;
+    apdu.p1 = YKPIV_ALGO_3DES; // triple des
+    apdu.p2 = YKPIV_KEY_CARDMGM; // management key
+
+    *{
+        let _old = dataptr;
+        dataptr = dataptr.offset(1isize);
+        _old
+    } = 0x7cu8;
+
+    *{
+        let _old = dataptr;
+        dataptr = dataptr.offset(1isize);
+        _old
+    } = 0xau8;
+
+    *{
+        let _old = dataptr;
+        dataptr = dataptr.offset(1isize);
+        _old
+    } = 0x82u8;
+
+    *{
+        let _old = dataptr;
+        dataptr = dataptr.offset(1isize);
+        _old
+    } = 8u8;
+
+    memcpy(
+        dataptr as *mut c_void,
+        response as *const c_void,
+        response_len,
+    );
+
+    dataptr = dataptr.offset(8isize);
+    apdu.lc = (dataptr as usize - apdu.data.as_ptr() as usize)
+        .try_into()
+        .unwrap();
+
+    res = _send_data(
+        state,
+        &mut apdu as (*mut APDU),
+        data.as_mut_ptr(),
+        &mut recv_len,
+        &mut sw,
+    );
+
+    if res == ErrorKind::YKPIV_OK && sw != 0x9000i32 {
+        res = ErrorKind::YKPIV_AUTHENTICATION_ERROR;
+    }
+
+    apdu.zeroize();
+    _ykpiv_end_transaction(state);
+    res
 }
 
 static mut MGMT_AID: *const u8 = 0xa0i32 as (*const u8);
 
-#[no_mangle]
-pub unsafe extern "C" fn ykpiv_auth_deauthenticate(mut state: *mut ykpiv_state) -> Enum5 {
-    let mut res: Enum5 = Enum5::YKPIV_OK;
-    let mut apdu: u_APDU;
+pub fn ykpiv_auth_deauthenticate(mut state: *mut ykpiv_state) -> ErrorKind {
+    let mut res: ErrorKind = ErrorKind::YKPIV_OK;
+    let mut apdu: APDU;
     let mut data: [u8; 255];
-    let mut recv_len: u32 = ::std::mem::size_of::<[u8; 255]>() as (u32);
+    let mut recv_len: u32 = mem::size_of::<[u8; 255]>() as (u32);
     let mut sw: i32;
     if state.is_null() {
-        Enum5::YKPIV_ARGUMENT_ERROR
+        ErrorKind::YKPIV_ARGUMENT_ERROR
     } else if {
         res = _ykpiv_begin_transaction(state);
         res
     } as (i32)
-        < Enum5::YKPIV_OK as (i32)
+        < ErrorKind::YKPIV_OK as (i32)
     {
         res
     } else {
@@ -3456,31 +3138,26 @@ pub unsafe extern "C" fn ykpiv_auth_deauthenticate(mut state: *mut ykpiv_state) 
         if {
             res = _send_data(
                 state,
-                &mut apdu as (*mut u_APDU),
+                &mut apdu as (*mut APDU),
                 data.as_mut_ptr(),
                 &mut recv_len as (*mut u32),
                 &mut sw as (*mut i32),
             );
             res
         } as (i32)
-            < Enum5::YKPIV_OK as (i32)
+            < ErrorKind::YKPIV_OK as (i32)
         {
             if (*state).verbose != 0 {
-                fprintf(
-                    __stderrp,
-                    (*b"Failed communicating with card: \'%s\'\n\0").as_ptr(),
-                    ykpiv_strerror(res),
+                eprintln!(
+                    "Failed communicating with card: \'{}\'",
+                    ykpiv_strerror(res)
                 );
             }
         } else if sw != 0x9000i32 {
             if (*state).verbose != 0 {
-                fprintf(
-                    __stderrp,
-                    (*b"Failed selecting mgmt application: %04x\n\0").as_ptr(),
-                    sw,
-                );
+                eprintln!("Failed selecting mgmt application: {:04x}", sw);
             }
-            res = Enum5::YKPIV_GENERIC_ERROR;
+            res = ErrorKind::YKPIV_GENERIC_ERROR;
         }
         _ykpiv_end_transaction(state);
         res

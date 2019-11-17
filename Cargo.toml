@@ -6,3 +6,5 @@ edition = "2018"
 license = "BSD"
 
 [dependencies]
+libc = "0.2"
+zeroize = "1"
