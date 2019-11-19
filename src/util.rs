@@ -89,28 +89,25 @@ pub unsafe fn ykpiv_util_get_cardid(state: *mut YubiKey, cardid: *mut CardId) ->
         return ErrorKind::GenericError;
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            res = _ykpiv_fetch_object(state, YKPIV_OBJ_CHUID as i32, buf.as_mut_ptr(), &mut len);
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        res = _ykpiv_fetch_object(state, YKPIV_OBJ_CHUID as i32, buf.as_mut_ptr(), &mut len);
-
-        if res == ErrorKind::Ok {
-            if len != CHUID_TMPL.len() {
-                res = ErrorKind::GenericError;
-            } else {
-                memcpy(
-                    (*cardid).0.as_mut_ptr() as (*mut c_void),
-                    buf.as_mut_ptr().add(CHUID_GUID_OFFS) as (*const c_void),
-                    YKPIV_CARDID_SIZE,
-                );
+            if res == ErrorKind::Ok {
+                if len != CHUID_TMPL.len() {
+                    res = ErrorKind::GenericError;
+                } else {
+                    memcpy(
+                        (*cardid).0.as_mut_ptr() as (*mut c_void),
+                        buf.as_mut_ptr().add(CHUID_GUID_OFFS) as (*const c_void),
+                        YKPIV_CARDID_SIZE,
+                    );
+                }
             }
         }
-    }
 
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Set Card ID
@@ -135,33 +132,30 @@ pub unsafe fn ykpiv_util_set_cardid(state: *mut YubiKey, cardid: *const CardId) 
         );
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            memcpy(
+                buf.as_mut_ptr() as *mut c_void,
+                CHUID_TMPL.as_ptr() as *const c_void,
+                buf.len(),
+            );
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        memcpy(
-            buf.as_mut_ptr() as *mut c_void,
-            CHUID_TMPL.as_ptr() as *const c_void,
-            buf.len(),
-        );
+            memcpy(
+                buf.as_mut_ptr().add(CHUID_GUID_OFFS) as *mut c_void,
+                id.as_mut_ptr() as *const c_void,
+                id.len(),
+            );
 
-        memcpy(
-            buf.as_mut_ptr().add(CHUID_GUID_OFFS) as *mut c_void,
-            id.as_mut_ptr() as *const c_void,
-            id.len(),
-        );
+            res = _ykpiv_save_object(
+                state,
+                YKPIV_OBJ_CHUID as i32,
+                buf.as_mut_ptr(),
+                CHUID_TMPL.len(),
+            );
+        }
 
-        res = _ykpiv_save_object(
-            state,
-            YKPIV_OBJ_CHUID as i32,
-            buf.as_mut_ptr(),
-            CHUID_TMPL.len(),
-        );
-    }
-
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Cardholder Capability Container (CCC) Identifier
@@ -178,33 +172,30 @@ pub unsafe fn ykpiv_util_get_cccid(state: *mut YubiKey, ccc: *mut CCCID) -> Erro
         return ErrorKind::GenericError;
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
-
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        res = _ykpiv_fetch_object(
-            state,
-            YKPIV_OBJ_CAPABILITY as i32,
-            buf.as_mut_ptr(),
-            &mut len,
-        );
-
-        if res == ErrorKind::Ok {
-            if len != CCC_TMPL.len() {
-                _ykpiv_end_transaction(state);
-                return ErrorKind::GenericError;
-            }
-
-            memcpy(
-                (*ccc).0.as_mut_ptr() as (*mut c_void),
-                buf.as_mut_ptr().offset(9) as (*const c_void),
-                YKPIV_CCCID_SIZE,
+    _ykpiv_transaction(state, |state| {
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            res = _ykpiv_fetch_object(
+                state,
+                YKPIV_OBJ_CAPABILITY as i32,
+                buf.as_mut_ptr(),
+                &mut len,
             );
-        }
-    }
 
-    res
+            if res == ErrorKind::Ok {
+                if len != CCC_TMPL.len() {
+                    return ErrorKind::GenericError;
+                }
+
+                memcpy(
+                    (*ccc).0.as_mut_ptr() as (*mut c_void),
+                    buf.as_mut_ptr().offset(9) as (*const c_void),
+                    YKPIV_CCCID_SIZE,
+                );
+            }
+        }
+
+        res
+    })
 }
 
 /// Get Cardholder Capability Container (CCC) ID
@@ -212,7 +203,6 @@ pub unsafe fn ykpiv_util_set_cccid(state: *mut YubiKey, ccc: *const CCCID) -> Er
     let mut res: ErrorKind = ErrorKind::Ok;
     let mut id = [0u8; 14];
     let mut buf = [0u8; 51];
-    let len: usize;
 
     if state.is_null() {
         return ErrorKind::GenericError;
@@ -230,30 +220,27 @@ pub unsafe fn ykpiv_util_set_cccid(state: *mut YubiKey, ccc: *const CCCID) -> Er
         );
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            let len = 51;
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        len = 51;
+            memcpy(
+                buf.as_mut_ptr() as *mut c_void,
+                CCC_TMPL.as_ptr() as *const c_void,
+                len,
+            );
 
-        memcpy(
-            buf.as_mut_ptr() as *mut c_void,
-            CCC_TMPL.as_ptr() as *const c_void,
-            len,
-        );
+            memcpy(
+                buf.as_mut_ptr().offset(9) as (*mut c_void),
+                id.as_mut_ptr() as (*const c_void),
+                14,
+            );
 
-        memcpy(
-            buf.as_mut_ptr().offset(9) as (*mut c_void),
-            id.as_mut_ptr() as (*const c_void),
-            14,
-        );
+            res = _ykpiv_save_object(state, YKPIV_OBJ_CAPABILITY as i32, buf.as_mut_ptr(), len);
+        }
 
-        res = _ykpiv_save_object(state, YKPIV_OBJ_CAPABILITY as i32, buf.as_mut_ptr(), len);
-    }
-
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Get YubiKey device model
@@ -317,129 +304,126 @@ pub unsafe fn ykpiv_util_list_keys(
     data: *mut *mut YkPivKey,
     data_len: *mut usize,
 ) -> ErrorKind {
-    let mut _currentBlock;
-    let mut res: ErrorKind = ErrorKind::Ok;
-    let mut p_key: *mut YkPivKey;
-    let mut p_data: *mut u8 = ptr::null_mut();
-    let mut p_temp: *mut u8;
-    let mut cb_data: usize;
-    let mut offset: usize = 0;
-    let mut buf = [0u8; YKPIV_OBJ_MAX_SIZE];
-    let mut cb_buf: usize;
-    let mut i: usize;
-    let mut cb_realloc: usize;
-    let CB_PAGE: usize = 4096;
-
     if data.is_null() || data_len.is_null() || key_count.is_null() {
         return ErrorKind::GenericError;
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        let mut _currentBlock;
+        let mut res: ErrorKind = ErrorKind::Ok;
+        let mut p_key: *mut YkPivKey;
+        let mut p_data: *mut u8 = ptr::null_mut();
+        let mut p_temp: *mut u8;
+        let mut cb_data: usize;
+        let mut offset: usize = 0;
+        let mut buf = [0u8; YKPIV_OBJ_MAX_SIZE];
+        let mut cb_buf: usize;
+        let mut i: usize;
+        let mut cb_realloc: usize;
+        let CB_PAGE: usize = 4096;
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        *key_count = 0;
-        *data = ptr::null_mut();
-        *data_len = 0;
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            *key_count = 0;
+            *data = ptr::null_mut();
+            *data_len = 0;
 
-        p_data = calloc(CB_PAGE, 1) as (*mut u8);
+            p_data = calloc(CB_PAGE, 1) as (*mut u8);
 
-        if p_data.is_null() {
-            _ykpiv_end_transaction(state);
-            return ErrorKind::MemoryError;
-        }
-
-        cb_data = CB_PAGE;
-        i = 0;
-
-        loop {
-            if i >= mem::size_of::<*const u8>() {
-                _currentBlock = 6;
-                break;
+            if p_data.is_null() {
+                return ErrorKind::MemoryError;
             }
 
-            cb_buf = buf.len();
-            res = _read_certificate(state, SLOTS[i], buf.as_mut_ptr(), &mut cb_buf);
+            cb_data = CB_PAGE;
+            i = 0;
 
-            if res == ErrorKind::Ok && (cb_buf > 0) {
-                cb_realloc = if mem::size_of::<YkPivKey>()
-                    .wrapping_add(cb_buf)
-                    .wrapping_sub(1)
-                    > cb_data.wrapping_sub(offset)
-                {
-                    (if mem::size_of::<YkPivKey>()
+            loop {
+                if i >= mem::size_of::<*const u8>() {
+                    _currentBlock = 6;
+                    break;
+                }
+
+                cb_buf = buf.len();
+                res = _read_certificate(state, SLOTS[i], buf.as_mut_ptr(), &mut cb_buf);
+
+                if res == ErrorKind::Ok && (cb_buf > 0) {
+                    cb_realloc = if mem::size_of::<YkPivKey>()
                         .wrapping_add(cb_buf)
                         .wrapping_sub(1)
-                        .wrapping_sub(cb_data.wrapping_sub(offset))
-                        > CB_PAGE
+                        > cb_data.wrapping_sub(offset)
                     {
-                        mem::size_of::<YkPivKey>()
+                        (if mem::size_of::<YkPivKey>()
                             .wrapping_add(cb_buf)
                             .wrapping_sub(1)
                             .wrapping_sub(cb_data.wrapping_sub(offset))
+                            > CB_PAGE
+                        {
+                            mem::size_of::<YkPivKey>()
+                                .wrapping_add(cb_buf)
+                                .wrapping_sub(1)
+                                .wrapping_sub(cb_data.wrapping_sub(offset))
+                        } else {
+                            CB_PAGE
+                        })
                     } else {
-                        CB_PAGE
-                    })
-                } else {
-                    0
-                };
+                        0
+                    };
 
-                if cb_realloc != 0 {
-                    if {
-                        p_temp = realloc(p_data as (*mut c_void), cb_data.wrapping_add(cb_realloc))
-                            as (*mut u8);
-                        p_temp
+                    if cb_realloc != 0 {
+                        if {
+                            p_temp =
+                                realloc(p_data as (*mut c_void), cb_data.wrapping_add(cb_realloc))
+                                    as (*mut u8);
+                            p_temp
+                        }
+                        .is_null()
+                        {
+                            _currentBlock = 15;
+                            break;
+                        }
+                        p_data = p_temp;
                     }
-                    .is_null()
-                    {
-                        _currentBlock = 15;
-                        break;
-                    }
-                    p_data = p_temp;
+
+                    cb_data = cb_data.wrapping_add(cb_realloc);
+                    p_key = p_data.add(offset) as *mut YkPivKey;
+                    (*p_key).slot = SLOTS[i];
+                    (*p_key).cert_len = cb_buf as (u16);
+
+                    memcpy(
+                        (*p_key).cert.as_mut_ptr() as *mut c_void,
+                        buf.as_mut_ptr() as *const c_void,
+                        cb_buf,
+                    );
+
+                    offset = offset.wrapping_add(
+                        mem::size_of::<YkPivKey>()
+                            .wrapping_add(cb_buf)
+                            .wrapping_sub(1),
+                    );
+
+                    *key_count = (*key_count as i32 + 1) as u8;
                 }
 
-                cb_data = cb_data.wrapping_add(cb_realloc);
-                p_key = p_data.add(offset) as *mut YkPivKey;
-                (*p_key).slot = SLOTS[i];
-                (*p_key).cert_len = cb_buf as (u16);
-
-                memcpy(
-                    (*p_key).cert.as_mut_ptr() as *mut c_void,
-                    buf.as_mut_ptr() as *const c_void,
-                    cb_buf,
-                );
-
-                offset = offset.wrapping_add(
-                    mem::size_of::<YkPivKey>()
-                        .wrapping_add(cb_buf)
-                        .wrapping_sub(1),
-                );
-
-                *key_count = (*key_count as i32 + 1) as u8;
+                i += 1;
             }
 
-            i += 1;
-        }
-
-        if _currentBlock == 6 {
-            *data = p_data as *mut YkPivKey;
-            p_data = ptr::null_mut();
-            if !data_len.is_null() {
-                *data_len = offset;
+            if _currentBlock == 6 {
+                *data = p_data as *mut YkPivKey;
+                p_data = ptr::null_mut();
+                if !data_len.is_null() {
+                    *data_len = offset;
+                }
+                res = ErrorKind::Ok;
+            } else {
+                res = ErrorKind::MemoryError;
             }
-            res = ErrorKind::Ok;
-        } else {
-            res = ErrorKind::MemoryError;
         }
-    }
 
-    if !p_data.is_null() {
-        free(p_data as (*mut c_void));
-    }
+        if !p_data.is_null() {
+            free(p_data as (*mut c_void));
+        }
 
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Read certificate
@@ -457,38 +441,35 @@ pub unsafe fn ykpiv_util_read_cert(
         return ErrorKind::GenericError;
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
-
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        *data = ptr::null_mut();
-        *data_len = 0;
-        res = _read_certificate(state, slot, buf.as_mut_ptr(), &mut cb_buf);
-        if res == ErrorKind::Ok {
-            if cb_buf == 0 {
-                *data = ptr::null_mut();
-                *data_len = 0;
-            } else if {
-                *data = calloc(cb_buf, 1) as *mut u8;
-                *data
-            }
-            .is_null()
-            {
-                res = ErrorKind::MemoryError;
-            } else {
-                memcpy(
-                    *data as (*mut c_void),
-                    buf.as_mut_ptr() as (*const c_void),
-                    cb_buf,
-                );
-                *data_len = cb_buf;
+    _ykpiv_transaction(state, |state| {
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            *data = ptr::null_mut();
+            *data_len = 0;
+            res = _read_certificate(state, slot, buf.as_mut_ptr(), &mut cb_buf);
+            if res == ErrorKind::Ok {
+                if cb_buf == 0 {
+                    *data = ptr::null_mut();
+                    *data_len = 0;
+                } else if {
+                    *data = calloc(cb_buf, 1) as *mut u8;
+                    *data
+                }
+                .is_null()
+                {
+                    res = ErrorKind::MemoryError;
+                } else {
+                    memcpy(
+                        *data as (*mut c_void),
+                        buf.as_mut_ptr() as (*const c_void),
+                        cb_buf,
+                    );
+                    *data_len = cb_buf;
+                }
             }
         }
-    }
 
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Write certificate
@@ -499,18 +480,15 @@ pub unsafe fn ykpiv_util_write_cert(
     data_len: usize,
     certinfo: u8,
 ) -> ErrorKind {
-    let mut res: ErrorKind = ErrorKind::Ok;
+    _ykpiv_transaction(state, |state| {
+        let mut res: ErrorKind = ErrorKind::Ok;
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            res = _write_certificate(state, slot, data, data_len, certinfo);
+        }
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        res = _write_certificate(state, slot, data, data_len, certinfo);
-    }
-
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Delete certificate
@@ -520,7 +498,6 @@ pub unsafe fn ykpiv_util_delete_cert(state: *mut YubiKey, slot: u8) -> ErrorKind
 
 /// Block PUK
 pub unsafe fn ykpiv_util_block_puk(state: *mut YubiKey) -> ErrorKind {
-    let mut _currentBlock;
     let mut res: ErrorKind = ErrorKind::Ok;
     let mut puk = [0x30, 0x42, 0x41, 0x44, 0x46, 0x30, 0x30, 0x44];
     let mut tries: i32 = -1;
@@ -534,104 +511,108 @@ pub unsafe fn ykpiv_util_block_puk(state: *mut YubiKey) -> ErrorKind {
         return ErrorKind::GenericError;
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        let mut _currentBlock;
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        _currentBlock = 20;
-    } else {
-        _currentBlock = 3;
-    }
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            _currentBlock = 20;
+        } else {
+            _currentBlock = 3;
+        }
 
-    loop {
-        if _currentBlock == 3 {
-            if tries != 0 {
-                res = ykpiv_change_puk(
-                    state,
-                    puk.as_ptr(),
-                    mem::size_of::<*const c_char>(),
-                    puk.as_ptr(),
-                    mem::size_of::<*const c_char>(),
-                    &mut tries,
-                );
-
-                if res == ErrorKind::Ok {
-                    let _rhs = 1;
-                    let mut _lhs = &mut puk[0];
-                    *_lhs += _rhs;
-                    _currentBlock = 3;
-                } else {
-                    if res != ErrorKind::PinLocked {
-                        _currentBlock = 3;
-                        continue;
-                    }
-                    tries = 0;
-                    res = ErrorKind::Ok;
-                    _currentBlock = 3;
-                }
-            } else {
-                let res = _read_metadata(state, TAG_ADMIN, data.as_mut_ptr(), &mut cb_data);
-
-                if res == ErrorKind::Ok {
-                    let res = _get_metadata_item(
-                        data.as_mut_ptr(),
-                        cb_data,
-                        TAG_ADMIN_FLAGS_1,
-                        &mut p_item,
-                        &mut cb_item,
+        loop {
+            if _currentBlock == 3 {
+                if tries != 0 {
+                    res = ykpiv_change_puk(
+                        state,
+                        puk.as_ptr(),
+                        mem::size_of::<*const c_char>(),
+                        puk.as_ptr(),
+                        mem::size_of::<*const c_char>(),
+                        &mut tries,
                     );
 
                     if res == ErrorKind::Ok {
-                        if cb_item == 1 {
-                            // TODO(tarcieri): get rid of memcpy and pointers, replace with slices!
-                            #[allow(trivial_casts)]
-                            memcpy(
-                                &mut flags as *mut u8 as *mut c_void,
-                                p_item as (*const c_void),
-                                cb_item,
-                            );
-                        } else if (*state).verbose != 0 {
-                            eprintln!("admin flags exist, but are incorrect size = {}", cb_item,);
+                        let _rhs = 1;
+                        let mut _lhs = &mut puk[0];
+                        *_lhs += _rhs;
+                        _currentBlock = 3;
+                    } else {
+                        if res != ErrorKind::PinLocked {
+                            _currentBlock = 3;
+                            continue;
+                        }
+                        tries = 0;
+                        res = ErrorKind::Ok;
+                        _currentBlock = 3;
+                    }
+                } else {
+                    let res = _read_metadata(state, TAG_ADMIN, data.as_mut_ptr(), &mut cb_data);
+
+                    if res == ErrorKind::Ok {
+                        let res = _get_metadata_item(
+                            data.as_mut_ptr(),
+                            cb_data,
+                            TAG_ADMIN_FLAGS_1,
+                            &mut p_item,
+                            &mut cb_item,
+                        );
+
+                        if res == ErrorKind::Ok {
+                            if cb_item == 1 {
+                                // TODO(tarcieri): get rid of memcpy and pointers, replace with slices!
+                                #[allow(trivial_casts)]
+                                memcpy(
+                                    &mut flags as *mut u8 as *mut c_void,
+                                    p_item as (*const c_void),
+                                    cb_item,
+                                );
+                            } else if (*state).verbose != 0 {
+                                eprintln!(
+                                    "admin flags exist, but are incorrect size = {}",
+                                    cb_item,
+                                );
+                            }
                         }
                     }
-                }
 
-                flags |= 0x1;
+                    flags |= 0x1;
 
-                if _set_metadata_item(
-                    data.as_mut_ptr(),
-                    &mut cb_data,
-                    CB_OBJ_MAX,
-                    TAG_ADMIN_FLAGS_1,
-                    &mut flags,
-                    1,
-                ) != ErrorKind::Ok
-                {
-                    if (*state).verbose == 0 {
+                    if _set_metadata_item(
+                        data.as_mut_ptr(),
+                        &mut cb_data,
+                        CB_OBJ_MAX,
+                        TAG_ADMIN_FLAGS_1,
+                        &mut flags,
+                        1,
+                    ) != ErrorKind::Ok
+                    {
+                        if (*state).verbose == 0 {
+                            _currentBlock = 20;
+                            continue;
+                        }
+                        eprintln!("could not set admin flags");
                         _currentBlock = 20;
-                        continue;
-                    }
-                    eprintln!("could not set admin flags");
-                    _currentBlock = 20;
-                } else {
-                    if _write_metadata(state, 0x80u8, data.as_mut_ptr(), cb_data) == ErrorKind::Ok {
+                    } else {
+                        if _write_metadata(state, 0x80u8, data.as_mut_ptr(), cb_data)
+                            == ErrorKind::Ok
+                        {
+                            _currentBlock = 20;
+                            continue;
+                        }
+                        if (*state).verbose == 0 {
+                            _currentBlock = 20;
+                            continue;
+                        }
+                        eprintln!("could not write admin metadata");
                         _currentBlock = 20;
-                        continue;
                     }
-                    if (*state).verbose == 0 {
-                        _currentBlock = 20;
-                        continue;
-                    }
-                    eprintln!("could not write admin metadata");
-                    _currentBlock = 20;
                 }
+            } else {
+                return res;
             }
-        } else {
-            _ykpiv_end_transaction(state);
-            return res;
         }
-    }
+    })
 }
 
 /// PIV container
@@ -674,60 +655,56 @@ pub unsafe fn ykpiv_util_read_mscmap(
     let mut buf = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_buf: usize = buf.len();
     let mut len: usize = 0;
-    let mut ptr: *mut u8;
 
     if containers.is_null() || n_containers.is_null() {
         res = ErrorKind::GenericError;
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        let mut ptr: *mut u8;
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        *containers = ptr::null_mut();
-        *n_containers = 0;
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            *containers = ptr::null_mut();
+            *n_containers = 0;
 
-        res = _ykpiv_fetch_object(
-            state,
-            YKPIV_OBJ_MSCMAP as i32,
-            buf.as_mut_ptr(),
-            &mut cb_buf,
-        );
+            res = _ykpiv_fetch_object(
+                state,
+                YKPIV_OBJ_MSCMAP as i32,
+                buf.as_mut_ptr(),
+                &mut cb_buf,
+            );
 
-        if res != ErrorKind::Ok {
-            _ykpiv_end_transaction(state);
-            return res;
-        }
+            if res != ErrorKind::Ok {
+                return res;
+            }
 
-        ptr = buf.as_mut_ptr();
+            ptr = buf.as_mut_ptr();
 
-        if cb_buf < CB_OBJ_TAG_MIN {
-            _ykpiv_end_transaction(state);
-            return ErrorKind::Ok;
-        }
-
-        if *ptr == TAG_MSCMAP {
-            ptr = ptr.add(1);
-            ptr = ptr.add(_ykpiv_get_length(ptr, &mut len));
-
-            if len > cb_buf - (ptr as isize - buf.as_mut_ptr() as isize) as usize {
-                _ykpiv_end_transaction(state);
+            if cb_buf < CB_OBJ_TAG_MIN {
                 return ErrorKind::Ok;
             }
 
-            *containers = calloc(len, 1) as (*mut YkPivContainer);
+            if *ptr == TAG_MSCMAP {
+                ptr = ptr.add(1);
+                ptr = ptr.add(_ykpiv_get_length(ptr, &mut len));
 
-            if (*containers).is_null() {
-                res = ErrorKind::MemoryError;
-            } else {
-                memcpy(*containers as (*mut c_void), ptr as (*const c_void), len);
-                *n_containers = len.wrapping_div(mem::size_of::<YkPivContainer>());
+                if len > cb_buf - (ptr as isize - buf.as_mut_ptr() as isize) as usize {
+                    return ErrorKind::Ok;
+                }
+
+                *containers = calloc(len, 1) as (*mut YkPivContainer);
+
+                if (*containers).is_null() {
+                    res = ErrorKind::MemoryError;
+                } else {
+                    memcpy(*containers as (*mut c_void), ptr as (*const c_void), len);
+                    *n_containers = len.wrapping_div(mem::size_of::<YkPivContainer>());
+                }
             }
         }
-    }
 
-    res
+        res
+    })
 }
 
 /// Get max object size
@@ -750,43 +727,38 @@ pub unsafe fn ykpiv_util_write_mscmap(
     let mut offset: usize = 0;
     let data_len: usize = n_containers.wrapping_mul(mem::size_of::<YkPivContainer>());
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            if containers.is_null() || n_containers == 0 {
+                if !containers.is_null() || n_containers != 0 {
+                    res = ErrorKind::GenericError;
+                } else {
+                    res = _ykpiv_save_object(state, YKPIV_OBJ_MSCMAP as i32, ptr::null_mut(), 0);
+                }
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        if containers.is_null() || n_containers == 0 {
-            if !containers.is_null() || n_containers != 0 {
-                res = ErrorKind::GenericError;
-            } else {
-                res = _ykpiv_save_object(state, YKPIV_OBJ_MSCMAP as i32, ptr::null_mut(), 0);
+                return res;
             }
 
-            _ykpiv_end_transaction(state);
-            return res;
+            let req_len = 1 + _ykpiv_set_length(buf.as_mut_ptr(), data_len) + data_len;
+
+            if req_len > _obj_size_max(state) {
+                return ErrorKind::SizeError;
+            }
+
+            buf[offset] = 0x81;
+            offset += 1;
+            offset += _ykpiv_set_length(buf.as_mut_ptr().add(offset), data_len);
+            memcpy(
+                buf.as_mut_ptr().add(offset) as (*mut c_void),
+                containers as (*mut u8) as (*const c_void),
+                data_len,
+            );
+            offset = offset.wrapping_add(data_len);
+            res = _ykpiv_save_object(state, YKPIV_OBJ_MSCMAP as i32, buf.as_mut_ptr(), offset);
         }
 
-        let req_len = 1 + _ykpiv_set_length(buf.as_mut_ptr(), data_len) + data_len;
-
-        if req_len > _obj_size_max(state) {
-            _ykpiv_end_transaction(state);
-            return ErrorKind::SizeError;
-        }
-
-        buf[offset] = 0x81;
-        offset += 1;
-        offset += _ykpiv_set_length(buf.as_mut_ptr().add(offset), data_len);
-        memcpy(
-            buf.as_mut_ptr().add(offset) as (*mut c_void),
-            containers as (*mut u8) as (*const c_void),
-            data_len,
-        );
-        offset = offset.wrapping_add(data_len);
-        res = _ykpiv_save_object(state, YKPIV_OBJ_MSCMAP as i32, buf.as_mut_ptr(), offset);
-    }
-
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Read msroots
@@ -795,128 +767,126 @@ pub unsafe fn ykpiv_util_read_msroots(
     data: *mut *mut u8,
     data_len: *mut usize,
 ) -> ErrorKind {
-    let mut _currentBlock;
-    let mut res = ErrorKind::Ok;
-    let mut buf = [0u8; YKPIV_OBJ_MAX_SIZE];
-    let mut cb_buf: usize;
-    let mut len: usize = 0;
-    let mut ptr: *mut u8;
-    let mut object_id: i32;
-    let mut tag: u8;
-    let mut p_data: *mut u8 = ptr::null_mut();
-    let mut p_temp: *mut u8;
-    let mut cb_data: usize;
-    let mut cb_realloc: usize;
-    let mut offset: usize = 0;
-
     if data.is_null() || data_len.is_null() {
         return ErrorKind::GenericError;
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        let mut _currentBlock;
+        let mut res = ErrorKind::Ok;
+        let mut buf = [0u8; YKPIV_OBJ_MAX_SIZE];
+        let mut cb_buf: usize;
+        let mut len: usize = 0;
+        let mut ptr: *mut u8;
+        let mut object_id: i32;
+        let mut tag: u8;
+        let mut p_data: *mut u8 = ptr::null_mut();
+        let mut p_temp: *mut u8;
+        let mut cb_data: usize;
+        let mut cb_realloc: usize;
+        let mut offset: usize = 0;
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        *data = ptr::null_mut();
-        *data_len = 0;
-        cb_data = _obj_size_max(state);
-        p_data = calloc(cb_data, 1) as (*mut u8);
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            *data = ptr::null_mut();
+            *data_len = 0;
+            cb_data = _obj_size_max(state);
+            p_data = calloc(cb_data, 1) as (*mut u8);
 
-        if p_data.is_null() {
-            res = ErrorKind::MemoryError;
-        } else {
-            object_id = YKPIV_OBJ_MSROOTS1 as i32;
-            loop {
-                if object_id > YKPIV_OBJ_MSROOTS5 as i32 {
-                    _currentBlock = 15;
-                    break;
-                }
-                cb_buf = buf.len();
-
-                res = _ykpiv_fetch_object(state, object_id, buf.as_mut_ptr(), &mut cb_buf);
-
-                if res != ErrorKind::Ok {
-                    _currentBlock = 21;
-                    break;
-                }
-
-                ptr = buf.as_mut_ptr();
-                if cb_buf < 2 {
-                    _currentBlock = 19;
-                    break;
-                }
-
-                tag = *{
-                    let _old = ptr;
-                    ptr = ptr.offset(1);
-                    _old
-                };
-
-                if tag != 0x82 && (tag != 0x83 || object_id == YKPIV_OBJ_MSROOTS5 as i32) {
-                    _currentBlock = 18;
-                    break;
-                }
-
-                ptr = ptr.add(_ykpiv_get_length(ptr, &mut len));
-
-                if len > cb_buf - (ptr as isize - buf.as_mut_ptr() as isize) as usize {
-                    _currentBlock = 17;
-                    break;
-                }
-
-                cb_realloc = if len > cb_data.wrapping_sub(offset) {
-                    len.wrapping_sub(cb_data.wrapping_sub(offset))
-                } else {
-                    0
-                };
-
-                if cb_realloc != 0 {
-                    if {
-                        p_temp = realloc(p_data as (*mut c_void), cb_data.wrapping_add(cb_realloc))
-                            as (*mut u8);
-                        p_temp
-                    }
-                    .is_null()
-                    {
-                        _currentBlock = 16;
-                        break;
-                    }
-                    p_data = p_temp;
-                }
-                cb_data = cb_data.wrapping_add(cb_realloc);
-                memcpy(
-                    p_data.add(offset) as (*mut c_void),
-                    ptr as (*const c_void),
-                    len,
-                );
-                offset = offset.wrapping_add(len);
-                if tag == 0x82 {
-                    _currentBlock = 15;
-                    break;
-                }
-                object_id += 1;
-            }
-            if _currentBlock == 21 {
-            } else if _currentBlock == 15 {
-                *data = p_data;
-                p_data = ptr::null_mut();
-                *data_len = offset;
-                res = ErrorKind::Ok;
-            } else if _currentBlock == 16 {
+            if p_data.is_null() {
                 res = ErrorKind::MemoryError;
             } else {
-                res = ErrorKind::Ok;
+                object_id = YKPIV_OBJ_MSROOTS1 as i32;
+                loop {
+                    if object_id > YKPIV_OBJ_MSROOTS5 as i32 {
+                        _currentBlock = 15;
+                        break;
+                    }
+                    cb_buf = buf.len();
+
+                    res = _ykpiv_fetch_object(state, object_id, buf.as_mut_ptr(), &mut cb_buf);
+
+                    if res != ErrorKind::Ok {
+                        _currentBlock = 21;
+                        break;
+                    }
+
+                    ptr = buf.as_mut_ptr();
+                    if cb_buf < 2 {
+                        _currentBlock = 19;
+                        break;
+                    }
+
+                    tag = *{
+                        let _old = ptr;
+                        ptr = ptr.offset(1);
+                        _old
+                    };
+
+                    if tag != 0x82 && (tag != 0x83 || object_id == YKPIV_OBJ_MSROOTS5 as i32) {
+                        _currentBlock = 18;
+                        break;
+                    }
+
+                    ptr = ptr.add(_ykpiv_get_length(ptr, &mut len));
+
+                    if len > cb_buf - (ptr as isize - buf.as_mut_ptr() as isize) as usize {
+                        _currentBlock = 17;
+                        break;
+                    }
+
+                    cb_realloc = if len > cb_data.wrapping_sub(offset) {
+                        len.wrapping_sub(cb_data.wrapping_sub(offset))
+                    } else {
+                        0
+                    };
+
+                    if cb_realloc != 0 {
+                        if {
+                            p_temp =
+                                realloc(p_data as (*mut c_void), cb_data.wrapping_add(cb_realloc))
+                                    as (*mut u8);
+                            p_temp
+                        }
+                        .is_null()
+                        {
+                            _currentBlock = 16;
+                            break;
+                        }
+                        p_data = p_temp;
+                    }
+                    cb_data = cb_data.wrapping_add(cb_realloc);
+                    memcpy(
+                        p_data.add(offset) as (*mut c_void),
+                        ptr as (*const c_void),
+                        len,
+                    );
+                    offset = offset.wrapping_add(len);
+                    if tag == 0x82 {
+                        _currentBlock = 15;
+                        break;
+                    }
+                    object_id += 1;
+                }
+                if _currentBlock == 21 {
+                } else if _currentBlock == 15 {
+                    *data = p_data;
+                    p_data = ptr::null_mut();
+                    *data_len = offset;
+                    res = ErrorKind::Ok;
+                } else if _currentBlock == 16 {
+                    res = ErrorKind::MemoryError;
+                } else {
+                    res = ErrorKind::Ok;
+                }
             }
         }
-    }
 
-    if !p_data.is_null() {
-        free(p_data as (*mut c_void));
-    }
+        if !p_data.is_null() {
+            free(p_data as (*mut c_void));
+        }
 
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Write msroots
@@ -927,78 +897,74 @@ pub unsafe fn ykpiv_util_write_msroots(
 ) -> ErrorKind {
     let mut res: ErrorKind = ErrorKind::Ok;
     let mut buf = [0u8; CB_OBJ_MAX];
-    let mut offset: usize;
     let mut data_offset: usize = 0;
-    let mut data_chunk: usize;
-    let n_objs: usize;
     let cb_obj_max = _obj_size_max(state);
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        let mut offset: usize;
+        let mut data_chunk: usize;
+        let n_objs: usize;
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        if data.is_null() || data_len == 0 {
-            if !data.is_null() || data_len != 0 {
-                res = ErrorKind::GenericError;
-            } else {
-                res = _ykpiv_save_object(state, YKPIV_OBJ_MSROOTS1 as i32, ptr::null_mut(), 0);
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            if data.is_null() || data_len == 0 {
+                if !data.is_null() || data_len != 0 {
+                    res = ErrorKind::GenericError;
+                } else {
+                    res = _ykpiv_save_object(state, YKPIV_OBJ_MSROOTS1 as i32, ptr::null_mut(), 0);
+                }
+
+                return res;
             }
 
-            _ykpiv_end_transaction(state);
-            return res;
-        }
+            n_objs = (data_len / (cb_obj_max - 4)) + 1;
 
-        n_objs = (data_len / (cb_obj_max - 4)) + 1;
-
-        if n_objs > 5 {
-            _ykpiv_end_transaction(state);
-            return ErrorKind::SizeError;
-        }
-
-        for i in 0..n_objs {
-            offset = 0;
-
-            data_chunk = if cb_obj_max - 4 < data_len - data_offset {
-                cb_obj_max - 4
-            } else {
-                data_len - data_offset
-            };
-
-            buf[offset] = if i == n_objs - 1 {
-                TAG_MSROOTS_END
-            } else {
-                TAG_MSROOTS_MID
-            };
-
-            offset += 1;
-            offset += _ykpiv_set_length(buf.as_mut_ptr().add(offset), data_chunk);
-
-            memcpy(
-                buf.as_mut_ptr().add(offset) as *mut c_void,
-                data.add(data_offset) as *const c_void,
-                data_chunk,
-            );
-
-            offset = offset.wrapping_add(data_chunk);
-
-            res = _ykpiv_save_object(
-                state,
-                (YKPIV_OBJ_MSROOTS1 + i as u32) as i32,
-                buf.as_mut_ptr(),
-                offset,
-            );
-
-            if res != ErrorKind::Ok {
-                break;
+            if n_objs > 5 {
+                return ErrorKind::SizeError;
             }
 
-            data_offset = data_offset.wrapping_add(data_chunk);
-        }
-    }
+            for i in 0..n_objs {
+                offset = 0;
 
-    _ykpiv_end_transaction(state);
-    res
+                data_chunk = if cb_obj_max - 4 < data_len - data_offset {
+                    cb_obj_max - 4
+                } else {
+                    data_len - data_offset
+                };
+
+                buf[offset] = if i == n_objs - 1 {
+                    TAG_MSROOTS_END
+                } else {
+                    TAG_MSROOTS_MID
+                };
+
+                offset += 1;
+                offset += _ykpiv_set_length(buf.as_mut_ptr().add(offset), data_chunk);
+
+                memcpy(
+                    buf.as_mut_ptr().add(offset) as *mut c_void,
+                    data.add(data_offset) as *const c_void,
+                    data_chunk,
+                );
+
+                offset = offset.wrapping_add(data_chunk);
+
+                res = _ykpiv_save_object(
+                    state,
+                    (YKPIV_OBJ_MSROOTS1 + i as u32) as i32,
+                    buf.as_mut_ptr(),
+                    offset,
+                );
+
+                if res != ErrorKind::Ok {
+                    break;
+                }
+
+                data_offset = data_offset.wrapping_add(data_chunk);
+            }
+        }
+
+        res
+    })
 }
 
 // Keygen messages
@@ -1034,12 +1000,6 @@ pub unsafe fn ykpiv_util_generate_key(
     let mut templ = [0, YKPIV_INS_GENERATE_ASYMMETRIC, 0, 0];
     let mut recv_len = data.len();
     let mut sw: i32 = 0;
-    let mut ptr_modulus: *mut u8 = ptr::null_mut();
-    let cb_modulus: usize;
-    let mut ptr_exp: *mut u8 = ptr::null_mut();
-    let cb_exp: usize;
-    let mut ptr_point: *mut u8 = ptr::null_mut();
-    let cb_point: usize;
     let setting_roca: SettingBool;
 
     if state.is_null() {
@@ -1120,271 +1080,275 @@ pub unsafe fn ykpiv_util_generate_key(
         }
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        let mut ptr_modulus: *mut u8 = ptr::null_mut();
+        let cb_modulus: usize;
+        let mut ptr_exp: *mut u8 = ptr::null_mut();
+        let cb_exp: usize;
+        let mut ptr_point: *mut u8 = ptr::null_mut();
+        let cb_point: usize;
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        templ[3] = slot;
-        *{
-            let _old = in_ptr;
-            in_ptr = in_ptr.offset(1);
-            _old
-        } = 0xac;
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            templ[3] = slot;
+            *{
+                let _old = in_ptr;
+                in_ptr = in_ptr.offset(1);
+                _old
+            } = 0xac;
 
-        *{
-            let _old = in_ptr;
-            in_ptr = in_ptr.offset(1);
-            _old
-        } = 3;
+            *{
+                let _old = in_ptr;
+                in_ptr = in_ptr.offset(1);
+                _old
+            } = 3;
 
-        *{
-            let _old = in_ptr;
-            in_ptr = in_ptr.offset(1);
-            _old
-        } = YKPIV_ALGO_TAG;
+            *{
+                let _old = in_ptr;
+                in_ptr = in_ptr.offset(1);
+                _old
+            } = YKPIV_ALGO_TAG;
 
-        *{
-            let _old = in_ptr;
-            in_ptr = in_ptr.offset(1);
-            _old
-        } = 1;
+            *{
+                let _old = in_ptr;
+                in_ptr = in_ptr.offset(1);
+                _old
+            } = 1;
 
-        *{
-            let _old = in_ptr;
-            in_ptr = in_ptr.offset(1);
-            _old
-        } = algorithm;
+            *{
+                let _old = in_ptr;
+                in_ptr = in_ptr.offset(1);
+                _old
+            } = algorithm;
 
-        if in_data[4] == 0 {
-            res = ErrorKind::AlgorithmError;
-            if (*state).verbose != 0 {
-                eprintln!("Unexpected algorithm.\n");
-            }
-        } else {
-            if pin_policy != YKPIV_PINPOLICY_DEFAULT {
-                let _rhs = 3;
-                let _lhs = &mut in_data[1];
-                *_lhs = (*_lhs as (i32) + _rhs) as (u8);
-                *{
-                    let _old = in_ptr;
-                    in_ptr = in_ptr.offset(1);
-                    _old
-                } = YKPIV_PINPOLICY_TAG;
-                *{
-                    let _old = in_ptr;
-                    in_ptr = in_ptr.offset(1);
-                    _old
-                } = 1u8;
-                *{
-                    let _old = in_ptr;
-                    in_ptr = in_ptr.offset(1);
-                    _old
-                } = pin_policy;
-            }
-
-            if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT {
-                let _rhs = 3i32;
-                let _lhs = &mut in_data[1];
-                *_lhs = (*_lhs as (i32) + _rhs) as (u8);
-                *{
-                    let _old = in_ptr;
-                    in_ptr = in_ptr.offset(1);
-                    _old
-                } = YKPIV_TOUCHPOLICY_TAG;
-                *{
-                    let _old = in_ptr;
-                    in_ptr = in_ptr.offset(1);
-                    _old
-                } = 1u8;
-                *{
-                    let _old = in_ptr;
-                    in_ptr = in_ptr.offset(1);
-                    _old
-                } = touch_policy;
-            }
-
-            res = _ykpiv_transfer_data(
-                state,
-                templ.as_ptr(),
-                in_data.as_mut_ptr(),
-                in_ptr as isize - in_data.as_mut_ptr() as isize,
-                data.as_mut_ptr(),
-                &mut recv_len,
-                &mut sw,
-            );
-
-            if res != ErrorKind::Ok {
+            if in_data[4] == 0 {
+                res = ErrorKind::AlgorithmError;
                 if (*state).verbose != 0 {
-                    eprintln!("Failed to communicate.");
-                }
-            } else if sw != SW_SUCCESS {
-                if (*state).verbose != 0 {
-                    eprint!("Failed to generate new key (");
-                }
-
-                match sw {
-                    SW_ERR_INCORRECT_SLOT => {
-                        res = ErrorKind::KeyError;
-                        if (*state).verbose != 0 {
-                            eprintln!("incorrect slot)");
-                        }
-                    }
-                    SW_ERR_INCORRECT_PARAM => {
-                        res = ErrorKind::AlgorithmError;
-                        if (*state).verbose != 0 {
-                            if pin_policy as (i32) != 0i32 {
-                                eprintln!("pin policy not supported?)",);
-                            } else if touch_policy as (i32) != 0i32 {
-                                eprintln!("touch policy not supported?)",);
-                            } else {
-                                eprintln!("algorithm not supported?)",);
-                            }
-                        }
-                    }
-                    SW_ERR_SECURITY_STATUS => {
-                        res = ErrorKind::AuthenticationError;
-                        if (*state).verbose != 0 {
-                            eprintln!("not authenticated)");
-                        }
-                    }
-                    _ => {
-                        res = ErrorKind::GenericError;
-                        if (*state).verbose != 0 {
-                            eprintln!("error {:x})", sw);
-                        }
-                    }
-                }
-            } else if algorithm == YKPIV_ALGO_RSA1024 || algorithm == YKPIV_ALGO_RSA2048 {
-                let mut data_ptr: *mut u8 = data.as_mut_ptr().offset(5);
-                let mut len: usize = 0;
-                if *data_ptr != TAG_RSA_MODULUS {
-                    if (*state).verbose != 0 {
-                        eprintln!("Failed to parse public key structure (modulus).");
-                    }
-                    res = ErrorKind::ParseError;
-                } else {
-                    data_ptr = data_ptr.add(1);
-                    data_ptr = data_ptr.add(_ykpiv_get_length(data_ptr, &mut len));
-                    cb_modulus = len;
-                    ptr_modulus = calloc(cb_modulus, 1) as *mut u8;
-                    if ptr_modulus.is_null() {
-                        if (*state).verbose != 0 {
-                            eprintln!("Failed to allocate memory for modulus.");
-                        }
-                        res = ErrorKind::MemoryError;
-                    } else {
-                        memcpy(
-                            ptr_modulus as *mut c_void,
-                            data_ptr as *const c_void,
-                            cb_modulus,
-                        );
-                        data_ptr = data_ptr.add(len);
-                        if *data_ptr != TAG_RSA_EXP {
-                            if (*state).verbose != 0 {
-                                eprintln!(
-                                    "Failed to parse public key structure (public exponent)."
-                                );
-                            }
-                            res = ErrorKind::ParseError;
-                        } else {
-                            data_ptr = data_ptr.add(1);
-                            data_ptr = data_ptr.add(_ykpiv_get_length(data_ptr, &mut len));
-                            cb_exp = len;
-                            ptr_exp = calloc(cb_exp, 1) as *mut u8;
-                            if ptr_exp.is_null() {
-                                if (*state).verbose != 0 {
-                                    eprintln!("Failed to allocate memory for public exponent.");
-                                }
-                                res = ErrorKind::MemoryError;
-                            } else {
-                                memcpy(
-                                    ptr_exp as (*mut c_void),
-                                    data_ptr as (*const c_void),
-                                    cb_exp,
-                                );
-                                *modulus = ptr_modulus;
-                                ptr_modulus = ptr::null_mut();
-                                *modulus_len = cb_modulus;
-                                *exp = ptr_exp;
-                                ptr_exp = ptr::null_mut();
-                                *exp_len = cb_exp;
-                            }
-                        }
-                    }
-                }
-            } else if algorithm == YKPIV_ALGO_ECCP256 || algorithm == YKPIV_ALGO_ECCP384 {
-                let mut data_ptr: *mut u8 = data.as_mut_ptr().offset(3);
-
-                let len = if algorithm == YKPIV_ALGO_ECCP256 {
-                    CB_ECC_POINTP256
-                } else {
-                    CB_ECC_POINTP384
-                };
-
-                if *{
-                    let _old = data_ptr;
-                    data_ptr = data_ptr.offset(1);
-                    _old
-                } != TAG_ECC_POINT
-                {
-                    if (*state).verbose != 0 {
-                        eprintln!("Failed to parse public key structure.\n",);
-                    }
-                    res = ErrorKind::ParseError;
-                } else if *{
-                    let _old = data_ptr;
-                    data_ptr = data_ptr.offset(1);
-                    _old
-                } as (usize)
-                    != len
-                {
-                    if (*state).verbose != 0 {
-                        eprintln!("Unexpected length.\n");
-                    }
-                    res = ErrorKind::AlgorithmError;
-                } else {
-                    cb_point = len;
-                    ptr_point = calloc(cb_point, 1) as (*mut u8);
-                    if ptr_point.is_null() {
-                        if (*state).verbose != 0 {
-                            eprintln!("Failed to allocate memory for public point.");
-                        }
-                        res = ErrorKind::MemoryError;
-                    } else {
-                        memcpy(
-                            ptr_point as (*mut c_void),
-                            data_ptr as (*const c_void),
-                            cb_point,
-                        );
-                        *point = ptr_point;
-                        ptr_point = ptr::null_mut();
-                        *point_len = cb_point;
-                    }
+                    eprintln!("Unexpected algorithm.\n");
                 }
             } else {
-                if (*state).verbose != 0 {
-                    eprintln!("Wrong algorithm.");
+                if pin_policy != YKPIV_PINPOLICY_DEFAULT {
+                    let _rhs = 3;
+                    let _lhs = &mut in_data[1];
+                    *_lhs = (*_lhs as (i32) + _rhs) as (u8);
+                    *{
+                        let _old = in_ptr;
+                        in_ptr = in_ptr.offset(1);
+                        _old
+                    } = YKPIV_PINPOLICY_TAG;
+                    *{
+                        let _old = in_ptr;
+                        in_ptr = in_ptr.offset(1);
+                        _old
+                    } = 1u8;
+                    *{
+                        let _old = in_ptr;
+                        in_ptr = in_ptr.offset(1);
+                        _old
+                    } = pin_policy;
                 }
-                res = ErrorKind::AlgorithmError;
+
+                if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT {
+                    let _rhs = 3i32;
+                    let _lhs = &mut in_data[1];
+                    *_lhs = (*_lhs as (i32) + _rhs) as (u8);
+                    *{
+                        let _old = in_ptr;
+                        in_ptr = in_ptr.offset(1);
+                        _old
+                    } = YKPIV_TOUCHPOLICY_TAG;
+                    *{
+                        let _old = in_ptr;
+                        in_ptr = in_ptr.offset(1);
+                        _old
+                    } = 1u8;
+                    *{
+                        let _old = in_ptr;
+                        in_ptr = in_ptr.offset(1);
+                        _old
+                    } = touch_policy;
+                }
+
+                res = _ykpiv_transfer_data(
+                    state,
+                    templ.as_ptr(),
+                    in_data.as_mut_ptr(),
+                    in_ptr as isize - in_data.as_mut_ptr() as isize,
+                    data.as_mut_ptr(),
+                    &mut recv_len,
+                    &mut sw,
+                );
+
+                if res != ErrorKind::Ok {
+                    if (*state).verbose != 0 {
+                        eprintln!("Failed to communicate.");
+                    }
+                } else if sw != SW_SUCCESS {
+                    if (*state).verbose != 0 {
+                        eprint!("Failed to generate new key (");
+                    }
+
+                    match sw {
+                        SW_ERR_INCORRECT_SLOT => {
+                            res = ErrorKind::KeyError;
+                            if (*state).verbose != 0 {
+                                eprintln!("incorrect slot)");
+                            }
+                        }
+                        SW_ERR_INCORRECT_PARAM => {
+                            res = ErrorKind::AlgorithmError;
+                            if (*state).verbose != 0 {
+                                if pin_policy as (i32) != 0i32 {
+                                    eprintln!("pin policy not supported?)",);
+                                } else if touch_policy as (i32) != 0i32 {
+                                    eprintln!("touch policy not supported?)",);
+                                } else {
+                                    eprintln!("algorithm not supported?)",);
+                                }
+                            }
+                        }
+                        SW_ERR_SECURITY_STATUS => {
+                            res = ErrorKind::AuthenticationError;
+                            if (*state).verbose != 0 {
+                                eprintln!("not authenticated)");
+                            }
+                        }
+                        _ => {
+                            res = ErrorKind::GenericError;
+                            if (*state).verbose != 0 {
+                                eprintln!("error {:x})", sw);
+                            }
+                        }
+                    }
+                } else if algorithm == YKPIV_ALGO_RSA1024 || algorithm == YKPIV_ALGO_RSA2048 {
+                    let mut data_ptr: *mut u8 = data.as_mut_ptr().offset(5);
+                    let mut len: usize = 0;
+                    if *data_ptr != TAG_RSA_MODULUS {
+                        if (*state).verbose != 0 {
+                            eprintln!("Failed to parse public key structure (modulus).");
+                        }
+                        res = ErrorKind::ParseError;
+                    } else {
+                        data_ptr = data_ptr.add(1);
+                        data_ptr = data_ptr.add(_ykpiv_get_length(data_ptr, &mut len));
+                        cb_modulus = len;
+                        ptr_modulus = calloc(cb_modulus, 1) as *mut u8;
+                        if ptr_modulus.is_null() {
+                            if (*state).verbose != 0 {
+                                eprintln!("Failed to allocate memory for modulus.");
+                            }
+                            res = ErrorKind::MemoryError;
+                        } else {
+                            memcpy(
+                                ptr_modulus as *mut c_void,
+                                data_ptr as *const c_void,
+                                cb_modulus,
+                            );
+                            data_ptr = data_ptr.add(len);
+                            if *data_ptr != TAG_RSA_EXP {
+                                if (*state).verbose != 0 {
+                                    eprintln!(
+                                        "Failed to parse public key structure (public exponent)."
+                                    );
+                                }
+                                res = ErrorKind::ParseError;
+                            } else {
+                                data_ptr = data_ptr.add(1);
+                                data_ptr = data_ptr.add(_ykpiv_get_length(data_ptr, &mut len));
+                                cb_exp = len;
+                                ptr_exp = calloc(cb_exp, 1) as *mut u8;
+                                if ptr_exp.is_null() {
+                                    if (*state).verbose != 0 {
+                                        eprintln!("Failed to allocate memory for public exponent.");
+                                    }
+                                    res = ErrorKind::MemoryError;
+                                } else {
+                                    memcpy(
+                                        ptr_exp as (*mut c_void),
+                                        data_ptr as (*const c_void),
+                                        cb_exp,
+                                    );
+                                    *modulus = ptr_modulus;
+                                    ptr_modulus = ptr::null_mut();
+                                    *modulus_len = cb_modulus;
+                                    *exp = ptr_exp;
+                                    ptr_exp = ptr::null_mut();
+                                    *exp_len = cb_exp;
+                                }
+                            }
+                        }
+                    }
+                } else if algorithm == YKPIV_ALGO_ECCP256 || algorithm == YKPIV_ALGO_ECCP384 {
+                    let mut data_ptr: *mut u8 = data.as_mut_ptr().offset(3);
+
+                    let len = if algorithm == YKPIV_ALGO_ECCP256 {
+                        CB_ECC_POINTP256
+                    } else {
+                        CB_ECC_POINTP384
+                    };
+
+                    if *{
+                        let _old = data_ptr;
+                        data_ptr = data_ptr.offset(1);
+                        _old
+                    } != TAG_ECC_POINT
+                    {
+                        if (*state).verbose != 0 {
+                            eprintln!("Failed to parse public key structure.\n",);
+                        }
+                        res = ErrorKind::ParseError;
+                    } else if *{
+                        let _old = data_ptr;
+                        data_ptr = data_ptr.offset(1);
+                        _old
+                    } as (usize)
+                        != len
+                    {
+                        if (*state).verbose != 0 {
+                            eprintln!("Unexpected length.\n");
+                        }
+                        res = ErrorKind::AlgorithmError;
+                    } else {
+                        cb_point = len;
+                        ptr_point = calloc(cb_point, 1) as (*mut u8);
+                        if ptr_point.is_null() {
+                            if (*state).verbose != 0 {
+                                eprintln!("Failed to allocate memory for public point.");
+                            }
+                            res = ErrorKind::MemoryError;
+                        } else {
+                            memcpy(
+                                ptr_point as (*mut c_void),
+                                data_ptr as (*const c_void),
+                                cb_point,
+                            );
+                            *point = ptr_point;
+                            ptr_point = ptr::null_mut();
+                            *point_len = cb_point;
+                        }
+                    }
+                } else {
+                    if (*state).verbose != 0 {
+                        eprintln!("Wrong algorithm.");
+                    }
+                    res = ErrorKind::AlgorithmError;
+                }
             }
         }
-    }
 
-    if !ptr_modulus.is_null() {
-        free(modulus as (*mut c_void));
-    }
+        if !ptr_modulus.is_null() {
+            free(modulus as (*mut c_void));
+        }
 
-    if !ptr_exp.is_null() {
-        free(ptr_exp as (*mut c_void));
-    }
+        if !ptr_exp.is_null() {
+            free(ptr_exp as (*mut c_void));
+        }
 
-    if !ptr_point.is_null() {
-        free(ptr_exp as (*mut c_void));
-    }
+        if !ptr_point.is_null() {
+            free(ptr_exp as (*mut c_void));
+        }
 
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Config mgm type
@@ -1439,109 +1403,106 @@ pub unsafe fn ykpiv_util_get_config(state: *mut YubiKey, config: *mut YkPivConfi
     (*config).pin_last_changed = 0u32;
     (*config).mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_MANUAL;
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            if _read_metadata(state, 0x80u8, data.as_mut_ptr(), &mut cb_data) == ErrorKind::Ok {
+                if _get_metadata_item(
+                    data.as_mut_ptr(),
+                    cb_data,
+                    0x81u8,
+                    &mut p_item,
+                    &mut cb_item,
+                ) == ErrorKind::Ok
+                {
+                    if *p_item & 0x1 != 0 {
+                        (*config).puk_blocked = 1u8;
+                    }
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        if _read_metadata(state, 0x80u8, data.as_mut_ptr(), &mut cb_data) == ErrorKind::Ok {
-            if _get_metadata_item(
-                data.as_mut_ptr(),
-                cb_data,
-                0x81u8,
-                &mut p_item,
-                &mut cb_item,
-            ) == ErrorKind::Ok
-            {
-                if *p_item & 0x1 != 0 {
-                    (*config).puk_blocked = 1u8;
+                    if *p_item & 0x2 != 0 {
+                        (*config).mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED;
+                    }
+                }
+                if _get_metadata_item(
+                    data.as_mut_ptr(),
+                    cb_data,
+                    0x82u8,
+                    &mut p_item,
+                    &mut cb_item,
+                ) == ErrorKind::Ok
+                {
+                    if (*config).mgm_type as (i32)
+                        != YkPivConfigMgmType::YKPIV_CONFIG_MGM_MANUAL as (i32)
+                    {
+                        if (*state).verbose != 0 {
+                            eprintln!("conflicting types of mgm key administration configured");
+                        }
+                    } else {
+                        (*config).mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_DERIVED;
+                    }
                 }
 
-                if *p_item & 0x2 != 0 {
+                if _get_metadata_item(
+                    data.as_mut_ptr(),
+                    cb_data,
+                    0x83u8,
+                    &mut p_item,
+                    &mut cb_item,
+                ) == ErrorKind::Ok
+                {
+                    if cb_item != 4 {
+                        if (*state).verbose != 0 {
+                            eprintln!("pin timestamp in admin metadata is an invalid size");
+                        }
+                    } else {
+                        // TODO(tarcieri): get rid of memcpy and pointers, replace with slices!
+                        #[allow(trivial_casts)]
+                        memcpy(
+                            &mut (*config).pin_last_changed as (*mut u32) as (*mut c_void),
+                            p_item as (*const c_void),
+                            cb_item,
+                        );
+                    }
+                }
+            }
+            cb_data = mem::size_of::<[u8; YKPIV_OBJ_MAX_SIZE]>();
+            if _read_metadata(state, 0x88u8, data.as_mut_ptr(), &mut cb_data) == ErrorKind::Ok {
+                (*config).protected_data_available = 1u8;
+
+                let res = _get_metadata_item(
+                    data.as_mut_ptr(),
+                    cb_data,
+                    0x81u8,
+                    &mut p_item,
+                    &mut cb_item,
+                );
+
+                if res == ErrorKind::Ok && *p_item as (i32) & 0x1i32 != 0 {
+                    (*config).puk_noblock_on_upgrade = 1u8;
+                }
+
+                let res = _get_metadata_item(
+                    data.as_mut_ptr(),
+                    cb_data,
+                    0x89u8,
+                    &mut p_item,
+                    &mut cb_item,
+                );
+
+                if res == ErrorKind::Ok {
+                    if (*config).mgm_type != YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED
+                        && (*state).verbose != 0
+                    {
+                        eprintln!(
+                             "conflicting types of mgm key administration configured - protected mgm exists"
+                         );
+                    }
                     (*config).mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED;
                 }
             }
-            if _get_metadata_item(
-                data.as_mut_ptr(),
-                cb_data,
-                0x82u8,
-                &mut p_item,
-                &mut cb_item,
-            ) == ErrorKind::Ok
-            {
-                if (*config).mgm_type as (i32)
-                    != YkPivConfigMgmType::YKPIV_CONFIG_MGM_MANUAL as (i32)
-                {
-                    if (*state).verbose != 0 {
-                        eprintln!("conflicting types of mgm key administration configured");
-                    }
-                } else {
-                    (*config).mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_DERIVED;
-                }
-            }
-
-            if _get_metadata_item(
-                data.as_mut_ptr(),
-                cb_data,
-                0x83u8,
-                &mut p_item,
-                &mut cb_item,
-            ) == ErrorKind::Ok
-            {
-                if cb_item != 4 {
-                    if (*state).verbose != 0 {
-                        eprintln!("pin timestamp in admin metadata is an invalid size");
-                    }
-                } else {
-                    // TODO(tarcieri): get rid of memcpy and pointers, replace with slices!
-                    #[allow(trivial_casts)]
-                    memcpy(
-                        &mut (*config).pin_last_changed as (*mut u32) as (*mut c_void),
-                        p_item as (*const c_void),
-                        cb_item,
-                    );
-                }
-            }
         }
-        cb_data = mem::size_of::<[u8; YKPIV_OBJ_MAX_SIZE]>();
-        if _read_metadata(state, 0x88u8, data.as_mut_ptr(), &mut cb_data) == ErrorKind::Ok {
-            (*config).protected_data_available = 1u8;
 
-            let res = _get_metadata_item(
-                data.as_mut_ptr(),
-                cb_data,
-                0x81u8,
-                &mut p_item,
-                &mut cb_item,
-            );
-
-            if res == ErrorKind::Ok && *p_item as (i32) & 0x1i32 != 0 {
-                (*config).puk_noblock_on_upgrade = 1u8;
-            }
-
-            let res = _get_metadata_item(
-                data.as_mut_ptr(),
-                cb_data,
-                0x89u8,
-                &mut p_item,
-                &mut cb_item,
-            );
-
-            if res == ErrorKind::Ok {
-                if (*config).mgm_type != YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED
-                    && (*state).verbose != 0
-                {
-                    eprintln!(
-                             "conflicting types of mgm key administration configured - protected mgm exists"
-                         );
-                }
-                (*config).mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED;
-            }
-        }
-    }
-
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Set PIN last changed
@@ -1549,51 +1510,47 @@ pub unsafe fn ykpiv_util_set_pin_last_changed(state: *mut YubiKey) -> ErrorKind 
     let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_data = data.len();
     let mut res = ErrorKind::Ok;
-    let ykrc: ErrorKind;
 
     if state.is_null() {
         return ErrorKind::GenericError;
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
+    _ykpiv_transaction(state, |state| {
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            let ykrc = _read_metadata(state, 0x80, data.as_mut_ptr(), &mut cb_data);
 
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        ykrc = _read_metadata(state, 0x80, data.as_mut_ptr(), &mut cb_data);
-
-        if ykrc != ErrorKind::Ok {
-            cb_data = 0;
-        }
-
-        let mut tnow = time(ptr::null_mut());
-
-        res = {
-            // TODO(tarcieri): get rid of memcpy and pointers, replace with slices!
-            #[allow(trivial_casts)]
-            _set_metadata_item(
-                data.as_mut_ptr(),
-                &mut cb_data,
-                CB_OBJ_MAX,
-                0x83,
-                &mut tnow as *mut i64 as *mut u8,
-                4,
-            )
-        };
-
-        if res != ErrorKind::Ok {
-            if (*state).verbose != 0 {
-                eprintln!("could not set pin timestamp, err = {}\n", res as (i32),);
+            if ykrc != ErrorKind::Ok {
+                cb_data = 0;
             }
-        } else {
-            res = _write_metadata(state, 0x80u8, data.as_mut_ptr(), cb_data);
-            if res != ErrorKind::Ok && (*state).verbose != 0 {
-                eprintln!("could not write admin data, err = {}", res);
+
+            let mut tnow = time(ptr::null_mut());
+
+            res = {
+                // TODO(tarcieri): get rid of memcpy and pointers, replace with slices!
+                #[allow(trivial_casts)]
+                _set_metadata_item(
+                    data.as_mut_ptr(),
+                    &mut cb_data,
+                    CB_OBJ_MAX,
+                    0x83,
+                    &mut tnow as *mut i64 as *mut u8,
+                    4,
+                )
+            };
+
+            if res != ErrorKind::Ok {
+                if (*state).verbose != 0 {
+                    eprintln!("could not set pin timestamp, err = {}\n", res as (i32),);
+                }
+            } else {
+                res = _write_metadata(state, 0x80u8, data.as_mut_ptr(), cb_data);
+                if res != ErrorKind::Ok && (*state).verbose != 0 {
+                    eprintln!("could not write admin data, err = {}", res);
+                }
             }
         }
-    }
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Management key (MGM)
@@ -1633,56 +1590,53 @@ pub unsafe fn ykpiv_util_get_derived_mgm(
         return ErrorKind::GenericError;
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
-
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        res = _read_metadata(state, 0x80u8, data.as_mut_ptr(), &mut cb_data);
-
-        if res == ErrorKind::Ok {
-            res = _get_metadata_item(
-                data.as_mut_ptr(),
-                cb_data,
-                0x82u8,
-                &mut p_item,
-                &mut cb_item,
-            );
+    _ykpiv_transaction(state, |state| {
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            res = _read_metadata(state, 0x80u8, data.as_mut_ptr(), &mut cb_data);
 
             if res == ErrorKind::Ok {
-                if cb_item != 16usize {
-                    if (*state).verbose != 0 {
-                        eprintln!(
-                            "derived mgm salt exists, but is incorrect size = {}",
-                            cb_item,
-                        );
-                    }
-                    res = ErrorKind::GenericError;
-                } else {
-                    let p5rc = pkcs5_pbkdf2_sha1(
-                        pin,
-                        pin_len,
-                        p_item,
-                        cb_item,
-                        10000,
-                        (*mgm).0.as_mut_ptr(),
-                        (*mgm).0.len(),
-                    );
+                res = _get_metadata_item(
+                    data.as_mut_ptr(),
+                    cb_data,
+                    0x82u8,
+                    &mut p_item,
+                    &mut cb_item,
+                );
 
-                    if p5rc != Pkcs5ErrorKind::Ok {
+                if res == ErrorKind::Ok {
+                    if cb_item != 16usize {
                         if (*state).verbose != 0 {
-                            eprintln!("pbkdf2 failure, err = {:?}", p5rc);
+                            eprintln!(
+                                "derived mgm salt exists, but is incorrect size = {}",
+                                cb_item,
+                            );
                         }
-
                         res = ErrorKind::GenericError;
+                    } else {
+                        let p5rc = pkcs5_pbkdf2_sha1(
+                            pin,
+                            pin_len,
+                            p_item,
+                            cb_item,
+                            10000,
+                            (*mgm).0.as_mut_ptr(),
+                            (*mgm).0.len(),
+                        );
+
+                        if p5rc != Pkcs5ErrorKind::Ok {
+                            if (*state).verbose != 0 {
+                                eprintln!("pbkdf2 failure, err = {:?}", p5rc);
+                            }
+
+                            res = ErrorKind::GenericError;
+                        }
                     }
                 }
             }
         }
-    }
 
-    _ykpiv_end_transaction(state);
-    res
+        res
+    })
 }
 
 /// Get protected management key (MGM)
@@ -1697,66 +1651,61 @@ pub unsafe fn ykpiv_util_get_protected_mgm(state: *mut YubiKey, mgm: *mut YkPivM
         return ErrorKind::GenericError;
     }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
-
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        res = _read_metadata(state, 0x88u8, data.as_mut_ptr(), &mut cb_data);
-
-        if res != ErrorKind::Ok {
-            if (*state).verbose != 0 {
-                eprintln!("could not read protected data, err = {:?}", res);
-            }
-        } else {
-            res = _get_metadata_item(
-                data.as_mut_ptr(),
-                cb_data,
-                0x89u8,
-                &mut p_item,
-                &mut cb_item,
-            );
+    _ykpiv_transaction(state, |state| {
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            res = _read_metadata(state, 0x88u8, data.as_mut_ptr(), &mut cb_data);
 
             if res != ErrorKind::Ok {
                 if (*state).verbose != 0 {
-                    eprintln!(
-                        "could not read protected mgm from metadata, err = {}",
-                        res as (i32),
-                    );
+                    eprintln!("could not read protected data, err = {:?}", res);
                 }
-            } else if cb_item != (*mgm).0.len() {
-                if (*state).verbose != 0 {
-                    eprintln!(
-                        "protected data contains mgm, but is the wrong size = {}",
+            } else {
+                res = _get_metadata_item(
+                    data.as_mut_ptr(),
+                    cb_data,
+                    0x89u8,
+                    &mut p_item,
+                    &mut cb_item,
+                );
+
+                if res != ErrorKind::Ok {
+                    if (*state).verbose != 0 {
+                        eprintln!(
+                            "could not read protected mgm from metadata, err = {}",
+                            res as (i32),
+                        );
+                    }
+                } else if cb_item != (*mgm).0.len() {
+                    if (*state).verbose != 0 {
+                        eprintln!(
+                            "protected data contains mgm, but is the wrong size = {}",
+                            cb_item,
+                        );
+                    }
+                    res = ErrorKind::AuthenticationError;
+                } else {
+                    memcpy(
+                        (*mgm).0.as_mut_ptr() as (*mut c_void),
+                        p_item as (*const c_void),
                         cb_item,
                     );
                 }
-                res = ErrorKind::AuthenticationError;
-            } else {
-                memcpy(
-                    (*mgm).0.as_mut_ptr() as (*mut c_void),
-                    p_item as (*const c_void),
-                    cb_item,
-                );
             }
         }
-    }
 
-    data.zeroize();
-    _ykpiv_end_transaction(state);
-    res
+        data.zeroize();
+        res
+    })
 }
 
 /// Set protected management key (MGM)
 #[allow(clippy::cognitive_complexity)]
 pub unsafe fn ykpiv_util_set_protected_mgm(state: *mut YubiKey, mgm: *mut YkPivMgm) -> ErrorKind {
-    let mut _currentBlock;
     let mut res: ErrorKind = ErrorKind::Ok;
     let mut ykrc: ErrorKind = ErrorKind::Ok;
     let mut prngrc: PRngErrorKind = PRngErrorKind::Ok;
     let mut f_generate: bool;
     let mut mgm_key = [0u8; 24];
-    let mut i: usize;
     let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_data = data.len();
     let mut p_item: *mut u8 = ptr::null_mut();
@@ -1776,184 +1725,174 @@ pub unsafe fn ykpiv_util_set_protected_mgm(state: *mut YubiKey, mgm: *mut YkPivM
             (*mgm).0.as_mut_ptr() as (*const c_void),
             (*mgm).0.len(),
         );
-        i = 0;
-        loop {
-            if i >= 24 {
-                _currentBlock = 8;
-                break;
-            }
-            if mgm_key[i] as (i32) != 0i32 {
-                _currentBlock = 6;
-                break;
-            }
-            i = i.wrapping_add(1);
-        }
-        if _currentBlock == 8 {
-        } else {
-            f_generate = false;
-        }
-    }
 
-    if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
-    }
-
-    if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-        loop {
-            if f_generate {
-                prngrc = _ykpiv_prng_generate(mgm_key.as_mut_ptr(), mem::size_of::<[u8; 24]>());
-                if prngrc != PRngErrorKind::Ok {
-                    _currentBlock = 47;
-                    break;
-                }
-            }
-
-            ykrc = ykpiv_set_mgmkey(state, mgm_key.as_mut_ptr());
-            if ykrc != ErrorKind::Ok {
-                if ErrorKind::KeyError as (i32) != ykrc as (i32) {
-                    _currentBlock = 44;
-                    break;
-                }
-            } else {
+        for i in 0..mgm_key.len() {
+            if mgm_key[i] != 0 {
                 f_generate = false;
-            }
-            if !f_generate {
-                _currentBlock = 16;
                 break;
             }
         }
+    }
 
-        if _currentBlock == 16 {
-            if !mgm.is_null() {
-                memcpy(
-                    (*mgm).0.as_mut_ptr() as (*mut c_void),
-                    mgm_key.as_mut_ptr() as (*const c_void),
-                    (*mgm).0.len(),
-                );
-            }
+    _ykpiv_transaction(state, |state| {
+        let mut _currentBlock;
 
-            ykrc = _read_metadata(state, 0x88u8, data.as_mut_ptr(), &mut cb_data);
-
-            if ykrc != ErrorKind::Ok {
-                cb_data = 0;
-            }
-
-            ykrc = _set_metadata_item(
-                data.as_mut_ptr(),
-                &mut cb_data,
-                CB_OBJ_MAX,
-                0x89,
-                mgm_key.as_mut_ptr(),
-                mgm_key.len(),
-            );
-
-            if ykrc != ErrorKind::Ok {
-                if (*state).verbose != 0 {
-                    eprintln!("could not set protected mgm item, err = {:?}", ykrc);
-                    _currentBlock = 26;
-                } else {
-                    _currentBlock = 26;
+        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            loop {
+                if f_generate {
+                    prngrc = _ykpiv_prng_generate(mgm_key.as_mut_ptr(), mem::size_of::<[u8; 24]>());
+                    if prngrc != PRngErrorKind::Ok {
+                        _currentBlock = 47;
+                        break;
+                    }
                 }
-            } else {
-                ykrc = _write_metadata(state, 0x88u8, data.as_mut_ptr(), cb_data);
+
+                ykrc = ykpiv_set_mgmkey(state, mgm_key.as_mut_ptr());
                 if ykrc != ErrorKind::Ok {
-                    if (*state).verbose != 0 {
-                        eprintln!("could not write protected data, err = {:?}", ykrc);
-                        _currentBlock = 51;
-                    } else {
-                        _currentBlock = 51;
+                    if ErrorKind::KeyError as (i32) != ykrc as (i32) {
+                        _currentBlock = 44;
+                        break;
                     }
                 } else {
-                    _currentBlock = 26;
+                    f_generate = false;
+                }
+                if !f_generate {
+                    _currentBlock = 16;
+                    break;
                 }
             }
 
-            if _currentBlock != 51 {
-                cb_data = YKPIV_OBJ_MAX_SIZE;
-                ykrc = _read_metadata(state, 0x80u8, data.as_mut_ptr(), &mut cb_data);
+            if _currentBlock == 16 {
+                if !mgm.is_null() {
+                    memcpy(
+                        (*mgm).0.as_mut_ptr() as (*mut c_void),
+                        mgm_key.as_mut_ptr() as (*const c_void),
+                        (*mgm).0.len(),
+                    );
+                }
+
+                ykrc = _read_metadata(state, 0x88u8, data.as_mut_ptr(), &mut cb_data);
 
                 if ykrc != ErrorKind::Ok {
                     cb_data = 0;
-                } else {
-                    ykrc = _get_metadata_item(
-                        data.as_mut_ptr(),
-                        cb_data,
-                        0x81u8,
-                        &mut p_item,
-                        &mut cb_item,
-                    );
-
-                    if ykrc != ErrorKind::Ok && (*state).verbose != 0 {
-                        eprintln!("admin data exists, but flags are not present",);
-                    }
-
-                    if cb_item == 1 {
-                        // TODO(tarcieri): get rid of memcpy and pointers, replace with slices!
-                        #[allow(trivial_casts)]
-                        memcpy(
-                            &mut flags_1 as (*mut u8) as (*mut c_void),
-                            p_item as (*const c_void),
-                            cb_item,
-                        );
-                    } else if (*state).verbose != 0 {
-                        eprintln!("admin data flags are an incorrect size = {}", cb_item,);
-                    }
-
-                    ykrc = _set_metadata_item(
-                        data.as_mut_ptr(),
-                        &mut cb_data,
-                        CB_OBJ_MAX,
-                        0x82,
-                        ptr::null_mut(),
-                        0,
-                    );
-
-                    if ykrc != ErrorKind::Ok && (*state).verbose != 0 {
-                        eprintln!("could not unset derived mgm salt, err = {}", ykrc);
-                    }
                 }
-                flags_1 |= 0x2;
 
                 ykrc = _set_metadata_item(
                     data.as_mut_ptr(),
                     &mut cb_data,
                     CB_OBJ_MAX,
-                    0x81,
-                    &mut flags_1,
-                    1,
+                    0x89,
+                    mgm_key.as_mut_ptr(),
+                    mgm_key.len(),
                 );
 
                 if ykrc != ErrorKind::Ok {
                     if (*state).verbose != 0 {
-                        eprintln!("could not set admin flags item, err = {}", ykrc);
+                        eprintln!("could not set protected mgm item, err = {:?}", ykrc);
+                        _currentBlock = 26;
+                    } else {
+                        _currentBlock = 26;
                     }
                 } else {
-                    ykrc = _write_metadata(state, 0x80u8, data.as_mut_ptr(), cb_data);
-                    if ykrc != ErrorKind::Ok && (*state).verbose != 0 {
-                        eprintln!("could not write admin data, err = {}", ykrc);
+                    ykrc = _write_metadata(state, 0x88u8, data.as_mut_ptr(), cb_data);
+                    if ykrc != ErrorKind::Ok {
+                        if (*state).verbose != 0 {
+                            eprintln!("could not write protected data, err = {:?}", ykrc);
+                            _currentBlock = 51;
+                        } else {
+                            _currentBlock = 51;
+                        }
+                    } else {
+                        _currentBlock = 26;
                     }
                 }
-            }
-        } else if _currentBlock == 44 {
-            if (*state).verbose != 0 {
-                eprintln!("could not set new derived mgm key, err = {}", ykrc);
-            }
 
-            res = ykrc;
-        } else {
-            if (*state).verbose != 0 {
-                eprintln!("could not generate new mgm, err = {:?}", prngrc);
-            }
+                if _currentBlock != 51 {
+                    cb_data = YKPIV_OBJ_MAX_SIZE;
+                    ykrc = _read_metadata(state, 0x80u8, data.as_mut_ptr(), &mut cb_data);
 
-            res = ErrorKind::RandomnessError;
+                    if ykrc != ErrorKind::Ok {
+                        cb_data = 0;
+                    } else {
+                        ykrc = _get_metadata_item(
+                            data.as_mut_ptr(),
+                            cb_data,
+                            0x81u8,
+                            &mut p_item,
+                            &mut cb_item,
+                        );
+
+                        if ykrc != ErrorKind::Ok && (*state).verbose != 0 {
+                            eprintln!("admin data exists, but flags are not present",);
+                        }
+
+                        if cb_item == 1 {
+                            // TODO(tarcieri): get rid of memcpy and pointers, replace with slices!
+                            #[allow(trivial_casts)]
+                            memcpy(
+                                &mut flags_1 as (*mut u8) as (*mut c_void),
+                                p_item as (*const c_void),
+                                cb_item,
+                            );
+                        } else if (*state).verbose != 0 {
+                            eprintln!("admin data flags are an incorrect size = {}", cb_item,);
+                        }
+
+                        ykrc = _set_metadata_item(
+                            data.as_mut_ptr(),
+                            &mut cb_data,
+                            CB_OBJ_MAX,
+                            0x82,
+                            ptr::null_mut(),
+                            0,
+                        );
+
+                        if ykrc != ErrorKind::Ok && (*state).verbose != 0 {
+                            eprintln!("could not unset derived mgm salt, err = {}", ykrc);
+                        }
+                    }
+                    flags_1 |= 0x2;
+
+                    ykrc = _set_metadata_item(
+                        data.as_mut_ptr(),
+                        &mut cb_data,
+                        CB_OBJ_MAX,
+                        0x81,
+                        &mut flags_1,
+                        1,
+                    );
+
+                    if ykrc != ErrorKind::Ok {
+                        if (*state).verbose != 0 {
+                            eprintln!("could not set admin flags item, err = {}", ykrc);
+                        }
+                    } else {
+                        ykrc = _write_metadata(state, 0x80u8, data.as_mut_ptr(), cb_data);
+                        if ykrc != ErrorKind::Ok && (*state).verbose != 0 {
+                            eprintln!("could not write admin data, err = {}", ykrc);
+                        }
+                    }
+                }
+            } else if _currentBlock == 44 {
+                if (*state).verbose != 0 {
+                    eprintln!("could not set new derived mgm key, err = {}", ykrc);
+                }
+
+                res = ykrc;
+            } else {
+                if (*state).verbose != 0 {
+                    eprintln!("could not generate new mgm, err = {:?}", prngrc);
+                }
+
+                res = ErrorKind::RandomnessError;
+            }
         }
-    }
 
-    data.zeroize();
-    mgm_key.zeroize();
-    _ykpiv_end_transaction(state);
+        data.zeroize();
+        mgm_key.zeroize();
 
-    res
+        res
+    })
 }
 
 /// Reset
