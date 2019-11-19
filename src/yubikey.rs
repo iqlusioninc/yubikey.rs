@@ -178,15 +178,15 @@ pub(crate) unsafe fn _ykpiv_has_valid_length(buffer: *const u8, len: usize) -> b
 }
 
 /// Initialize YubiKey client instance
-pub unsafe fn ykpiv_init(state: *mut *mut YubiKey, verbose: i32) -> ErrorKind {
+pub unsafe fn ykpiv_init(state: *mut *mut YubiKey, verbose: i32) -> Result<(), ErrorKind> {
     if state.is_null() {
-        return ErrorKind::GenericError;
+        return Err(ErrorKind::GenericError);
     }
 
     let s = malloc(mem::size_of::<YubiKey>()) as (*mut YubiKey);
 
     if s.is_null() {
-        return ErrorKind::MemoryError;
+        return Err(ErrorKind::MemoryError);
     }
 
     memset(s as (*mut c_void), 0i32, mem::size_of::<YubiKey>());
@@ -194,7 +194,7 @@ pub unsafe fn ykpiv_init(state: *mut *mut YubiKey, verbose: i32) -> ErrorKind {
     (*s).verbose = verbose;
     (*s).context = -1i32;
     *state = s;
-    ErrorKind::Ok
+    Ok(())
 }
 
 /// Cleanup YubiKey session
@@ -391,7 +391,7 @@ pub unsafe fn ykpiv_connect_with_external_card(
 }
 
 /// Connect to a YubiKey
-pub unsafe fn ykpiv_connect(state: *mut YubiKey, wanted: *const c_char) -> ErrorKind {
+pub unsafe fn ykpiv_connect(state: *mut YubiKey, wanted: *const c_char) -> Result<(), ErrorKind> {
     let mut _currentBlock;
     let mut active_protocol: u32 = 0;
     let mut reader_buf: [c_char; 2048] = [0; 2048];
@@ -403,7 +403,7 @@ pub unsafe fn ykpiv_connect(state: *mut YubiKey, wanted: *const c_char) -> Error
     let mut ret: ErrorKind = ykpiv_list_readers(state, reader_buf.as_mut_ptr(), &mut num_readers);
 
     if ret != ErrorKind::Ok {
-        return ret;
+        return Err(ret);
     }
     reader_ptr = reader_buf.as_mut_ptr();
     loop {
@@ -494,9 +494,9 @@ pub unsafe fn ykpiv_connect(state: *mut YubiKey, wanted: *const c_char) -> Error
 
             SCardReleaseContext((*state).context);
             (*state).context = -1;
-            return ErrorKind::PcscError;
+            return Err(ErrorKind::PcscError);
         } else {
-            return ErrorKind::GenericError;
+            return Err(ErrorKind::GenericError);
         }
     }
 
@@ -504,12 +504,15 @@ pub unsafe fn ykpiv_connect(state: *mut YubiKey, wanted: *const c_char) -> Error
     // you may not want to select the applet when connecting to a card handle that
     // was supplied by an external library.
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     ret = _ykpiv_select_application(state);
     _ykpiv_end_transaction(state);
-    ret
+    match ret {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// List readers
@@ -879,7 +882,7 @@ pub(crate) unsafe fn _send_data(
 pub const DEFAULT_AUTH_KEY: &[u8] = b"\x01\x02\x03\x04\x05\x06\x07\x08\x01\x02\x03\x04\x05\x06\x07\x08\x01\x02\x03\x04\x05\x06\x07\x08\0";
 
 /// Authenticate to the card
-pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> ErrorKind {
+pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Result<(), ErrorKind> {
     let mut data = [0u8; 261];
     let mut challenge = [0u8; 8];
     let mut recv_len = data.len() as u32;
@@ -890,11 +893,11 @@ pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Err
     let mut res = ErrorKind::Ok;
 
     if state.is_null() {
-        return ErrorKind::GenericError;
+        return Err(ErrorKind::GenericError);
     }
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
@@ -911,7 +914,7 @@ pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Err
                 "didn't expect mgm key to be set by failing op!"
             );
             _ykpiv_end_transaction(state);
-            return ErrorKind::AlgorithmError;
+            return Err(ErrorKind::AlgorithmError);
         }
 
         // get a challenge from the card
@@ -928,12 +931,12 @@ pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Err
 
         if res != ErrorKind::Ok {
             _ykpiv_end_transaction(state);
-            return res;
+            return Err(res);
         }
 
         if sw != SW_SUCCESS {
             _ykpiv_end_transaction(state);
-            return ErrorKind::AuthenticationError;
+            return Err(ErrorKind::AuthenticationError);
         }
 
         memcpy(
@@ -956,7 +959,7 @@ pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Err
 
         if drc != DesErrorKind::Ok {
             _ykpiv_end_transaction(state);
-            return ErrorKind::AuthenticationError;
+            return Err(ErrorKind::AuthenticationError);
         }
 
         recv_len = data.len() as u32;
@@ -982,7 +985,7 @@ pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Err
             }
 
             _ykpiv_end_transaction(state);
-            return ErrorKind::RandomnessError;
+            return Err(ErrorKind::RandomnessError);
         }
 
         memcpy(
@@ -996,12 +999,12 @@ pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Err
 
         if res != ErrorKind::Ok {
             _ykpiv_end_transaction(state);
-            return res;
+            return Err(res);
         }
 
         if sw != SW_SUCCESS {
             _ykpiv_end_transaction(state);
-            return ErrorKind::AuthenticationError;
+            return Err(ErrorKind::AuthenticationError);
         }
 
         // compare the response from the card with our challenge
@@ -1034,7 +1037,10 @@ pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Err
     }
 
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Set the management key (MGM)
@@ -1247,13 +1253,13 @@ pub unsafe fn ykpiv_sign_data(
     out_len: *mut usize,
     algorithm: u8,
     key: u8,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     if state.is_null() {
-        return ErrorKind::GenericError;
+        return Err(ErrorKind::GenericError);
     }
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     // don't attempt to reselect in crypt operations to avoid problems with PIN_ALWAYS
@@ -1263,7 +1269,10 @@ pub unsafe fn ykpiv_sign_data(
     );
 
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Decrypt data using a PIV key
@@ -1275,20 +1284,23 @@ pub unsafe fn ykpiv_decrypt_data(
     out_len: *mut usize,
     algorithm: u8,
     key: u8,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     if state.is_null() {
-        return ErrorKind::GenericError;
+        return Err(ErrorKind::GenericError);
     }
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     // don't attempt to reselect in crypt operations to avoid problems with PIN_ALWAYS
 
     let res = _general_authenticate(state, input, input_len, out, out_len, algorithm, key, true);
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Get the version of the PIV application installed on the YubiKey
@@ -1551,11 +1563,11 @@ pub(crate) unsafe fn _ykpiv_get_serial(
 }
 
 /// Get YubiKey device serial number
-pub unsafe fn ykpiv_get_serial(state: *mut YubiKey, p_serial: *mut u32) -> ErrorKind {
+pub unsafe fn ykpiv_get_serial(state: *mut YubiKey, p_serial: *mut u32) -> Result<(), ErrorKind> {
     let mut res = ErrorKind::Ok;
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
@@ -1563,7 +1575,10 @@ pub unsafe fn ykpiv_get_serial(state: *mut YubiKey, p_serial: *mut u32) -> Error
     }
 
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Cache PIN in memory
@@ -1711,9 +1726,9 @@ pub unsafe fn ykpiv_verify_select(
 }
 
 /// Get the number of PIN retries
-pub unsafe fn ykpiv_get_pin_retries(state: *mut YubiKey, tries: *mut i32) -> ErrorKind {
+pub unsafe fn ykpiv_get_pin_retries(state: *mut YubiKey, tries: *mut i32) -> Result<(), ErrorKind> {
     if state.is_null() || tries.is_null() {
-        return ErrorKind::ArgumentError;
+        return Err(ErrorKind::ArgumentError);
     }
 
     // Force a re-select to unverify, because once verified the spec dictates that
@@ -1722,16 +1737,15 @@ pub unsafe fn ykpiv_get_pin_retries(state: *mut YubiKey, tries: *mut i32) -> Err
     let res = _ykpiv_select_application(state);
 
     if res != ErrorKind::Ok {
-        return res;
+        return Err(res);
     }
 
     let ykrc = ykpiv_verify(state, ptr::null(), tries);
 
     // WRONG_PIN is expected on successful query.
-    if ykrc == ErrorKind::WrongPin {
-        ErrorKind::Ok
-    } else {
-        ykrc
+    match ykrc {
+        ErrorKind::Ok | ErrorKind::WrongPin => Ok(()),
+        e => Err(e),
     }
 }
 
@@ -1740,7 +1754,7 @@ pub unsafe fn ykpiv_set_pin_retries(
     state: *mut YubiKey,
     pin_tries: i32,
     puk_tries: i32,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     let mut res = ErrorKind::Ok;
     let mut templ = [0, YKPIV_INS_SET_PIN_RETRIES, 0, 0];
     let mut data = [0u8; 255];
@@ -1749,18 +1763,18 @@ pub unsafe fn ykpiv_set_pin_retries(
 
     // Special case: if either retry count is 0, it's a successful no-op
     if pin_tries == 0 || puk_tries == 0 {
-        return ErrorKind::Ok;
+        return Ok(());
     }
 
     if pin_tries > 0xff || puk_tries > 0xff || pin_tries < 1 || puk_tries < 1 {
-        return ErrorKind::RangeError;
+        return Err(ErrorKind::RangeError);
     }
 
     templ[2] = pin_tries as (u8);
     templ[3] = puk_tries as (u8);
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
@@ -1785,7 +1799,10 @@ pub unsafe fn ykpiv_set_pin_retries(
     }
 
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Change the PIN
@@ -1890,11 +1907,11 @@ pub unsafe fn ykpiv_change_pin(
     new_pin: *const c_char,
     new_pin_len: usize,
     tries: *mut i32,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     let mut res: ErrorKind = ErrorKind::GenericError;
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
@@ -1916,7 +1933,10 @@ pub unsafe fn ykpiv_change_pin(
     }
 
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Change the PIN Unblocking Key (PUK). PUKs are codes for resetting
@@ -1965,11 +1985,11 @@ pub unsafe fn ykpiv_unblock_pin(
     new_pin: *const c_char,
     new_pin_len: usize,
     tries: *mut i32,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     let mut res = ErrorKind::GenericError;
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
@@ -1977,7 +1997,10 @@ pub unsafe fn ykpiv_unblock_pin(
     }
 
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Fetch an object from the YubiKey
@@ -1986,11 +2009,11 @@ pub unsafe fn ykpiv_fetch_object(
     object_id: i32,
     data: *mut u8,
     len: *mut usize,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     let mut res = ErrorKind::Ok;
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
@@ -1998,7 +2021,10 @@ pub unsafe fn ykpiv_fetch_object(
     }
 
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Fetch an object
@@ -2077,11 +2103,11 @@ pub unsafe fn ykpiv_save_object(
     object_id: i32,
     indata: *mut u8,
     len: usize,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     let mut res = ErrorKind::Ok;
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
@@ -2089,7 +2115,10 @@ pub unsafe fn ykpiv_save_object(
     }
 
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Save an object
@@ -2184,7 +2213,7 @@ pub unsafe fn ykpiv_import_private_key(
     ec_data_len: u8,
     pin_policy: u8,
     touch_policy: u8,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     let mut key_data = [0u8; 1024];
     let mut in_ptr: *mut u8 = key_data.as_mut_ptr();
     let templ = [0, YKPIV_INS_IMPORT_KEY, algorithm, key];
@@ -2199,7 +2228,7 @@ pub unsafe fn ykpiv_import_private_key(
     let mut res = ErrorKind::Ok;
 
     if state.is_null() {
-        return ErrorKind::GenericError;
+        return Err(ErrorKind::GenericError);
     }
 
     if key == YKPIV_KEY_CARDMGM
@@ -2207,7 +2236,7 @@ pub unsafe fn ykpiv_import_private_key(
         || key > YKPIV_KEY_RETIRED20 && (key < YKPIV_KEY_AUTHENTICATION)
         || key > YKPIV_KEY_CARDAUTH && (key != YKPIV_KEY_ATTESTATION)
     {
-        return ErrorKind::KeyError;
+        return Err(ErrorKind::KeyError);
     }
 
     if pin_policy != YKPIV_PINPOLICY_DEFAULT
@@ -2215,7 +2244,7 @@ pub unsafe fn ykpiv_import_private_key(
         && (pin_policy != YKPIV_PINPOLICY_ONCE)
         && (pin_policy != YKPIV_PINPOLICY_ALWAYS)
     {
-        return ErrorKind::GenericError;
+        return Err(ErrorKind::GenericError);
     }
 
     if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT
@@ -2223,13 +2252,13 @@ pub unsafe fn ykpiv_import_private_key(
         && (touch_policy != YKPIV_TOUCHPOLICY_ALWAYS)
         && (touch_policy != YKPIV_TOUCHPOLICY_CACHED)
     {
-        return ErrorKind::GenericError;
+        return Err(ErrorKind::GenericError);
     }
 
     match algorithm {
         YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 => {
             if p_len + q_len + dp_len + dq_len + qinv_len >= 1024 {
-                return ErrorKind::SizeError;
+                return Err(ErrorKind::SizeError);
             } else {
                 if algorithm == YKPIV_ALGO_RSA1024 {
                     elem_len = 64;
@@ -2240,7 +2269,7 @@ pub unsafe fn ykpiv_import_private_key(
                 }
 
                 if p.is_null() || q.is_null() || dp.is_null() || dq.is_null() || qinv.is_null() {
-                    return ErrorKind::GenericError;
+                    return Err(ErrorKind::GenericError);
                 }
 
                 params[0] = p;
@@ -2259,7 +2288,7 @@ pub unsafe fn ykpiv_import_private_key(
         }
         YKPIV_ALGO_ECCP256 | YKPIV_ALGO_ECCP384 => {
             if ec_data_len as (usize) >= key_data.len() {
-                return ErrorKind::SizeError;
+                return Err(ErrorKind::SizeError);
             }
 
             if algorithm == YKPIV_ALGO_ECCP256 {
@@ -2269,7 +2298,7 @@ pub unsafe fn ykpiv_import_private_key(
             }
 
             if ec_data.is_null() {
-                return ErrorKind::GenericError;
+                return Err(ErrorKind::GenericError);
             }
 
             params[0] = ec_data;
@@ -2277,7 +2306,7 @@ pub unsafe fn ykpiv_import_private_key(
             param_tag = 0x6;
             n_params = 1;
         }
-        _ => return ErrorKind::AlgorithmError,
+        _ => return Err(ErrorKind::AlgorithmError),
     }
 
     for i in 0..n_params {
@@ -2289,7 +2318,7 @@ pub unsafe fn ykpiv_import_private_key(
         let remaining = (key_data.as_mut_ptr() as usize) + 1024 - in_ptr as usize;
 
         if padding > remaining {
-            return ErrorKind::AlgorithmError;
+            return Err(ErrorKind::AlgorithmError);
         }
 
         memset(in_ptr as *mut c_void, 0, padding);
@@ -2317,7 +2346,7 @@ pub unsafe fn ykpiv_import_private_key(
     }
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     } else if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
         res = ykpiv_transfer_data(
             state,
@@ -2339,7 +2368,10 @@ pub unsafe fn ykpiv_import_private_key(
 
     key_data.zeroize();
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Generate an attestation certificate for a stored key
@@ -2348,20 +2380,20 @@ pub unsafe fn ykpiv_attest(
     key: u8,
     data: *mut u8,
     data_len: *mut usize,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     let mut res = ErrorKind::GenericError;
     let templ = [0, YKPIV_INS_ATTEST, key, 0];
     let mut sw: i32 = 0;
     let mut ul_data_len: usize;
 
     if state.is_null() || data.is_null() || data_len.is_null() {
-        return ErrorKind::ArgumentError;
+        return Err(ErrorKind::ArgumentError);
     }
 
     ul_data_len = *data_len;
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
@@ -2390,7 +2422,10 @@ pub unsafe fn ykpiv_attest(
     }
 
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Get an auth challenge
@@ -2398,22 +2433,22 @@ pub unsafe fn ykpiv_auth_getchallenge(
     state: *mut YubiKey,
     challenge: *mut u8,
     challenge_len: usize,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     let mut data = [0u8; 261];
     let mut recv_len = data.len() as u32;
     let mut sw: i32 = 0;
     let mut res = ErrorKind::Ok;
 
     if state.is_null() || challenge.is_null() {
-        return ErrorKind::GenericError;
+        return Err(ErrorKind::GenericError);
     }
 
     if challenge_len != 8 {
-        return ErrorKind::SizeError;
+        return Err(ErrorKind::SizeError);
     }
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
@@ -2442,7 +2477,10 @@ pub unsafe fn ykpiv_auth_getchallenge(
     }
 
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// Verify an auth response
@@ -2450,22 +2488,22 @@ pub unsafe fn ykpiv_auth_verifyresponse(
     state: *mut YubiKey,
     response: *mut u8,
     response_len: usize,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     let mut data = [0u8; 261];
     let mut recv_len = data.len() as u32;
     let mut sw: i32 = 0;
     let mut res: ErrorKind;
 
     if state.is_null() || response.is_null() {
-        return ErrorKind::GenericError;
+        return Err(ErrorKind::GenericError);
     }
 
     if response_len != 8 {
-        return ErrorKind::SizeError;
+        return Err(ErrorKind::SizeError);
     }
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     // send the response to the card and a challenge of our own.
@@ -2494,27 +2532,30 @@ pub unsafe fn ykpiv_auth_verifyresponse(
 
     apdu.zeroize();
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
 
 /// MGMT Application ID(?)
 static mut MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
 
 /// Deauthenticate
-pub unsafe fn ykpiv_auth_deauthenticate(state: *mut YubiKey) -> ErrorKind {
+pub unsafe fn ykpiv_auth_deauthenticate(state: *mut YubiKey) -> Result<(), ErrorKind> {
     let mut data = [0u8; 255];
     let mut recv_len = data.len() as u32;
     let mut sw: i32 = 0;
     let mut res: ErrorKind;
 
     if state.is_null() {
-        return ErrorKind::ArgumentError;
+        return Err(ErrorKind::ArgumentError);
     }
 
     res = _ykpiv_begin_transaction(state);
 
     if res != ErrorKind::Ok {
-        return res;
+        return Err(res);
     }
 
     let mut apdu = APDU::default();
@@ -2545,5 +2586,8 @@ pub unsafe fn ykpiv_auth_deauthenticate(state: *mut YubiKey) -> ErrorKind {
     }
 
     _ykpiv_end_transaction(state);
-    res
+    match res {
+        ErrorKind::Ok => Ok(()),
+        e => Err(e),
+    }
 }
