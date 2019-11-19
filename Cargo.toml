@@ -1,9 +1,20 @@
 [package]
-name = "yubikey-piv"
-version = "0.0.0"
-authors = ["Tony Arcieri <bascule@gmail.com>", "Yubico AB"]
-edition = "2018"
-license = "BSD"
+name    = "yubikey-piv"
+version = "0.0.0" # Also update html_root_url in lib.rs when bumping this
+description = """
+Pure Rust host-side driver for the YubiKey Personal Identity Verification (PIV)
+CCID application providing general-purpose public-key signing and encryption
+with hardware-backed private keys for RSA (2048/1024) and ECC (P-256/P-384)
+algorithms (e.g, PKCS#1v1.5, ECDSA)
+"""
+
+authors    = ["Tony Arcieri <bascule@gmail.com>", "Yubico AB"]
+edition    = "2018"
+license    = "BSD"
+repository = "https://github.com/tarcieri/yubikey-piv.rs"
+readme     = "README.md"
+categories = ["api-bindings", "cryptography", "hardware-support"]
+keywords   = ["ccid", "ecdsa", "rsa", "piv", "yubikey"]
 
 [dependencies]
 libc = "0.2"
