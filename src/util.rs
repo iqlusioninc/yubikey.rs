@@ -481,13 +481,11 @@ pub unsafe fn ykpiv_util_write_cert(
     certinfo: u8,
 ) -> ErrorKind {
     _ykpiv_transaction(state, |state| {
-        let mut res: ErrorKind = ErrorKind::Ok;
-
         if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-            res = _write_certificate(state, slot, data, data_len, certinfo);
+            _write_certificate(state, slot, data, data_len, certinfo)
+        } else {
+            ErrorKind::Ok
         }
-
-        res
     })
 }
 
@@ -512,13 +510,11 @@ pub unsafe fn ykpiv_util_block_puk(state: *mut YubiKey) -> ErrorKind {
     }
 
     _ykpiv_transaction(state, |state| {
-        let mut _currentBlock;
-
-        if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-            _currentBlock = 20;
+        let mut _currentBlock = if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
+            20
         } else {
-            _currentBlock = 3;
-        }
+            3
+        };
 
         loop {
             if _currentBlock == 3 {
@@ -1726,8 +1722,8 @@ pub unsafe fn ykpiv_util_set_protected_mgm(state: *mut YubiKey, mgm: *mut YkPivM
             (*mgm).0.len(),
         );
 
-        for i in 0..mgm_key.len() {
-            if mgm_key[i] != 0 {
+        for byte in &mgm_key {
+            if *byte != 0 {
                 f_generate = false;
                 break;
             }

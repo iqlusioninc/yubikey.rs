@@ -1662,11 +1662,11 @@ pub unsafe fn ykpiv_verify_select(
     force_select: bool,
 ) -> ErrorKind {
     _ykpiv_transaction(state, |state| {
-        let mut res = ErrorKind::Ok;
-
-        if force_select {
-            res = _ykpiv_ensure_application_selected(state);
-        }
+        let mut res = if force_select {
+            _ykpiv_ensure_application_selected(state)
+        } else {
+            ErrorKind::Ok
+        };
 
         if res == ErrorKind::Ok {
             res = _verify(state, pin, pin_len, tries);
@@ -1895,10 +1895,8 @@ pub unsafe fn ykpiv_change_puk(
     tries: *mut i32,
 ) -> ErrorKind {
     _ykpiv_transaction(state, |state| {
-        let mut res = ErrorKind::GenericError;
-
         if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-            res = _ykpiv_change_pin(
+            _ykpiv_change_pin(
                 state,
                 2,
                 current_puk,
@@ -1906,10 +1904,10 @@ pub unsafe fn ykpiv_change_puk(
                 new_puk,
                 new_puk_len,
                 tries,
-            );
+            )
+        } else {
+            ErrorKind::GenericError
         }
-
-        res
     })
 }
 
@@ -1924,13 +1922,11 @@ pub unsafe fn ykpiv_unblock_pin(
     tries: *mut i32,
 ) -> ErrorKind {
     _ykpiv_transaction(state, |state| {
-        let mut res = ErrorKind::GenericError;
-
         if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-            res = _ykpiv_change_pin(state, 1, puk, puk_len, new_pin, new_pin_len, tries);
+            _ykpiv_change_pin(state, 1, puk, puk_len, new_pin, new_pin_len, tries)
+        } else {
+            ErrorKind::GenericError
         }
-
-        res
     })
 }
 
@@ -1942,13 +1938,11 @@ pub unsafe fn ykpiv_fetch_object(
     len: *mut usize,
 ) -> ErrorKind {
     _ykpiv_transaction(state, |state| {
-        let mut res = ErrorKind::Ok;
-
         if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-            res = _ykpiv_fetch_object(state, object_id, data, len);
+            _ykpiv_fetch_object(state, object_id, data, len)
+        } else {
+            ErrorKind::Ok
         }
-
-        res
     })
 }
 
@@ -2030,13 +2024,11 @@ pub unsafe fn ykpiv_save_object(
     len: usize,
 ) -> ErrorKind {
     _ykpiv_transaction(state, |state| {
-        let mut res = ErrorKind::Ok;
-
         if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
-            res = _ykpiv_save_object(state, object_id, indata, len);
+            _ykpiv_save_object(state, object_id, indata, len)
+        } else {
+            ErrorKind::Ok
         }
-
-        res
     })
 }
 
