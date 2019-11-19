@@ -51,8 +51,11 @@ jobs:
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
+        env:
+          RUSTFLAGS: -D warnings
         with:
           command: test
+          args: --release
 
   fmt:
     name: Rustfmt

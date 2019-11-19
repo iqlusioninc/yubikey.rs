@@ -72,6 +72,10 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/tarcieri/yubikey-piv.rs/develop/img/logo.png",
+    html_root_url = "https://docs.rs/yubikey-piv/0.0.1"
+)]
 #![warn(
     missing_docs,
     rust_2018_idioms,
