@@ -115,8 +115,8 @@ or conditions.
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [build-image]: https://github.com/tarcieri/yubikey-piv.rs/workflows/Rust/badge.svg
 [build-link]: https://github.com/tarcieri/yubikey-piv.rs/actions
-[gitter-image]: https://badges.gitter.im/tarcieri/yubihsm-piv.rs.svg
-[gitter-link]: https://gitter.im/tarcieri/community
+[gitter-image]: https://badges.gitter.im/yubihsm-piv-rs.svg
+[gitter-link]: https://gitter.im/yubikey-piv-rs/community
 
 [//]: # (general links)
 
