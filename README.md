@@ -55,7 +55,7 @@ USE AT YOUR OWN RISK!
 
 ## Requirements
 
-- Rust 1.36+
+- Rust 1.39+
 
 ## Code of Conduct
 
@@ -111,7 +111,7 @@ or conditions.
 [docs-image]: https://docs.rs/yubikey-piv/badge.svg
 [docs-link]: https://docs.rs/yubikey-piv/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
-[rustc-image]: https://img.shields.io/badge/rustc-1.36+-blue.svg
+[rustc-image]: https://img.shields.io/badge/rustc-1.39+-blue.svg
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [build-image]: https://github.com/tarcieri/yubikey-piv.rs/workflows/Rust/badge.svg
 [build-link]: https://github.com/tarcieri/yubikey-piv.rs/actions
