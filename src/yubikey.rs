@@ -216,7 +216,7 @@ pub unsafe fn ykpiv_done(state: &mut YubiKey) -> Result<(), ErrorKind> {
 }
 
 /// Disconnect a YubiKey session
-pub unsafe fn ykpiv_disconnect(state: &mut YubiKey) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_disconnect(state: &mut YubiKey) {
     if state.card != 0 {
         SCardDisconnect(state.card, 0x1);
         state.card = 0i32;
@@ -226,8 +226,6 @@ pub unsafe fn ykpiv_disconnect(state: &mut YubiKey) -> Result<(), ErrorKind> {
         SCardReleaseContext(state.context);
         state.context = -1i32;
     }
-
-    Ok(())
 }
 
 /// Select application
