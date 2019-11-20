@@ -1,5 +1,6 @@
 //! Application Protocol Data Unit (APDU)
 
+use std::fmt::{self, Debug};
 use zeroize::Zeroize;
 
 /// Application Protocol Data Unit (APDU).
@@ -28,16 +29,25 @@ pub struct APDU {
 }
 
 impl APDU {
-    /// Get a const pointer to this APDU
-    // TODO(tarcieri): eliminate pointers and use all safe references
-    pub(crate) fn as_ptr(&self) -> *const APDU {
-        self
-    }
-
     /// Get a mut pointer to this APDU
     // TODO(tarcieri): eliminate pointers and use all safe references
     pub(crate) fn as_mut_ptr(&mut self) -> *mut APDU {
         self
+    }
+}
+
+impl Debug for APDU {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "APDU {{ cla: {}, ins: {}, p1: {}, p2: {}, lc: {}, data: {:?} }}",
+            self.cla,
+            self.ins,
+            self.p1,
+            self.p2,
+            self.lc,
+            &self.data[..]
+        )
     }
 }
 

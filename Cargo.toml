@@ -18,4 +18,5 @@ keywords   = ["ccid", "ecdsa", "rsa", "piv", "yubikey"]
 
 [dependencies]
 libc = "0.2"
+log = "0.4"
 zeroize = "1"
