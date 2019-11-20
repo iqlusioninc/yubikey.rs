@@ -805,24 +805,24 @@ pub(crate) unsafe fn dump_hex(buf: *const u8, len: u32) {
 /// Send data
 pub(crate) unsafe fn _send_data(
     state: &mut YubiKey,
-    apdu: *mut APDU,
+    apdu: &mut APDU,
     data: *mut u8,
     recv_len: *mut u32,
     sw: *mut i32,
 ) -> Result<(), ErrorKind> {
-    let send_len = (*apdu).lc as u32 + 5;
+    let send_len = apdu.lc as u32 + 5;
     let mut tmp_len = *recv_len;
 
     if state.verbose > 1 {
         eprint!("> ");
-        dump_hex((*apdu).as_ptr() as *const u8, send_len);
+        dump_hex(apdu.as_ptr() as *const u8, send_len);
         eprintln!();
     }
 
     let rc = SCardTransmit(
         state.card,
         SCARD_PCI_T1,
-        (*apdu).as_mut_ptr() as *mut i8,
+        apdu.as_mut_ptr() as *mut i8,
         send_len,
         ptr::null(),
         data,
