@@ -311,7 +311,7 @@ pub unsafe fn ykpiv_util_list_keys(
     data_len: *mut usize,
 ) -> Result<(), ErrorKind> {
     let mut _currentBlock;
-    let mut res: ErrorKind = ErrorKind::Ok;
+    let mut res = Ok(());
     let mut p_key: *mut YkPivKey;
     let mut p_data: *mut u8 = ptr::null_mut();
     let mut p_temp: *mut u8;
@@ -353,7 +353,7 @@ pub unsafe fn ykpiv_util_list_keys(
             cb_buf = buf.len();
             res = _read_certificate(state, SLOTS[i], buf.as_mut_ptr(), &mut cb_buf);
 
-            if res == ErrorKind::Ok && (cb_buf > 0) {
+            if res.is_ok() && (cb_buf > 0) {
                 cb_realloc = if mem::size_of::<YkPivKey>()
                     .wrapping_add(cb_buf)
                     .wrapping_sub(1)
@@ -419,9 +419,9 @@ pub unsafe fn ykpiv_util_list_keys(
             if !data_len.is_null() {
                 *data_len = offset;
             }
-            res = ErrorKind::Ok;
+            res = Ok(());
         } else {
-            res = ErrorKind::MemoryError;
+            res = Err(ErrorKind::MemoryError);
         }
     }
 
@@ -430,10 +430,7 @@ pub unsafe fn ykpiv_util_list_keys(
     }
 
     _ykpiv_end_transaction(state);
-    match res {
-        ErrorKind::Ok => Ok(()),
-        e => Err(e),
-    }
+    res
 }
 
 /// Read certificate
@@ -443,7 +440,7 @@ pub unsafe fn ykpiv_util_read_cert(
     data: *mut *mut u8,
     data_len: *mut usize,
 ) -> Result<(), ErrorKind> {
-    let mut res: ErrorKind = ErrorKind::Ok;
+    let mut res = Ok(());
     let mut buf = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_buf: usize = buf.len();
 
@@ -457,7 +454,7 @@ pub unsafe fn ykpiv_util_read_cert(
         *data = ptr::null_mut();
         *data_len = 0;
         res = _read_certificate(state, slot, buf.as_mut_ptr(), &mut cb_buf);
-        if res == ErrorKind::Ok {
+        if res.is_ok() {
             if cb_buf == 0 {
                 *data = ptr::null_mut();
                 *data_len = 0;
@@ -467,7 +464,7 @@ pub unsafe fn ykpiv_util_read_cert(
             }
             .is_null()
             {
-                res = ErrorKind::MemoryError;
+                res = Err(ErrorKind::MemoryError);
             } else {
                 memcpy(
                     *data as (*mut c_void),
@@ -480,10 +477,7 @@ pub unsafe fn ykpiv_util_read_cert(
     }
 
     _ykpiv_end_transaction(state);
-    match res {
-        ErrorKind::Ok => Ok(()),
-        e => Err(e),
-    }
+    res
 }
 
 /// Write certificate
@@ -1404,7 +1398,7 @@ pub unsafe fn ykpiv_util_get_config(
     let mut cb_data: usize = mem::size_of::<[u8; YKPIV_OBJ_MAX_SIZE]>();
     let mut p_item: *mut u8 = ptr::null_mut();
     let mut cb_item: usize = 0;
-    let res = ErrorKind::Ok;
+    let mut res = Ok(());
 
     if config.is_null() {
         return Err(ErrorKind::GenericError);
@@ -1485,7 +1479,7 @@ pub unsafe fn ykpiv_util_get_config(
         if _read_metadata(state, 0x88u8, data.as_mut_ptr(), &mut cb_data).is_ok() {
             (*config).protected_data_available = 1u8;
 
-            let res = _get_metadata_item(
+            res = _get_metadata_item(
                 data.as_mut_ptr(),
                 cb_data,
                 0x81u8,
@@ -1497,7 +1491,7 @@ pub unsafe fn ykpiv_util_get_config(
                 (*config).puk_noblock_on_upgrade = 1u8;
             }
 
-            let res = _get_metadata_item(
+            res = _get_metadata_item(
                 data.as_mut_ptr(),
                 cb_data,
                 0x89u8,
@@ -1519,10 +1513,7 @@ pub unsafe fn ykpiv_util_get_config(
     }
 
     _ykpiv_end_transaction(state);
-    match res {
-        ErrorKind::Ok => Ok(()),
-        e => Err(e),
-    }
+    res
 }
 
 /// Set PIN last changed
@@ -1973,13 +1964,13 @@ unsafe fn _read_certificate(
     slot: u8,
     buf: *mut u8,
     buf_len: *mut usize,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     let mut ptr: *mut u8;
     let object_id = ykpiv_util_slot_object(slot) as i32;
     let mut len: usize = 0;
 
     if object_id == -1 {
-        return ErrorKind::InvalidObject;
+        return Err(ErrorKind::InvalidObject);
     }
 
     if _ykpiv_fetch_object(state, object_id, buf, buf_len).is_ok() {
@@ -1987,7 +1978,7 @@ unsafe fn _read_certificate(
 
         if *buf_len < CB_OBJ_TAG_MIN {
             *buf_len = 0;
-            return ErrorKind::Ok;
+            return Ok(());
         } else if *{
             let _old = ptr;
             ptr = ptr.offset(1);
@@ -1998,7 +1989,7 @@ unsafe fn _read_certificate(
 
             if len > *buf_len - (ptr as isize - buf as isize) as usize {
                 *buf_len = 0;
-                return ErrorKind::Ok;
+                return Ok(());
             } else {
                 memmove(buf as (*mut c_void), ptr as (*const c_void), len);
                 *buf_len = len;
@@ -2008,7 +1999,7 @@ unsafe fn _read_certificate(
         *buf_len = 0;
     }
 
-    ErrorKind::Ok
+    Ok(())
 }
 
 /// Write certificate

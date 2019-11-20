@@ -195,28 +195,28 @@ pub fn ykpiv_init(verbose: i32) -> YubiKey {
 }
 
 /// Cleanup YubiKey session
-pub(crate) unsafe fn _ykpiv_done(state: &mut YubiKey, disconnect: bool) -> ErrorKind {
+pub(crate) unsafe fn _ykpiv_done(state: &mut YubiKey, disconnect: bool) -> Result<(), ErrorKind> {
     if disconnect {
         ykpiv_disconnect(state);
     }
 
     _cache_pin(state, ptr::null(), 0);
-    ErrorKind::Ok
+    Ok(())
 }
 
 /// Cleanup YubiKey session with external card upon completion
 // TODO(tarcieri): make this a `Drop` handler
-pub unsafe fn ykpiv_done_with_external_card(state: &mut YubiKey) -> ErrorKind {
+pub unsafe fn ykpiv_done_with_external_card(state: &mut YubiKey) -> Result<(), ErrorKind> {
     _ykpiv_done(state, false)
 }
 
 /// Cleanup YubiKey session upon completion
-pub unsafe fn ykpiv_done(state: &mut YubiKey) -> ErrorKind {
+pub unsafe fn ykpiv_done(state: &mut YubiKey) -> Result<(), ErrorKind> {
     _ykpiv_done(state, true)
 }
 
 /// Disconnect a YubiKey session
-pub unsafe fn ykpiv_disconnect(state: &mut YubiKey) -> ErrorKind {
+pub unsafe fn ykpiv_disconnect(state: &mut YubiKey) -> Result<(), ErrorKind> {
     if state.card != 0 {
         SCardDisconnect(state.card, 0x1);
         state.card = 0i32;
@@ -227,7 +227,7 @@ pub unsafe fn ykpiv_disconnect(state: &mut YubiKey) -> ErrorKind {
         state.context = -1i32;
     }
 
-    ErrorKind::Ok
+    Ok(())
 }
 
 /// Select application
@@ -320,10 +320,14 @@ pub(crate) unsafe fn _ykpiv_ensure_application_selected(
 }
 
 /// Connect to the YubiKey
-pub(crate) unsafe fn _ykpiv_connect(state: &mut YubiKey, context: usize, card: usize) -> ErrorKind {
+pub(crate) unsafe fn _ykpiv_connect(
+    state: &mut YubiKey,
+    context: usize,
+    card: usize,
+) -> Result<(), ErrorKind> {
     // if the context has changed, and the new context is not valid, return an error
     if context != state.context as (usize) && (0x0i32 != SCardIsValidContext(context as (i32))) {
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     // if card handle has changed, determine if handle is valid (less efficient, but complete)
@@ -345,7 +349,7 @@ pub(crate) unsafe fn _ykpiv_connect(state: &mut YubiKey, context: usize, card: u
             &mut atr_len,
         ) != 0
         {
-            return ErrorKind::PcscError;
+            return Err(ErrorKind::PcscError);
         }
 
         state.is_neo = (atr_len as usize == YKPIV_ATR_NEO_R3.len() - 1)
@@ -367,7 +371,7 @@ pub(crate) unsafe fn _ykpiv_connect(state: &mut YubiKey, context: usize, card: u
     // The applet _is_ selected by ykpiv_connect(), but is not selected when bypassing
     // it with ykpiv_connect_with_external_card().
 
-    ErrorKind::Ok
+    Ok(())
 }
 
 /// Connect to an external card
@@ -375,7 +379,7 @@ pub unsafe fn ykpiv_connect_with_external_card(
     state: &mut YubiKey,
     context: usize,
     card: usize,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     _ykpiv_connect(state, context, card)
 }
 
@@ -389,11 +393,8 @@ pub unsafe fn ykpiv_connect(state: &mut YubiKey, wanted: *const c_char) -> Resul
     let mut reader_ptr: *mut c_char;
     let mut card: i32 = -1i32;
 
-    let ret: ErrorKind = ykpiv_list_readers(state, reader_buf.as_mut_ptr(), &mut num_readers);
+    ykpiv_list_readers(state, reader_buf.as_mut_ptr(), &mut num_readers)?;
 
-    if ret != ErrorKind::Ok {
-        return Err(ret);
-    }
     reader_ptr = reader_buf.as_mut_ptr();
     loop {
         if *reader_ptr == b'\0' as c_char {
@@ -465,7 +466,7 @@ pub unsafe fn ykpiv_connect(state: &mut YubiKey, wanted: *const c_char) -> Resul
                 // at this point, card should not equal state->card,
                 // to allow _ykpiv_connect() to determine device type
                 let res = _ykpiv_connect(state, state.context as (usize), card as (usize));
-                if res != ErrorKind::Ok {
+                if res.is_err() {
                     _currentBlock = 19;
                     break;
                 }
@@ -504,7 +505,7 @@ pub unsafe fn ykpiv_list_readers(
     state: &mut YubiKey,
     readers: *mut c_char,
     len: *mut usize,
-) -> ErrorKind {
+) -> Result<(), ErrorKind> {
     let mut num_readers: u32 = 0u32;
     let mut rc: i32;
 
@@ -515,7 +516,7 @@ pub unsafe fn ykpiv_list_readers(
             if state.verbose != 0 {
                 eprintln!("error: SCardEstablishContext failed, rc={}", rc);
             }
-            return ErrorKind::PcscError;
+            return Err(ErrorKind::PcscError);
         }
     }
 
@@ -532,7 +533,7 @@ pub unsafe fn ykpiv_list_readers(
         }
         SCardReleaseContext(state.context);
         state.context = -1i32;
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     if num_readers as (usize) > *len {
@@ -550,11 +551,11 @@ pub unsafe fn ykpiv_list_readers(
 
         SCardReleaseContext(state.context);
         state.context = -1i32;
-        return ErrorKind::PcscError;
+        return Err(ErrorKind::PcscError);
     }
 
     *len = num_readers as usize;
-    ErrorKind::Ok
+    Ok(())
 }
 
 /// Reconnect to a YubiKey
@@ -1499,9 +1500,13 @@ pub unsafe fn ykpiv_get_serial(state: &mut YubiKey, p_serial: *mut u32) -> Resul
 
 /// Cache PIN in memory
 // TODO(tarcieri): better security around the cached PIN
-pub(crate) unsafe fn _cache_pin(state: &mut YubiKey, pin: *const c_char, len: usize) -> ErrorKind {
+pub(crate) unsafe fn _cache_pin(
+    state: &mut YubiKey,
+    pin: *const c_char,
+    len: usize,
+) -> Result<(), ErrorKind> {
     if !pin.is_null() && (state.pin as *const c_char == pin) {
-        return ErrorKind::Ok;
+        return Ok(());
     }
 
     if !state.pin.is_null() {
@@ -1518,14 +1523,14 @@ pub(crate) unsafe fn _cache_pin(state: &mut YubiKey, pin: *const c_char, len: us
         state.pin = malloc(len + 1) as (*mut u8);
 
         if state.pin.is_null() {
-            return ErrorKind::MemoryError;
+            return Err(ErrorKind::MemoryError);
         }
 
         memcpy(state.pin as (*mut c_void), pin as (*const c_void), len);
         *state.pin.add(len) = 0u8;
     }
 
-    ErrorKind::Ok
+    Ok(())
 }
 
 /// Verify device PIN
