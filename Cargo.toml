@@ -17,6 +17,7 @@ categories = ["api-bindings", "cryptography", "hardware-support"]
 keywords   = ["ccid", "ecdsa", "rsa", "piv", "yubikey"]
 
 [dependencies]
+getrandom = "0.1"
 libc = "0.2"
 log = "0.4"
 zeroize = "1"

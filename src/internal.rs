@@ -69,7 +69,6 @@ extern "C" {
         keylen: i32,
         out: *mut u8,
     ) -> i32;
-    fn RAND_bytes(buf: *mut u8, num: i32) -> i32;
 }
 
 /// DES-related errors
@@ -232,26 +231,6 @@ pub unsafe fn des_decrypt(
 /// Is the given DES key weak?
 pub unsafe fn yk_des_is_weak_key(key: *const u8, _cb_key: usize) -> bool {
     DES_is_weak_key(key as (*mut [u8; 8])) != 0
-}
-
-/// PRNG errors/results
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[repr(i32)]
-pub enum PRngErrorKind {
-    /// Ok
-    Ok = 0,
-
-    /// General error
-    GeneralError = -1,
-}
-
-/// Generate bytes with the PRNG
-pub unsafe fn _ykpiv_prng_generate(buffer: *mut u8, cb_req: usize) -> PRngErrorKind {
-    if RAND_bytes(buffer, cb_req as (i32)) != -1 {
-        PRngErrorKind::Ok
-    } else {
-        PRngErrorKind::GeneralError
-    }
 }
 
 /// PKCS#5 error types
