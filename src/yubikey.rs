@@ -178,64 +178,60 @@ pub(crate) unsafe fn _ykpiv_has_valid_length(buffer: *const u8, len: usize) -> b
 }
 
 /// Initialize YubiKey client instance
-pub unsafe fn ykpiv_init(state: *mut *mut YubiKey, verbose: i32) -> Result<(), ErrorKind> {
-    if state.is_null() {
-        return Err(ErrorKind::GenericError);
+pub fn ykpiv_init(verbose: i32) -> YubiKey {
+    YubiKey {
+        context: -1,
+        card: 0,
+        verbose,
+        pin: ptr::null_mut(),
+        is_neo: false,
+        ver: Version {
+            major: 0,
+            minor: 0,
+            patch: 0,
+        },
+        serial: 0,
     }
-
-    let s = malloc(mem::size_of::<YubiKey>()) as (*mut YubiKey);
-
-    if s.is_null() {
-        return Err(ErrorKind::MemoryError);
-    }
-
-    memset(s as (*mut c_void), 0i32, mem::size_of::<YubiKey>());
-    (*s).pin = ptr::null_mut();
-    (*s).verbose = verbose;
-    (*s).context = -1i32;
-    *state = s;
-    Ok(())
 }
 
 /// Cleanup YubiKey session
-pub(crate) unsafe fn _ykpiv_done(state: *mut YubiKey, disconnect: bool) -> ErrorKind {
+pub(crate) unsafe fn _ykpiv_done(state: &mut YubiKey, disconnect: bool) -> ErrorKind {
     if disconnect {
         ykpiv_disconnect(state);
     }
 
     _cache_pin(state, ptr::null(), 0);
-    free(state as *mut c_void);
     ErrorKind::Ok
 }
 
 /// Cleanup YubiKey session with external card upon completion
 // TODO(tarcieri): make this a `Drop` handler
-pub unsafe fn ykpiv_done_with_external_card(state: *mut YubiKey) -> ErrorKind {
+pub unsafe fn ykpiv_done_with_external_card(state: &mut YubiKey) -> ErrorKind {
     _ykpiv_done(state, false)
 }
 
 /// Cleanup YubiKey session upon completion
-pub unsafe fn ykpiv_done(state: *mut YubiKey) -> ErrorKind {
+pub unsafe fn ykpiv_done(state: &mut YubiKey) -> ErrorKind {
     _ykpiv_done(state, true)
 }
 
 /// Disconnect a YubiKey session
-pub unsafe fn ykpiv_disconnect(state: *mut YubiKey) -> ErrorKind {
-    if (*state).card != 0 {
-        SCardDisconnect((*state).card, 0x1);
-        (*state).card = 0i32;
+pub unsafe fn ykpiv_disconnect(state: &mut YubiKey) -> ErrorKind {
+    if state.card != 0 {
+        SCardDisconnect(state.card, 0x1);
+        state.card = 0i32;
     }
 
-    if SCardIsValidContext((*state).context) == 0x0 {
-        SCardReleaseContext((*state).context);
-        (*state).context = -1i32;
+    if SCardIsValidContext(state.context) == 0x0 {
+        SCardReleaseContext(state.context);
+        state.context = -1i32;
     }
 
     ErrorKind::Ok
 }
 
 /// Select application
-pub(crate) unsafe fn _ykpiv_select_application(state: *mut YubiKey) -> ErrorKind {
+pub(crate) unsafe fn _ykpiv_select_application(state: &mut YubiKey) -> ErrorKind {
     let mut data = [0u8; 255];
     let mut recv_len = data.len() as u32;
     let mut sw = 0i32;
@@ -255,14 +251,14 @@ pub(crate) unsafe fn _ykpiv_select_application(state: *mut YubiKey) -> ErrorKind
     res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
 
     if res != ErrorKind::Ok {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!(
                 "Failed communicating with card: \'{}\'",
                 ykpiv_strerror(res)
             );
         }
     } else if sw != SW_SUCCESS {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("Failed selecting application: {:04x}", sw);
         }
         return ErrorKind::GenericError;
@@ -277,14 +273,14 @@ pub(crate) unsafe fn _ykpiv_select_application(state: *mut YubiKey) -> ErrorKind
     // will result in another selection of the PIV applet.
 
     res = _ykpiv_get_version(state, ptr::null_mut());
-    if res != ErrorKind::Ok && (*state).verbose != 0 {
+    if res != ErrorKind::Ok && state.verbose != 0 {
         eprintln!("Failed to retrieve version: \'{}\'", ykpiv_strerror(res));
     }
 
     res = _ykpiv_get_serial(state, ptr::null_mut(), false);
 
     if res != ErrorKind::Ok {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!(
                 "Failed to retrieve serial number: \'{}\'",
                 ykpiv_strerror(res)
@@ -298,7 +294,7 @@ pub(crate) unsafe fn _ykpiv_select_application(state: *mut YubiKey) -> ErrorKind
 }
 
 /// Ensure an application is selected (presently noop)
-pub(crate) unsafe fn _ykpiv_ensure_application_selected(_state: *mut YubiKey) -> ErrorKind {
+pub(crate) unsafe fn _ykpiv_ensure_application_selected(_state: &mut YubiKey) -> ErrorKind {
     // TODO(tarcieri): ENABLE_APPLICATION_RESELECTION support?
     //
     // Original C code below:
@@ -327,18 +323,14 @@ pub(crate) unsafe fn _ykpiv_ensure_application_selected(_state: *mut YubiKey) ->
 }
 
 /// Connect to the YubiKey
-pub(crate) unsafe fn _ykpiv_connect(state: *mut YubiKey, context: usize, card: usize) -> ErrorKind {
-    if state.is_null() {
-        return ErrorKind::GenericError;
-    }
-
+pub(crate) unsafe fn _ykpiv_connect(state: &mut YubiKey, context: usize, card: usize) -> ErrorKind {
     // if the context has changed, and the new context is not valid, return an error
-    if context != (*state).context as (usize) && (0x0i32 != SCardIsValidContext(context as (i32))) {
+    if context != state.context as (usize) && (0x0i32 != SCardIsValidContext(context as (i32))) {
         return ErrorKind::PcscError;
     }
 
     // if card handle has changed, determine if handle is valid (less efficient, but complete)
-    if card != (*state).card as usize {
+    if card != state.card as usize {
         let mut reader = [0u8; YKPIV_OBJ_MAX_SIZE];
         let mut reader_len = reader.len() as u32;
         let mut atr = [0u8; 33];
@@ -359,7 +351,7 @@ pub(crate) unsafe fn _ykpiv_connect(state: *mut YubiKey, context: usize, card: u
             return ErrorKind::PcscError;
         }
 
-        (*state).is_neo = (atr_len as usize == YKPIV_ATR_NEO_R3.len() - 1)
+        state.is_neo = (atr_len as usize == YKPIV_ATR_NEO_R3.len() - 1)
             && (memcmp(
                 YKPIV_ATR_NEO_R3.as_ptr() as *const c_void,
                 atr.as_mut_ptr() as *const c_void,
@@ -367,8 +359,8 @@ pub(crate) unsafe fn _ykpiv_connect(state: *mut YubiKey, context: usize, card: u
             ) == 0);
     }
 
-    (*state).context = context as i32;
-    (*state).card = card as i32;
+    state.context = context as i32;
+    state.card = card as i32;
 
     // Do not select the applet here, as we need to accommodate commands that are
     // sensitive to re-select (custom apdu/auth). All commands that can handle explicit
@@ -383,7 +375,7 @@ pub(crate) unsafe fn _ykpiv_connect(state: *mut YubiKey, context: usize, card: u
 
 /// Connect to an external card
 pub unsafe fn ykpiv_connect_with_external_card(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     context: usize,
     card: usize,
 ) -> ErrorKind {
@@ -391,7 +383,7 @@ pub unsafe fn ykpiv_connect_with_external_card(
 }
 
 /// Connect to a YubiKey
-pub unsafe fn ykpiv_connect(state: *mut YubiKey, wanted: *const c_char) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_connect(state: &mut YubiKey, wanted: *const c_char) -> Result<(), ErrorKind> {
     let mut _currentBlock;
     let mut active_protocol: u32 = 0;
     let mut reader_buf: [c_char; 2048] = [0; 2048];
@@ -437,7 +429,7 @@ pub unsafe fn ykpiv_connect(state: *mut YubiKey, wanted: *const c_char) -> Resul
                 found = true;
             }
             if found as (i32) == 0i32 {
-                if (*state).verbose != 0 {
+                if state.verbose != 0 {
                     eprintln!(
                         "skipping reader \'{}\' since it doesn\'t match \'{}\'.",
                         CStr::from_ptr(reader_ptr).to_string_lossy(),
@@ -454,14 +446,14 @@ pub unsafe fn ykpiv_connect(state: *mut YubiKey, wanted: *const c_char) -> Resul
             _currentBlock = 15;
         }
         if _currentBlock == 15 {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!(
                     "trying to connect to reader \'{}\'.",
                     CStr::from_ptr(reader_ptr).to_string_lossy()
                 );
             }
             rc = SCardConnect(
-                (*state).context,
+                state.context,
                 reader_ptr,
                 0x2u32,
                 0x2u32,
@@ -469,13 +461,13 @@ pub unsafe fn ykpiv_connect(state: *mut YubiKey, wanted: *const c_char) -> Resul
                 &mut active_protocol,
             ) as (isize);
             if rc != 0x0 {
-                if (*state).verbose != 0 {
+                if state.verbose != 0 {
                     eprintln!("SCardConnect failed, rc={}", rc);
                 }
             } else {
                 // at this point, card should not equal state->card,
                 // to allow _ykpiv_connect() to determine device type
-                let res = _ykpiv_connect(state, (*state).context as (usize), card as (usize));
+                let res = _ykpiv_connect(state, state.context as (usize), card as (usize));
                 if res != ErrorKind::Ok {
                     _currentBlock = 19;
                     break;
@@ -488,12 +480,12 @@ pub unsafe fn ykpiv_connect(state: *mut YubiKey, wanted: *const c_char) -> Resul
 
     if _currentBlock == 3 {
         if *reader_ptr == b'\0' as c_char {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("error: no usable reader found.");
             }
 
-            SCardReleaseContext((*state).context);
-            (*state).context = -1;
+            SCardReleaseContext(state.context);
+            state.context = -1;
             return Err(ErrorKind::PcscError);
         } else {
             return Err(ErrorKind::GenericError);
@@ -517,18 +509,18 @@ pub unsafe fn ykpiv_connect(state: *mut YubiKey, wanted: *const c_char) -> Resul
 
 /// List readers
 pub unsafe fn ykpiv_list_readers(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     readers: *mut c_char,
     len: *mut usize,
 ) -> ErrorKind {
     let mut num_readers: u32 = 0u32;
     let mut rc: i32;
 
-    if SCardIsValidContext((*state).context) != 0 {
-        rc = SCardEstablishContext(0x2, ptr::null(), ptr::null(), &mut (*state).context);
+    if SCardIsValidContext(state.context) != 0 {
+        rc = SCardEstablishContext(0x2, ptr::null(), ptr::null(), &mut state.context);
 
         if rc != 0 {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("error: SCardEstablishContext failed, rc={}", rc);
             }
             return ErrorKind::PcscError;
@@ -536,18 +528,18 @@ pub unsafe fn ykpiv_list_readers(
     }
 
     rc = SCardListReaders(
-        (*state).context,
+        state.context,
         ptr::null(),
         ptr::null_mut(),
         &mut num_readers,
     );
 
     if rc != 0 {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("error: SCardListReaders failed, rc={}", rc);
         }
-        SCardReleaseContext((*state).context);
-        (*state).context = -1i32;
+        SCardReleaseContext(state.context);
+        state.context = -1i32;
         return ErrorKind::PcscError;
     }
 
@@ -557,15 +549,15 @@ pub unsafe fn ykpiv_list_readers(
         *len = num_readers as (usize);
     }
 
-    rc = SCardListReaders((*state).context, ptr::null(), readers, &mut num_readers);
+    rc = SCardListReaders(state.context, ptr::null(), readers, &mut num_readers);
 
     if rc != 0 {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("error: SCardListReaders failed, rc={}", rc);
         }
 
-        SCardReleaseContext((*state).context);
-        (*state).context = -1i32;
+        SCardReleaseContext(state.context);
+        state.context = -1i32;
         return ErrorKind::PcscError;
     }
 
@@ -574,18 +566,18 @@ pub unsafe fn ykpiv_list_readers(
 }
 
 /// Reconnect to a YubiKey
-pub(crate) unsafe fn reconnect(state: *mut YubiKey) -> ErrorKind {
+pub(crate) unsafe fn reconnect(state: &mut YubiKey) -> ErrorKind {
     let mut active_protocol: u32 = 0;
     let mut tries: i32 = 0;
 
-    if (*state).verbose != 0 {
+    if state.verbose != 0 {
         eprintln!("trying to reconnect to current reader.");
     }
 
-    let rc = SCardReconnect((*state).card, 0x2u32, 0x2u32, 0x1u32, &mut active_protocol);
+    let rc = SCardReconnect(state.card, 0x2u32, 0x2u32, 0x1u32, &mut active_protocol);
 
     if rc != 0x0 {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("SCardReconnect failed, rc={}", rc);
         }
         return ErrorKind::PcscError;
@@ -597,16 +589,16 @@ pub(crate) unsafe fn reconnect(state: *mut YubiKey) -> ErrorKind {
         return res;
     }
 
-    if !(*state).pin.is_null() {
-        ykpiv_verify(state, (*state).pin as *const c_char, &mut tries)
+    if !state.pin.is_null() {
+        ykpiv_verify(state, state.pin as *const c_char, &mut tries)
     } else {
         ErrorKind::Ok
     }
 }
 
 /// Begin a transaction
-pub(crate) unsafe fn _ykpiv_begin_transaction(state: *mut YubiKey) -> ErrorKind {
-    let mut rc = SCardBeginTransaction((*state).card);
+pub(crate) unsafe fn _ykpiv_begin_transaction(state: &mut YubiKey) -> ErrorKind {
+    let mut rc = SCardBeginTransaction(state.card);
 
     if rc as usize & 0xffff_ffff == 0x8010_0068 {
         let res = reconnect(state);
@@ -615,11 +607,11 @@ pub(crate) unsafe fn _ykpiv_begin_transaction(state: *mut YubiKey) -> ErrorKind 
             return res;
         }
 
-        rc = SCardBeginTransaction((*state).card);
+        rc = SCardBeginTransaction(state.card);
     }
 
     if rc != 0 {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("error: Failed to begin pcsc transaction, rc={}", rc);
         }
 
@@ -630,10 +622,10 @@ pub(crate) unsafe fn _ykpiv_begin_transaction(state: *mut YubiKey) -> ErrorKind 
 }
 
 /// End a transaction
-pub(crate) unsafe fn _ykpiv_end_transaction(state: *mut YubiKey) -> ErrorKind {
-    let rc = SCardEndTransaction((*state).card, 0x0);
+pub(crate) unsafe fn _ykpiv_end_transaction(state: &mut YubiKey) -> ErrorKind {
+    let rc = SCardEndTransaction(state.card, 0x0);
 
-    if rc != 0x0 && (*state).verbose != 0 {
+    if rc != 0x0 && state.verbose != 0 {
         eprintln!("error: Failed to end pcsc transaction, rc={}", rc);
         return ErrorKind::PcscError;
     }
@@ -643,7 +635,7 @@ pub(crate) unsafe fn _ykpiv_end_transaction(state: *mut YubiKey) -> ErrorKind {
 
 /// Transfer data
 pub(crate) unsafe fn _ykpiv_transfer_data(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     templ: *const u8,
     in_data: *const u8,
     in_len: isize,
@@ -676,7 +668,7 @@ pub(crate) unsafe fn _ykpiv_transfer_data(
             this_size = in_data.offset(in_len) as usize - in_ptr as usize;
         }
 
-        if (*state).verbose > 2 {
+        if state.verbose > 2 {
             eprintln!("Going to send {} bytes in this go.", this_size);
         }
 
@@ -734,7 +726,7 @@ pub(crate) unsafe fn _ykpiv_transfer_data(
             let mut data = [0u8; 261];
             recv_len = data.len() as u32;
 
-            if (*state).verbose > 2 {
+            if state.verbose > 2 {
                 eprintln!(
                     "The card indicates there is {} bytes more data for us.",
                     *sw & 0xff
@@ -773,7 +765,7 @@ pub(crate) unsafe fn _ykpiv_transfer_data(
         }
 
         if _currentBlock != 24 {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!(
                     "Output buffer to small, wanted to write {}, max was {}.",
                     (*out_len).wrapping_add(recv_len as usize).wrapping_sub(2),
@@ -783,7 +775,7 @@ pub(crate) unsafe fn _ykpiv_transfer_data(
             res = ErrorKind::SizeError;
         }
     } else if _currentBlock == 21 {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!(
                 "Output buffer to small, wanted to write {}, max was {}.",
                 (*out_len).wrapping_add(recv_len as usize).wrapping_sub(2),
@@ -797,7 +789,7 @@ pub(crate) unsafe fn _ykpiv_transfer_data(
 
 /// Transfer data
 pub unsafe fn ykpiv_transfer_data(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     templ: *const u8,
     in_data: *const u8,
     in_len: isize,
@@ -827,7 +819,7 @@ pub(crate) unsafe fn dump_hex(buf: *const u8, len: u32) {
 
 /// Send data
 pub(crate) unsafe fn _send_data(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     apdu: *mut APDU,
     data: *mut u8,
     recv_len: *mut u32,
@@ -836,14 +828,14 @@ pub(crate) unsafe fn _send_data(
     let send_len = (*apdu).lc as u32 + 5;
     let mut tmp_len = *recv_len;
 
-    if (*state).verbose > 1 {
+    if state.verbose > 1 {
         eprint!("> ");
         dump_hex((*apdu).as_ptr() as *const u8, send_len);
         eprintln!();
     }
 
     let rc = SCardTransmit(
-        (*state).card,
+        state.card,
         SCARD_PCI_T1,
         (*apdu).as_mut_ptr() as *mut i8,
         send_len,
@@ -853,7 +845,7 @@ pub(crate) unsafe fn _send_data(
     );
 
     if rc != SCARD_S_SUCCESS {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("error: SCardTransmit failed, rc={:08x}", rc);
         }
 
@@ -862,7 +854,7 @@ pub(crate) unsafe fn _send_data(
 
     *recv_len = tmp_len;
 
-    if (*state).verbose > 1 {
+    if state.verbose > 1 {
         eprint!("< ");
         dump_hex(data, *recv_len);
         eprintln!();
@@ -882,7 +874,7 @@ pub(crate) unsafe fn _send_data(
 pub const DEFAULT_AUTH_KEY: &[u8] = b"\x01\x02\x03\x04\x05\x06\x07\x08\x01\x02\x03\x04\x05\x06\x07\x08\x01\x02\x03\x04\x05\x06\x07\x08\0";
 
 /// Authenticate to the card
-pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Result<(), ErrorKind> {
     let mut data = [0u8; 261];
     let mut challenge = [0u8; 8];
     let mut recv_len = data.len() as u32;
@@ -891,10 +883,6 @@ pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Res
     let mut mgm_key: *mut DesKey = ptr::null_mut();
     let mut out_len: usize;
     let mut res = ErrorKind::Ok;
-
-    if state.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
         return Err(ErrorKind::PcscError);
@@ -980,7 +968,7 @@ pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Res
         apdu.data[13] = 8;
 
         if _ykpiv_prng_generate(data[14..20].as_mut_ptr(), 8) == PRngErrorKind::GeneralError {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("Failed getting randomness for authentication.");
             }
 
@@ -1044,13 +1032,13 @@ pub unsafe fn ykpiv_authenticate(state: *mut YubiKey, mut key: *const u8) -> Res
 }
 
 /// Set the management key (MGM)
-pub unsafe fn ykpiv_set_mgmkey(state: *mut YubiKey, new_key: *const u8) -> ErrorKind {
+pub unsafe fn ykpiv_set_mgmkey(state: &mut YubiKey, new_key: *const u8) -> ErrorKind {
     ykpiv_set_mgmkey2(state, new_key, 0)
 }
 
 /// Set the management key (MGM)
 pub(crate) unsafe fn ykpiv_set_mgmkey2(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     new_key: *const u8,
     touch: u8,
 ) -> ErrorKind {
@@ -1066,7 +1054,7 @@ pub(crate) unsafe fn ykpiv_set_mgmkey2(
 
     if _ykpiv_ensure_application_selected(state) == ErrorKind::Ok {
         if yk_des_is_weak_key(new_key, (8i32 * 3i32) as (usize)) {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 // TODO(tarcieri): format string
                 eprint!("Won\'t set new key \'");
                 dump_hex(new_key, DES_LEN_3DES as u32);
@@ -1110,7 +1098,7 @@ pub(crate) unsafe fn ykpiv_set_mgmkey2(
 
 /// Authenticate to the YubiKey
 pub(crate) unsafe fn _general_authenticate(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     sign_in: *const u8,
     in_len: usize,
     out: *mut u8,
@@ -1191,14 +1179,14 @@ pub(crate) unsafe fn _general_authenticate(
     );
 
     if res != ErrorKind::Ok {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("Sign command failed to communicate.");
         }
         return res;
     }
 
     if sw != SW_SUCCESS {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("Failed sign command with code {:x}.\n\0", sw);
         }
 
@@ -1211,7 +1199,7 @@ pub(crate) unsafe fn _general_authenticate(
 
     // skip the first 7c tag
     if data[0] != 0x7c {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("Failed parsing signature reply.");
         }
         return ErrorKind::ParseError;
@@ -1222,7 +1210,7 @@ pub(crate) unsafe fn _general_authenticate(
 
     // skip the 82 tag
     if *dataptr != 0x82 {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("Failed parsing signature reply.");
         }
 
@@ -1233,7 +1221,7 @@ pub(crate) unsafe fn _general_authenticate(
     dataptr = dataptr.add(_ykpiv_get_length(dataptr, &mut len));
 
     if len > *out_len {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("Wrong size on output buffer.");
         }
         return ErrorKind::SizeError;
@@ -1246,7 +1234,7 @@ pub(crate) unsafe fn _general_authenticate(
 
 /// Sign data using a PIV key
 pub unsafe fn ykpiv_sign_data(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     raw_in: *const u8,
     in_len: usize,
     sign_out: *mut u8,
@@ -1254,10 +1242,6 @@ pub unsafe fn ykpiv_sign_data(
     algorithm: u8,
     key: u8,
 ) -> Result<(), ErrorKind> {
-    if state.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
-
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
         return Err(ErrorKind::PcscError);
     }
@@ -1277,7 +1261,7 @@ pub unsafe fn ykpiv_sign_data(
 
 /// Decrypt data using a PIV key
 pub unsafe fn ykpiv_decrypt_data(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     input: *const u8,
     input_len: usize,
     out: *mut u8,
@@ -1285,10 +1269,6 @@ pub unsafe fn ykpiv_decrypt_data(
     algorithm: u8,
     key: u8,
 ) -> Result<(), ErrorKind> {
-    if state.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
-
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
         return Err(ErrorKind::PcscError);
     }
@@ -1304,24 +1284,20 @@ pub unsafe fn ykpiv_decrypt_data(
 }
 
 /// Get the version of the PIV application installed on the YubiKey
-pub(crate) unsafe fn _ykpiv_get_version(state: *mut YubiKey, p_version: *mut Version) -> ErrorKind {
+pub(crate) unsafe fn _ykpiv_get_version(state: &mut YubiKey, p_version: *mut Version) -> ErrorKind {
     let mut data = [0u8; 261];
     let mut recv_len = data.len() as u32;
     let mut sw: i32 = 0;
     let res: ErrorKind;
 
-    if state.is_null() {
-        return ErrorKind::ArgumentError;
-    }
-
     // get version from state if already from device
-    if (*state).ver.major != 0 || (*state).ver.minor != 0 || (*state).ver.patch != 0 {
+    if state.ver.major != 0 || state.ver.minor != 0 || state.ver.patch != 0 {
         if !p_version.is_null() {
             // TODO(tarcieri): use real references instead of pointers and memcpy!!!
             #[allow(trivial_casts)]
             memcpy(
                 p_version as *mut c_void,
-                &(*state).ver as *const Version as *const c_void,
+                &state.ver as *const Version as *const c_void,
                 mem::size_of::<Version>(),
             );
         }
@@ -1347,16 +1323,16 @@ pub(crate) unsafe fn _ykpiv_get_version(state: *mut YubiKey, p_version: *mut Ver
         return ErrorKind::SizeError;
     }
 
-    (*state).ver.major = data[0];
-    (*state).ver.minor = data[1];
-    (*state).ver.patch = data[2];
+    state.ver.major = data[0];
+    state.ver.minor = data[1];
+    state.ver.patch = data[2];
 
     if !p_version.is_null() {
         // TODO(tarcieri): use real references instead of pointers and memcpy!!!
         #[allow(trivial_casts)]
         memcpy(
             p_version as *mut c_void,
-            &(*state).ver as (*const Version) as (*const c_void),
+            &state.ver as (*const Version) as (*const c_void),
             mem::size_of::<Version>(),
         );
     }
@@ -1365,7 +1341,7 @@ pub(crate) unsafe fn _ykpiv_get_version(state: *mut YubiKey, p_version: *mut Ver
 }
 
 /// Get the YubiKey's PIV application version as a string
-pub unsafe fn ykpiv_get_version(state: *mut YubiKey) -> Result<String, ErrorKind> {
+pub unsafe fn ykpiv_get_version(state: &mut YubiKey) -> Result<String, ErrorKind> {
     let mut ver: Version = Version {
         major: 0u8,
         minor: 0u8,
@@ -1393,7 +1369,7 @@ pub unsafe fn ykpiv_get_version(state: *mut YubiKey) -> Result<String, ErrorKind
 ///
 /// NOTE: caller must make sure that this is wrapped in a transaction for synchronized operation
 pub(crate) unsafe fn _ykpiv_get_serial(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     p_serial: *mut u32,
     f_force: bool,
 ) -> ErrorKind {
@@ -1405,19 +1381,15 @@ pub(crate) unsafe fn _ykpiv_get_serial(
     let mut sw: i32 = 0;
     let p_temp: *mut u8;
 
-    if state.is_null() {
-        return ErrorKind::ArgumentError;
-    }
-
-    if !f_force && (*state).serial != 0 {
+    if !f_force && state.serial != 0 {
         if !p_serial.is_null() {
-            *p_serial = (*state).serial;
+            *p_serial = state.serial;
         }
 
         return ErrorKind::Ok;
     }
 
-    if (*state).ver.major < 5 {
+    if state.ver.major < 5 {
         // get serial from neo/yk4 devices using the otp applet
         let mut temp = [0u8; 255];
         recv_len = temp.len() as u32;
@@ -1436,7 +1408,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
         res = _send_data(state, &mut apdu, temp.as_mut_ptr(), &mut recv_len, &mut sw);
 
         if res != ErrorKind::Ok {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!(
                     "Failed communicating with card: \'{}\'",
                     ykpiv_strerror(res)
@@ -1447,7 +1419,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
         }
 
         if sw != SW_SUCCESS {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("Failed selecting yk application: {:04x}", sw);
             }
 
@@ -1463,7 +1435,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
         res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
 
         if res != ErrorKind::Ok {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!(
                     "Failed communicating with card: \'{}\'",
                     ykpiv_strerror(res)
@@ -1474,7 +1446,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
         }
 
         if sw != SW_SUCCESS {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("Failed retrieving serial number: {:04x}", sw);
             }
 
@@ -1496,7 +1468,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
         res = _send_data(state, &mut apdu, temp.as_mut_ptr(), &mut recv_len, &mut sw);
 
         if res != ErrorKind::Ok {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!(
                     "Failed communicating with card: \'{}\'",
                     ykpiv_strerror(res)
@@ -1506,7 +1478,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
         }
 
         if sw != SW_SUCCESS {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("Failed selecting application: {:04x}", sw);
             }
             return ErrorKind::GenericError;
@@ -1521,7 +1493,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
         res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
 
         if res != ErrorKind::Ok {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!(
                     "Failed communicating with card: \'{}\'",
                     ykpiv_strerror(res)
@@ -1529,7 +1501,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
             }
             return res;
         } else if sw != SW_SUCCESS {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("Failed retrieving serial number: {:04x}", sw);
             }
             return ErrorKind::GenericError;
@@ -1546,7 +1518,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
         // TODO(tarcieri): replace pointers and casts with proper references!
         #[allow(trivial_casts)]
         {
-            p_temp = &mut (*state).serial as (*mut u32) as (*mut u8);
+            p_temp = &mut state.serial as (*mut u32) as (*mut u8);
         }
 
         *p_temp = data[3];
@@ -1555,7 +1527,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
         *p_temp.add(3) = data[0];
 
         if !p_serial.is_null() {
-            *p_serial = (*state).serial;
+            *p_serial = state.serial;
         }
     }
 
@@ -1563,7 +1535,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
 }
 
 /// Get YubiKey device serial number
-pub unsafe fn ykpiv_get_serial(state: *mut YubiKey, p_serial: *mut u32) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_get_serial(state: &mut YubiKey, p_serial: *mut u32) -> Result<(), ErrorKind> {
     let mut res = ErrorKind::Ok;
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
@@ -1583,41 +1555,37 @@ pub unsafe fn ykpiv_get_serial(state: *mut YubiKey, p_serial: *mut u32) -> Resul
 
 /// Cache PIN in memory
 // TODO(tarcieri): better security around the cached PIN
-pub(crate) unsafe fn _cache_pin(state: *mut YubiKey, pin: *const c_char, len: usize) -> ErrorKind {
-    if state.is_null() {
-        return ErrorKind::ArgumentError;
-    }
-
-    if !pin.is_null() && ((*state).pin as *const c_char == pin) {
+pub(crate) unsafe fn _cache_pin(state: &mut YubiKey, pin: *const c_char, len: usize) -> ErrorKind {
+    if !pin.is_null() && (state.pin as *const c_char == pin) {
         return ErrorKind::Ok;
     }
 
-    if !(*state).pin.is_null() {
+    if !state.pin.is_null() {
         // Zeroize the old cached PIN
-        let old_len = strlen((*state).pin as *const c_char);
-        let pin_slice = slice::from_raw_parts_mut((*state).pin, old_len);
+        let old_len = strlen(state.pin as *const c_char);
+        let pin_slice = slice::from_raw_parts_mut(state.pin, old_len);
         pin_slice.zeroize();
 
-        free((*state).pin as (*mut c_void));
-        (*state).pin = ptr::null_mut();
+        free(state.pin as (*mut c_void));
+        state.pin = ptr::null_mut();
     }
 
     if !pin.is_null() && len > 0 {
-        (*state).pin = malloc(len + 1) as (*mut u8);
+        state.pin = malloc(len + 1) as (*mut u8);
 
-        if (*state).pin.is_null() {
+        if state.pin.is_null() {
             return ErrorKind::MemoryError;
         }
 
-        memcpy((*state).pin as (*mut c_void), pin as (*const c_void), len);
-        *(*state).pin.add(len) = 0u8;
+        memcpy(state.pin as (*mut c_void), pin as (*const c_void), len);
+        *state.pin.add(len) = 0u8;
     }
 
     ErrorKind::Ok
 }
 
 /// Verify device PIN
-pub unsafe fn ykpiv_verify(state: *mut YubiKey, pin: *const c_char, tries: *mut i32) -> ErrorKind {
+pub unsafe fn ykpiv_verify(state: &mut YubiKey, pin: *const c_char, tries: *mut i32) -> ErrorKind {
     ykpiv_verify_select(
         state,
         pin,
@@ -1629,7 +1597,7 @@ pub unsafe fn ykpiv_verify(state: *mut YubiKey, pin: *const c_char, tries: *mut 
 
 /// Verify device PIN
 pub(crate) unsafe fn _verify(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     pin: *const c_char,
     pin_len: usize,
     tries: *mut i32,
@@ -1701,7 +1669,7 @@ pub(crate) unsafe fn _verify(
 
 /// Verify and select application
 pub unsafe fn ykpiv_verify_select(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     pin: *const c_char,
     pin_len: usize,
     tries: *mut i32,
@@ -1726,8 +1694,8 @@ pub unsafe fn ykpiv_verify_select(
 }
 
 /// Get the number of PIN retries
-pub unsafe fn ykpiv_get_pin_retries(state: *mut YubiKey, tries: *mut i32) -> Result<(), ErrorKind> {
-    if state.is_null() || tries.is_null() {
+pub unsafe fn ykpiv_get_pin_retries(state: &mut YubiKey, tries: *mut i32) -> Result<(), ErrorKind> {
+    if tries.is_null() {
         return Err(ErrorKind::ArgumentError);
     }
 
@@ -1751,7 +1719,7 @@ pub unsafe fn ykpiv_get_pin_retries(state: *mut YubiKey, tries: *mut i32) -> Res
 
 /// Set the number of PIN retries
 pub unsafe fn ykpiv_set_pin_retries(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     pin_tries: i32,
     puk_tries: i32,
 ) -> Result<(), ErrorKind> {
@@ -1807,7 +1775,7 @@ pub unsafe fn ykpiv_set_pin_retries(
 
 /// Change the PIN
 pub(crate) unsafe fn _ykpiv_change_pin(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     action: i32,
     current_pin: *const c_char,
     current_pin_len: usize,
@@ -1886,7 +1854,7 @@ pub(crate) unsafe fn _ykpiv_change_pin(
         } else if sw == SW_ERR_AUTH_BLOCKED {
             return ErrorKind::PinLocked;
         } else {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("Failed changing pin, token response code: {:x}.", sw);
             }
 
@@ -1901,7 +1869,7 @@ pub(crate) unsafe fn _ykpiv_change_pin(
 ///
 /// The default PIN code is 123456
 pub unsafe fn ykpiv_change_pin(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     current_pin: *const c_char,
     current_pin_len: usize,
     new_pin: *const c_char,
@@ -1947,7 +1915,7 @@ pub unsafe fn ykpiv_change_pin(
 ///
 /// The default PUK code is 12345678.
 pub unsafe fn ykpiv_change_puk(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     current_puk: *const c_char,
     current_puk_len: usize,
     new_puk: *const c_char,
@@ -1979,7 +1947,7 @@ pub unsafe fn ykpiv_change_puk(
 /// Unblock a Personal Identification Number (PIN) using a previously
 /// configured PIN Unblocking Key (PUK).
 pub unsafe fn ykpiv_unblock_pin(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     puk: *const c_char,
     puk_len: usize,
     new_pin: *const c_char,
@@ -2005,7 +1973,7 @@ pub unsafe fn ykpiv_unblock_pin(
 
 /// Fetch an object from the YubiKey
 pub unsafe fn ykpiv_fetch_object(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     object_id: i32,
     data: *mut u8,
     len: *mut usize,
@@ -2029,7 +1997,7 @@ pub unsafe fn ykpiv_fetch_object(
 
 /// Fetch an object
 pub(crate) unsafe fn _ykpiv_fetch_object(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     object_id: i32,
     data: *mut u8,
     len: *mut usize,
@@ -2077,7 +2045,7 @@ pub(crate) unsafe fn _ykpiv_fetch_object(
     }
 
     if outlen.wrapping_add(offs).wrapping_add(1) != *len {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!(
                 "Invalid length indicated in object, total objlen is {}, indicated length is {}.",
                 *len, outlen
@@ -2099,7 +2067,7 @@ pub(crate) unsafe fn _ykpiv_fetch_object(
 
 /// Save an object
 pub unsafe fn ykpiv_save_object(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     object_id: i32,
     indata: *mut u8,
     len: usize,
@@ -2123,7 +2091,7 @@ pub unsafe fn ykpiv_save_object(
 
 /// Save an object
 pub unsafe fn _ykpiv_save_object(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     object_id: i32,
     indata: *mut u8,
     len: usize,
@@ -2196,7 +2164,7 @@ pub(crate) unsafe fn set_object(object_id: i32, mut buffer: *mut u8) -> *mut u8 
 
 /// Import a private encryption or signing key into the YubiKey
 pub unsafe fn ykpiv_import_private_key(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     key: u8,
     algorithm: u8,
     p: *const u8,
@@ -2226,10 +2194,6 @@ pub unsafe fn ykpiv_import_private_key(
     let n_params: u8;
     let param_tag: i32;
     let mut res = ErrorKind::Ok;
-
-    if state.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
 
     if key == YKPIV_KEY_CARDMGM
         || key < YKPIV_KEY_RETIRED1
@@ -2376,7 +2340,7 @@ pub unsafe fn ykpiv_import_private_key(
 
 /// Generate an attestation certificate for a stored key
 pub unsafe fn ykpiv_attest(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     key: u8,
     data: *mut u8,
     data_len: *mut usize,
@@ -2386,7 +2350,7 @@ pub unsafe fn ykpiv_attest(
     let mut sw: i32 = 0;
     let mut ul_data_len: usize;
 
-    if state.is_null() || data.is_null() || data_len.is_null() {
+    if data.is_null() || data_len.is_null() {
         return Err(ErrorKind::ArgumentError);
     }
 
@@ -2430,7 +2394,7 @@ pub unsafe fn ykpiv_attest(
 
 /// Get an auth challenge
 pub unsafe fn ykpiv_auth_getchallenge(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     challenge: *mut u8,
     challenge_len: usize,
 ) -> Result<(), ErrorKind> {
@@ -2439,7 +2403,7 @@ pub unsafe fn ykpiv_auth_getchallenge(
     let mut sw: i32 = 0;
     let mut res = ErrorKind::Ok;
 
-    if state.is_null() || challenge.is_null() {
+    if challenge.is_null() {
         return Err(ErrorKind::GenericError);
     }
 
@@ -2485,7 +2449,7 @@ pub unsafe fn ykpiv_auth_getchallenge(
 
 /// Verify an auth response
 pub unsafe fn ykpiv_auth_verifyresponse(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     response: *mut u8,
     response_len: usize,
 ) -> Result<(), ErrorKind> {
@@ -2494,7 +2458,7 @@ pub unsafe fn ykpiv_auth_verifyresponse(
     let mut sw: i32 = 0;
     let mut res: ErrorKind;
 
-    if state.is_null() || response.is_null() {
+    if response.is_null() {
         return Err(ErrorKind::GenericError);
     }
 
@@ -2542,15 +2506,11 @@ pub unsafe fn ykpiv_auth_verifyresponse(
 static mut MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
 
 /// Deauthenticate
-pub unsafe fn ykpiv_auth_deauthenticate(state: *mut YubiKey) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_auth_deauthenticate(state: &mut YubiKey) -> Result<(), ErrorKind> {
     let mut data = [0u8; 255];
     let mut recv_len = data.len() as u32;
     let mut sw: i32 = 0;
     let mut res: ErrorKind;
-
-    if state.is_null() {
-        return Err(ErrorKind::ArgumentError);
-    }
 
     res = _ykpiv_begin_transaction(state);
 
@@ -2572,14 +2532,14 @@ pub unsafe fn ykpiv_auth_deauthenticate(state: *mut YubiKey) -> Result<(), Error
     res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
 
     if res != ErrorKind::Ok {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!(
                 "Failed communicating with card: \'{}\'",
                 ykpiv_strerror(res)
             );
         }
     } else if sw != SW_SUCCESS {
-        if (*state).verbose != 0 {
+        if state.verbose != 0 {
             eprintln!("Failed selecting mgmt application: {:04x}", sw);
         }
         res = ErrorKind::GenericError;

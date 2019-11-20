@@ -81,7 +81,7 @@ pub struct CardId([u8; 16]);
 
 /// Get Card ID
 pub unsafe fn ykpiv_util_get_cardid(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     cardid: *mut CardId,
 ) -> Result<(), ErrorKind> {
     let mut buf = [0u8; CB_OBJ_MAX];
@@ -121,16 +121,12 @@ pub unsafe fn ykpiv_util_get_cardid(
 
 /// Set Card ID
 pub unsafe fn ykpiv_util_set_cardid(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     cardid: *const CardId,
 ) -> Result<(), ErrorKind> {
     let mut id = [0u8; YKPIV_CARDID_SIZE];
     let mut buf = [0u8; CHUID_TMPL.len()];
     let mut res = ErrorKind::Ok;
-
-    if state.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
 
     if cardid.is_null() {
         if _ykpiv_prng_generate(id.as_mut_ptr(), id.len()) != PRngErrorKind::Ok {
@@ -181,7 +177,7 @@ pub unsafe fn ykpiv_util_set_cardid(
 pub struct CCCID([u8; 14]);
 
 /// Get Cardholder Capability Container (CCC) ID
-pub unsafe fn ykpiv_util_get_cccid(state: *mut YubiKey, ccc: *mut CCCID) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_get_cccid(state: &mut YubiKey, ccc: *mut CCCID) -> Result<(), ErrorKind> {
     let mut res: ErrorKind = ErrorKind::Ok;
     let mut buf = [0u8; CB_OBJ_MAX];
     let mut len = buf.len();
@@ -224,17 +220,13 @@ pub unsafe fn ykpiv_util_get_cccid(state: *mut YubiKey, ccc: *mut CCCID) -> Resu
 
 /// Get Cardholder Capability Container (CCC) ID
 pub unsafe fn ykpiv_util_set_cccid(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     ccc: *const CCCID,
 ) -> Result<(), ErrorKind> {
     let mut res: ErrorKind = ErrorKind::Ok;
     let mut id = [0u8; 14];
     let mut buf = [0u8; 51];
     let len: usize;
-
-    if state.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
 
     if ccc.is_null() {
         if _ykpiv_prng_generate(id.as_mut_ptr(), id.len()) != PRngErrorKind::Ok {
@@ -278,10 +270,10 @@ pub unsafe fn ykpiv_util_set_cccid(
 }
 
 /// Get YubiKey device model
-pub unsafe fn ykpiv_util_devicemodel(state: *mut YubiKey) -> u32 {
-    if state.is_null() || (*state).context == 0 || (*state).context == -1 {
+pub unsafe fn ykpiv_util_devicemodel(state: &mut YubiKey) -> u32 {
+    if state.context == 0 || state.context == -1 {
         DEVTYPE_UNKNOWN
-    } else if (*state).is_neo {
+    } else if state.is_neo {
         DEVTYPE_NEOr3
     } else {
         DEVTYPE_YK4
@@ -333,7 +325,7 @@ pub const SLOTS: [u8; 24] = [
 // TODO(tarcieri): fix clippy alignment warnings
 #[allow(clippy::cast_ptr_alignment)]
 pub unsafe fn ykpiv_util_list_keys(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     key_count: *mut u8,
     data: *mut *mut YkPivKey,
     data_len: *mut usize,
@@ -468,7 +460,7 @@ pub unsafe fn ykpiv_util_list_keys(
 
 /// Read certificate
 pub unsafe fn ykpiv_util_read_cert(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     slot: u8,
     data: *mut *mut u8,
     data_len: *mut usize,
@@ -520,7 +512,7 @@ pub unsafe fn ykpiv_util_read_cert(
 
 /// Write certificate
 pub unsafe fn ykpiv_util_write_cert(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     slot: u8,
     data: *mut u8,
     data_len: usize,
@@ -544,12 +536,12 @@ pub unsafe fn ykpiv_util_write_cert(
 }
 
 /// Delete certificate
-pub unsafe fn ykpiv_util_delete_cert(state: *mut YubiKey, slot: u8) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_delete_cert(state: &mut YubiKey, slot: u8) -> Result<(), ErrorKind> {
     ykpiv_util_write_cert(state, slot, ptr::null_mut(), 0, 0)
 }
 
 /// Block PUK
-pub unsafe fn ykpiv_util_block_puk(state: *mut YubiKey) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_block_puk(state: &mut YubiKey) -> Result<(), ErrorKind> {
     let mut _currentBlock;
     let mut res: ErrorKind = ErrorKind::Ok;
     let mut puk = [0x30, 0x42, 0x41, 0x44, 0x46, 0x30, 0x30, 0x44];
@@ -559,10 +551,6 @@ pub unsafe fn ykpiv_util_block_puk(state: *mut YubiKey) -> Result<(), ErrorKind>
     let mut p_item: *mut u8 = ptr::null_mut();
     let mut cb_item: usize = 0;
     let mut flags: u8 = 0;
-
-    if state.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
         return Err(ErrorKind::PcscError);
@@ -621,7 +609,7 @@ pub unsafe fn ykpiv_util_block_puk(state: *mut YubiKey) -> Result<(), ErrorKind>
                                 p_item as (*const c_void),
                                 cb_item,
                             );
-                        } else if (*state).verbose != 0 {
+                        } else if state.verbose != 0 {
                             eprintln!("admin flags exist, but are incorrect size = {}", cb_item,);
                         }
                     }
@@ -638,7 +626,7 @@ pub unsafe fn ykpiv_util_block_puk(state: *mut YubiKey) -> Result<(), ErrorKind>
                     1,
                 ) != ErrorKind::Ok
                 {
-                    if (*state).verbose == 0 {
+                    if state.verbose == 0 {
                         _currentBlock = 20;
                         continue;
                     }
@@ -649,7 +637,7 @@ pub unsafe fn ykpiv_util_block_puk(state: *mut YubiKey) -> Result<(), ErrorKind>
                         _currentBlock = 20;
                         continue;
                     }
-                    if (*state).verbose == 0 {
+                    if state.verbose == 0 {
                         _currentBlock = 20;
                         continue;
                     }
@@ -699,7 +687,7 @@ pub struct YkPivContainer {
 
 /// Read mscmap
 pub unsafe fn ykpiv_util_read_mscmap(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     containers: *mut *mut YkPivContainer,
     n_containers: *mut usize,
 ) -> Result<(), ErrorKind> {
@@ -771,8 +759,8 @@ pub unsafe fn ykpiv_util_read_mscmap(
 }
 
 /// Get max object size
-unsafe fn _obj_size_max(state: *mut YubiKey) -> usize {
-    if !state.is_null() && (*state).is_neo {
+unsafe fn _obj_size_max(state: &mut YubiKey) -> usize {
+    if state.is_neo {
         2048 - 9
     } else {
         CB_OBJ_MAX
@@ -781,7 +769,7 @@ unsafe fn _obj_size_max(state: *mut YubiKey) -> usize {
 
 /// Write mscmap
 pub unsafe fn ykpiv_util_write_mscmap(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     containers: *mut YkPivContainer,
     n_containers: usize,
 ) -> Result<(), ErrorKind> {
@@ -837,7 +825,7 @@ pub unsafe fn ykpiv_util_write_mscmap(
 
 /// Read msroots
 pub unsafe fn ykpiv_util_read_msroots(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     data: *mut *mut u8,
     data_len: *mut usize,
 ) -> Result<(), ErrorKind> {
@@ -970,7 +958,7 @@ pub unsafe fn ykpiv_util_read_msroots(
 
 /// Write msroots
 pub unsafe fn ykpiv_util_write_msroots(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     data: *mut u8,
     data_len: usize,
 ) -> Result<(), ErrorKind> {
@@ -1070,7 +1058,7 @@ const SZ_ROCA_DEFAULT: &str = "was permitted by default, but is not recommended.
 /// Generate key
 #[allow(clippy::cognitive_complexity)]
 pub unsafe fn ykpiv_util_generate_key(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     slot: u8,
     algorithm: u8,
     pin_policy: u8,
@@ -1097,14 +1085,10 @@ pub unsafe fn ykpiv_util_generate_key(
     let cb_point: usize;
     let setting_roca: SettingBool;
 
-    if state.is_null() {
-        return Err(ErrorKind::ArgumentError);
-    }
-
     if ykpiv_util_devicemodel(state) == DEVTYPE_YK4
         && (algorithm == YKPIV_ALGO_RSA1024 || algorithm == YKPIV_ALGO_RSA2048)
-        && (*state).ver.major == 4
-        && ((*state).ver.minor < 3 || (*state).ver.minor == 3 && ((*state).ver.patch < 5))
+        && state.ver.major == 4
+        && (state.ver.minor < 3 || state.ver.minor == 3 && (state.ver.patch < 5))
     {
         let setting_name = CString::new(SZ_SETTING_ROCA).unwrap();
         setting_roca = setting_get_bool(setting_name.as_ptr(), true);
@@ -1132,7 +1116,7 @@ pub unsafe fn ykpiv_util_generate_key(
              (ROCA) and should be replaced. On-chip key generation {}  See \
              YSA-2017-01 <https://www.yubico.com/support/security-advisories/ysa-2017-01/> \
              for additional information on device replacement and mitigation assistance",
-            (*state).serial,
+            state.serial,
             psz_msg
         );
 
@@ -1144,7 +1128,7 @@ pub unsafe fn ykpiv_util_generate_key(
     match algorithm {
         YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 => {
             if point.is_null() || point_len.is_null() {
-                if (*state).verbose != 0 {
+                if state.verbose != 0 {
                     eprintln!("Invalid output parameter for ECC algorithm");
                 }
                 return Err(ErrorKind::GenericError);
@@ -1155,7 +1139,7 @@ pub unsafe fn ykpiv_util_generate_key(
         }
         YKPIV_ALGO_ECCP256 | YKPIV_ALGO_ECCP384 => {
             if modulus.is_null() || modulus_len.is_null() || exp.is_null() || exp_len.is_null() {
-                if (*state).verbose != 0 {
+                if state.verbose != 0 {
                     eprintln!("Invalid output parameter for RSA algorithm",);
                 }
                 return Err(ErrorKind::GenericError);
@@ -1167,7 +1151,7 @@ pub unsafe fn ykpiv_util_generate_key(
             }
         }
         _ => {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("Invalid algorithm specified");
             }
 
@@ -1213,7 +1197,7 @@ pub unsafe fn ykpiv_util_generate_key(
 
         if in_data[4] == 0 {
             res = ErrorKind::AlgorithmError;
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("Unexpected algorithm.\n");
             }
         } else {
@@ -1270,24 +1254,24 @@ pub unsafe fn ykpiv_util_generate_key(
             );
 
             if res != ErrorKind::Ok {
-                if (*state).verbose != 0 {
+                if state.verbose != 0 {
                     eprintln!("Failed to communicate.");
                 }
             } else if sw != SW_SUCCESS {
-                if (*state).verbose != 0 {
+                if state.verbose != 0 {
                     eprint!("Failed to generate new key (");
                 }
 
                 match sw {
                     SW_ERR_INCORRECT_SLOT => {
                         res = ErrorKind::KeyError;
-                        if (*state).verbose != 0 {
+                        if state.verbose != 0 {
                             eprintln!("incorrect slot)");
                         }
                     }
                     SW_ERR_INCORRECT_PARAM => {
                         res = ErrorKind::AlgorithmError;
-                        if (*state).verbose != 0 {
+                        if state.verbose != 0 {
                             if pin_policy as (i32) != 0i32 {
                                 eprintln!("pin policy not supported?)",);
                             } else if touch_policy as (i32) != 0i32 {
@@ -1299,13 +1283,13 @@ pub unsafe fn ykpiv_util_generate_key(
                     }
                     SW_ERR_SECURITY_STATUS => {
                         res = ErrorKind::AuthenticationError;
-                        if (*state).verbose != 0 {
+                        if state.verbose != 0 {
                             eprintln!("not authenticated)");
                         }
                     }
                     _ => {
                         res = ErrorKind::GenericError;
-                        if (*state).verbose != 0 {
+                        if state.verbose != 0 {
                             eprintln!("error {:x})", sw);
                         }
                     }
@@ -1314,7 +1298,7 @@ pub unsafe fn ykpiv_util_generate_key(
                 let mut data_ptr: *mut u8 = data.as_mut_ptr().offset(5);
                 let mut len: usize = 0;
                 if *data_ptr != TAG_RSA_MODULUS {
-                    if (*state).verbose != 0 {
+                    if state.verbose != 0 {
                         eprintln!("Failed to parse public key structure (modulus).");
                     }
                     res = ErrorKind::ParseError;
@@ -1324,7 +1308,7 @@ pub unsafe fn ykpiv_util_generate_key(
                     cb_modulus = len;
                     ptr_modulus = calloc(cb_modulus, 1) as *mut u8;
                     if ptr_modulus.is_null() {
-                        if (*state).verbose != 0 {
+                        if state.verbose != 0 {
                             eprintln!("Failed to allocate memory for modulus.");
                         }
                         res = ErrorKind::MemoryError;
@@ -1336,7 +1320,7 @@ pub unsafe fn ykpiv_util_generate_key(
                         );
                         data_ptr = data_ptr.add(len);
                         if *data_ptr != TAG_RSA_EXP {
-                            if (*state).verbose != 0 {
+                            if state.verbose != 0 {
                                 eprintln!(
                                     "Failed to parse public key structure (public exponent)."
                                 );
@@ -1348,7 +1332,7 @@ pub unsafe fn ykpiv_util_generate_key(
                             cb_exp = len;
                             ptr_exp = calloc(cb_exp, 1) as *mut u8;
                             if ptr_exp.is_null() {
-                                if (*state).verbose != 0 {
+                                if state.verbose != 0 {
                                     eprintln!("Failed to allocate memory for public exponent.");
                                 }
                                 res = ErrorKind::MemoryError;
@@ -1383,7 +1367,7 @@ pub unsafe fn ykpiv_util_generate_key(
                     _old
                 } != TAG_ECC_POINT
                 {
-                    if (*state).verbose != 0 {
+                    if state.verbose != 0 {
                         eprintln!("Failed to parse public key structure.\n",);
                     }
                     res = ErrorKind::ParseError;
@@ -1394,7 +1378,7 @@ pub unsafe fn ykpiv_util_generate_key(
                 } as (usize)
                     != len
                 {
-                    if (*state).verbose != 0 {
+                    if state.verbose != 0 {
                         eprintln!("Unexpected length.\n");
                     }
                     res = ErrorKind::AlgorithmError;
@@ -1402,7 +1386,7 @@ pub unsafe fn ykpiv_util_generate_key(
                     cb_point = len;
                     ptr_point = calloc(cb_point, 1) as (*mut u8);
                     if ptr_point.is_null() {
-                        if (*state).verbose != 0 {
+                        if state.verbose != 0 {
                             eprintln!("Failed to allocate memory for public point.");
                         }
                         res = ErrorKind::MemoryError;
@@ -1418,7 +1402,7 @@ pub unsafe fn ykpiv_util_generate_key(
                     }
                 }
             } else {
-                if (*state).verbose != 0 {
+                if state.verbose != 0 {
                     eprintln!("Wrong algorithm.");
                 }
                 res = ErrorKind::AlgorithmError;
@@ -1481,7 +1465,7 @@ pub struct YkPivConfig {
 
 /// Get config
 pub unsafe fn ykpiv_util_get_config(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     config: *mut YkPivConfig,
 ) -> Result<(), ErrorKind> {
     let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
@@ -1490,7 +1474,7 @@ pub unsafe fn ykpiv_util_get_config(
     let mut cb_item: usize = 0;
     let res = ErrorKind::Ok;
 
-    if state.is_null() || config.is_null() {
+    if config.is_null() {
         return Err(ErrorKind::GenericError);
     }
 
@@ -1533,7 +1517,7 @@ pub unsafe fn ykpiv_util_get_config(
                 if (*config).mgm_type as (i32)
                     != YkPivConfigMgmType::YKPIV_CONFIG_MGM_MANUAL as (i32)
                 {
-                    if (*state).verbose != 0 {
+                    if state.verbose != 0 {
                         eprintln!("conflicting types of mgm key administration configured");
                     }
                 } else {
@@ -1550,7 +1534,7 @@ pub unsafe fn ykpiv_util_get_config(
             ) == ErrorKind::Ok
             {
                 if cb_item != 4 {
-                    if (*state).verbose != 0 {
+                    if state.verbose != 0 {
                         eprintln!("pin timestamp in admin metadata is an invalid size");
                     }
                 } else {
@@ -1590,7 +1574,7 @@ pub unsafe fn ykpiv_util_get_config(
 
             if res == ErrorKind::Ok {
                 if (*config).mgm_type != YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED
-                    && (*state).verbose != 0
+                    && state.verbose != 0
                 {
                     eprintln!(
                              "conflicting types of mgm key administration configured - protected mgm exists"
@@ -1609,15 +1593,11 @@ pub unsafe fn ykpiv_util_get_config(
 }
 
 /// Set PIN last changed
-pub unsafe fn ykpiv_util_set_pin_last_changed(state: *mut YubiKey) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_set_pin_last_changed(state: &mut YubiKey) -> Result<(), ErrorKind> {
     let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_data = data.len();
     let mut res = ErrorKind::Ok;
     let ykrc: ErrorKind;
-
-    if state.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
 
     if _ykpiv_begin_transaction(state) != ErrorKind::Ok {
         return Err(ErrorKind::PcscError);
@@ -1646,12 +1626,12 @@ pub unsafe fn ykpiv_util_set_pin_last_changed(state: *mut YubiKey) -> Result<(),
         };
 
         if res != ErrorKind::Ok {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("could not set pin timestamp, err = {}\n", res as (i32),);
             }
         } else {
             res = _write_metadata(state, 0x80u8, data.as_mut_ptr(), cb_data);
-            if res != ErrorKind::Ok && (*state).verbose != 0 {
+            if res != ErrorKind::Ok && state.verbose != 0 {
                 eprintln!("could not write admin data, err = {}", res);
             }
         }
@@ -1681,7 +1661,7 @@ impl Drop for YkPivMgm {
 
 /// Get derived management key (MGM)
 pub unsafe fn ykpiv_util_get_derived_mgm(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     pin: *const u8,
     pin_len: usize,
     mgm: *mut YkPivMgm,
@@ -1691,10 +1671,6 @@ pub unsafe fn ykpiv_util_get_derived_mgm(
     let mut p_item: *mut u8 = ptr::null_mut();
     let mut cb_item: usize = 0;
     let mut res: ErrorKind = ErrorKind::Ok;
-
-    if state.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
 
     if pin.is_null() || pin_len == 0 || mgm.is_null() {
         return Err(ErrorKind::GenericError);
@@ -1718,7 +1694,7 @@ pub unsafe fn ykpiv_util_get_derived_mgm(
 
             if res == ErrorKind::Ok {
                 if cb_item != 16usize {
-                    if (*state).verbose != 0 {
+                    if state.verbose != 0 {
                         eprintln!(
                             "derived mgm salt exists, but is incorrect size = {}",
                             cb_item,
@@ -1737,7 +1713,7 @@ pub unsafe fn ykpiv_util_get_derived_mgm(
                     );
 
                     if p5rc != Pkcs5ErrorKind::Ok {
-                        if (*state).verbose != 0 {
+                        if state.verbose != 0 {
                             eprintln!("pbkdf2 failure, err = {:?}", p5rc);
                         }
 
@@ -1757,7 +1733,7 @@ pub unsafe fn ykpiv_util_get_derived_mgm(
 
 /// Get protected management key (MGM)
 pub unsafe fn ykpiv_util_get_protected_mgm(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     mgm: *mut YkPivMgm,
 ) -> Result<(), ErrorKind> {
     let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
@@ -1766,7 +1742,7 @@ pub unsafe fn ykpiv_util_get_protected_mgm(
     let mut cb_item: usize = 0;
     let mut res = ErrorKind::Ok;
 
-    if state.is_null() || mgm.is_null() {
+    if mgm.is_null() {
         return Err(ErrorKind::GenericError);
     }
 
@@ -1778,7 +1754,7 @@ pub unsafe fn ykpiv_util_get_protected_mgm(
         res = _read_metadata(state, 0x88u8, data.as_mut_ptr(), &mut cb_data);
 
         if res != ErrorKind::Ok {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("could not read protected data, err = {:?}", res);
             }
         } else {
@@ -1791,14 +1767,14 @@ pub unsafe fn ykpiv_util_get_protected_mgm(
             );
 
             if res != ErrorKind::Ok {
-                if (*state).verbose != 0 {
+                if state.verbose != 0 {
                     eprintln!(
                         "could not read protected mgm from metadata, err = {}",
                         res as (i32),
                     );
                 }
             } else if cb_item != (*mgm).0.len() {
-                if (*state).verbose != 0 {
+                if state.verbose != 0 {
                     eprintln!(
                         "protected data contains mgm, but is the wrong size = {}",
                         cb_item,
@@ -1826,7 +1802,7 @@ pub unsafe fn ykpiv_util_get_protected_mgm(
 /// Set protected management key (MGM)
 #[allow(clippy::cognitive_complexity)]
 pub unsafe fn ykpiv_util_set_protected_mgm(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     mgm: *mut YkPivMgm,
 ) -> Result<(), ErrorKind> {
     let mut _currentBlock;
@@ -1841,10 +1817,6 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
     let mut p_item: *mut u8 = ptr::null_mut();
     let mut cb_item: usize = 0;
     let mut flags_1: u8 = 0;
-
-    if state.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
 
     if mgm.is_null() {
         f_generate = true;
@@ -1927,7 +1899,7 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
             );
 
             if ykrc != ErrorKind::Ok {
-                if (*state).verbose != 0 {
+                if state.verbose != 0 {
                     eprintln!("could not set protected mgm item, err = {:?}", ykrc);
                     _currentBlock = 26;
                 } else {
@@ -1936,7 +1908,7 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
             } else {
                 ykrc = _write_metadata(state, 0x88u8, data.as_mut_ptr(), cb_data);
                 if ykrc != ErrorKind::Ok {
-                    if (*state).verbose != 0 {
+                    if state.verbose != 0 {
                         eprintln!("could not write protected data, err = {:?}", ykrc);
                         _currentBlock = 51;
                     } else {
@@ -1962,7 +1934,7 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
                         &mut cb_item,
                     );
 
-                    if ykrc != ErrorKind::Ok && (*state).verbose != 0 {
+                    if ykrc != ErrorKind::Ok && state.verbose != 0 {
                         eprintln!("admin data exists, but flags are not present",);
                     }
 
@@ -1974,7 +1946,7 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
                             p_item as (*const c_void),
                             cb_item,
                         );
-                    } else if (*state).verbose != 0 {
+                    } else if state.verbose != 0 {
                         eprintln!("admin data flags are an incorrect size = {}", cb_item,);
                     }
 
@@ -1987,7 +1959,7 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
                         0,
                     );
 
-                    if ykrc != ErrorKind::Ok && (*state).verbose != 0 {
+                    if ykrc != ErrorKind::Ok && state.verbose != 0 {
                         eprintln!("could not unset derived mgm salt, err = {}", ykrc);
                     }
                 }
@@ -2003,24 +1975,24 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
                 );
 
                 if ykrc != ErrorKind::Ok {
-                    if (*state).verbose != 0 {
+                    if state.verbose != 0 {
                         eprintln!("could not set admin flags item, err = {}", ykrc);
                     }
                 } else {
                     ykrc = _write_metadata(state, 0x80u8, data.as_mut_ptr(), cb_data);
-                    if ykrc != ErrorKind::Ok && (*state).verbose != 0 {
+                    if ykrc != ErrorKind::Ok && state.verbose != 0 {
                         eprintln!("could not write admin data, err = {}", ykrc);
                     }
                 }
             }
         } else if _currentBlock == 44 {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("could not set new derived mgm key, err = {}", ykrc);
             }
 
             res = ykrc;
         } else {
-            if (*state).verbose != 0 {
+            if state.verbose != 0 {
                 eprintln!("could not generate new mgm, err = {:?}", prngrc);
             }
 
@@ -2039,7 +2011,7 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
 }
 
 /// Reset
-pub unsafe fn ykpiv_util_reset(state: *mut YubiKey) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_reset(state: &mut YubiKey) -> Result<(), ErrorKind> {
     let templ = [0, YKPIV_INS_RESET, 0, 0];
     let mut data = [0u8; 255];
     let mut recv_len = data.len();
@@ -2081,7 +2053,7 @@ pub fn ykpiv_util_slot_object(slot: u8) -> u32 {
 
 /// Read certificate
 unsafe fn _read_certificate(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     slot: u8,
     buf: *mut u8,
     buf_len: *mut usize,
@@ -2125,7 +2097,7 @@ unsafe fn _read_certificate(
 
 /// Write certificate
 unsafe fn _write_certificate(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     slot: u8,
     data: *mut u8,
     data_len: usize,
@@ -2337,7 +2309,7 @@ unsafe fn _set_metadata_item(
 
 /// Read metadata
 unsafe fn _read_metadata(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     tag: u8,
     data: *mut u8,
     pcb_data: *mut usize,
@@ -2393,7 +2365,7 @@ unsafe fn _read_metadata(
 
 /// Write metadata
 unsafe fn _write_metadata(
-    state: *mut YubiKey,
+    state: &mut YubiKey,
     tag: u8,
     data: *mut u8,
     cb_data: usize,
