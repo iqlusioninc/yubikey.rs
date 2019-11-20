@@ -275,9 +275,7 @@ pub(crate) unsafe fn _ykpiv_select_application(state: &mut YubiKey) -> Result<()
         }
     }
 
-    res = _ykpiv_get_serial(state, ptr::null_mut(), false);
-
-    if let Err(e) = res.as_ref() {
+    if let Err(e) = _ykpiv_get_serial(state, false) {
         if state.verbose != 0 {
             eprintln!("Failed to retrieve serial number: \'{}\'", e);
         }
@@ -1332,11 +1330,8 @@ pub unsafe fn ykpiv_get_version(state: &mut YubiKey) -> Result<String, ErrorKind
 /// NOTE: caller must make sure that this is wrapped in a transaction for synchronized operation
 pub(crate) unsafe fn _ykpiv_get_serial(
     state: &mut YubiKey,
-    p_serial: *mut u32,
     f_force: bool,
-) -> Result<(), ErrorKind> {
-    let mut _currentBlock;
-    let mut res;
+) -> Result<u32, ErrorKind> {
     let yk_applet: *const u8 = ptr::null();
     let mut data = [0u8; 255];
     let mut recv_len = data.len() as u32;
@@ -1344,11 +1339,7 @@ pub(crate) unsafe fn _ykpiv_get_serial(
     let p_temp: *mut u8;
 
     if !f_force && state.serial != 0 {
-        if !p_serial.is_null() {
-            *p_serial = state.serial;
-        }
-
-        return Ok(());
+        return Ok(state.serial);
     }
 
     if state.ver.major < 5 {
@@ -1367,17 +1358,13 @@ pub(crate) unsafe fn _ykpiv_get_serial(
             mem::size_of_val(&yk_applet),
         );
 
-        res = _send_data(state, &mut apdu, temp.as_mut_ptr(), &mut recv_len, &mut sw);
-
-        if let Err(e) = res.as_ref() {
+        if let Err(e) = _send_data(state, &mut apdu, temp.as_mut_ptr(), &mut recv_len, &mut sw) {
             if state.verbose != 0 {
                 eprintln!("Failed communicating with card: \'{}\'", e);
             }
 
-            return res;
-        }
-
-        if sw != SW_SUCCESS {
+            return Err(e);
+        } else if sw != SW_SUCCESS {
             if state.verbose != 0 {
                 eprintln!("Failed selecting yk application: {:04x}", sw);
             }
@@ -1391,17 +1378,13 @@ pub(crate) unsafe fn _ykpiv_get_serial(
         apdu.p1 = 0x10;
         apdu.lc = 0x00;
 
-        res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
-
-        if let Err(e) = res.as_ref() {
+        if let Err(e) = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw) {
             if state.verbose != 0 {
                 eprintln!("Failed communicating with card: \'{}\'", e);
             }
 
-            return res;
-        }
-
-        if sw != SW_SUCCESS {
+            return Err(e);
+        } else if sw != SW_SUCCESS {
             if state.verbose != 0 {
                 eprintln!("Failed retrieving serial number: {:04x}", sw);
             }
@@ -1421,77 +1404,62 @@ pub(crate) unsafe fn _ykpiv_get_serial(
             mem::size_of_val(&AID),
         );
 
-        res = _send_data(state, &mut apdu, temp.as_mut_ptr(), &mut recv_len, &mut sw);
-
-        if let Err(e) = res.as_ref() {
+        if let Err(e) = _send_data(state, &mut apdu, temp.as_mut_ptr(), &mut recv_len, &mut sw) {
             if state.verbose != 0 {
                 eprintln!("Failed communicating with card: \'{}\'", e);
             }
-            return res;
-        }
-
-        if sw != SW_SUCCESS {
+            return Err(e);
+        } else if sw != SW_SUCCESS {
             if state.verbose != 0 {
                 eprintln!("Failed selecting application: {:04x}", sw);
             }
             return Err(ErrorKind::GenericError);
         }
-
-        _currentBlock = 17;
     } else {
         // get serial from yk5 and later devices using the f8 command
         let mut apdu = APDU::default();
         apdu.ins = YKPIV_INS_GET_SERIAL;
 
-        res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
-
-        if let Err(e) = res.as_ref() {
+        if let Err(e) = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw) {
             if state.verbose != 0 {
                 eprintln!("Failed communicating with card: \'{}\'", e);
             }
-            return res;
+            return Err(e);
         } else if sw != SW_SUCCESS {
             if state.verbose != 0 {
                 eprintln!("Failed retrieving serial number: {:04x}", sw);
             }
             return Err(ErrorKind::GenericError);
         }
-        _currentBlock = 17;
     }
 
-    if _currentBlock == 17 {
-        // check that we received enough data for the serial number
-        if recv_len < 4 {
-            return Err(ErrorKind::SizeError);
-        }
-
-        // TODO(tarcieri): replace pointers and casts with proper references!
-        #[allow(trivial_casts)]
-        {
-            p_temp = &mut state.serial as (*mut u32) as (*mut u8);
-        }
-
-        *p_temp = data[3];
-        *p_temp.add(1) = data[2];
-        *p_temp.add(2) = data[1];
-        *p_temp.add(3) = data[0];
-
-        if !p_serial.is_null() {
-            *p_serial = state.serial;
-        }
+    // check that we received enough data for the serial number
+    if recv_len < 4 {
+        return Err(ErrorKind::SizeError);
     }
 
-    res
+    // TODO(tarcieri): replace pointers and casts with proper references!
+    #[allow(trivial_casts)]
+    {
+        p_temp = &mut state.serial as (*mut u32) as (*mut u8);
+    }
+
+    *p_temp = data[3];
+    *p_temp.add(1) = data[2];
+    *p_temp.add(2) = data[1];
+    *p_temp.add(3) = data[0];
+
+    Ok(state.serial)
 }
 
 /// Get YubiKey device serial number
-pub unsafe fn ykpiv_get_serial(state: &mut YubiKey, p_serial: *mut u32) -> Result<(), ErrorKind> {
-    let mut res = Ok(());
+pub unsafe fn ykpiv_get_serial(state: &mut YubiKey) -> Result<u32, ErrorKind> {
+    let mut res = Err(ErrorKind::GenericError);
 
     _ykpiv_begin_transaction(state)?;
 
     if _ykpiv_ensure_application_selected(state).is_ok() {
-        res = _ykpiv_get_serial(state, p_serial, false);
+        res = _ykpiv_get_serial(state, false);
     }
 
     _ykpiv_end_transaction(state);
