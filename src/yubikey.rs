@@ -2228,20 +2228,11 @@ pub unsafe fn ykpiv_auth_getchallenge(state: &mut YubiKey) -> Result<[u8; 8], Er
 /// Verify an auth response
 pub unsafe fn ykpiv_auth_verifyresponse(
     state: &mut YubiKey,
-    response: *mut u8,
-    response_len: usize,
+    response: &[u8; 8],
 ) -> Result<(), ErrorKind> {
     let mut data = [0u8; 261];
     let mut recv_len = data.len() as u32;
     let mut sw: i32 = 0;
-
-    if response.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
-
-    if response_len != 8 {
-        return Err(ErrorKind::SizeError);
-    }
 
     _ykpiv_begin_transaction(state)?;
 
@@ -2254,13 +2245,7 @@ pub unsafe fn ykpiv_auth_verifyresponse(
     apdu.data[1] = 0x0a; // 2 + 8
     apdu.data[2] = 0x82;
     apdu.data[3] = 8;
-
-    memcpy(
-        apdu.data.as_mut_ptr().add(4) as *mut c_void,
-        response as *const c_void,
-        response_len,
-    );
-
+    apdu.data[4..12].copy_from_slice(response);
     apdu.lc = 12;
 
     let mut res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
