@@ -36,6 +36,12 @@
 
 pub const szLOG_SOURCE: &str = "yubikey-piv.rs";
 
+pub const ADMIN_FLAGS_1_PUK_BLOCKED: u8 = 0x01;
+pub const ADMIN_FLAGS_1_PROTECTED_MGM: u8 = 0x02;
+
+pub const CB_ADMIN_TIMESTAMP: usize = 0x04;
+pub const CB_ADMIN_SALT: usize = 16;
+
 pub const CB_OBJ_MAX: usize = 3063;
 
 pub const CB_OBJ_TAG_MIN: usize = 2; // 1 byte tag + 1 byte len
@@ -64,6 +70,10 @@ pub const DEVTYPE_YK: u32 = 0x594B_0000; //"YK"
 pub const DEVTYPE_NEOr3: u32 = (DEVTYPE_NEO | 0x0000_7233); //"r3"
 pub const DEVTYPE_YK4: u32 = (DEVTYPE_YK | 0x0000_0034); // "4"
 pub const DEVYTPE_YK5: u32 = (DEVTYPE_YK | 0x0000_0035); // "5"
+
+pub const ITER_MGM_PBKDF2: usize = 10000;
+
+pub const PROTECTED_FLAGS_1_PUK_NOBLOCK: u8 = 0x01;
 
 // sw is status words, see NIST special publication 800-73-4, section 5.6
 
