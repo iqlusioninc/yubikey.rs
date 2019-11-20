@@ -491,7 +491,7 @@ pub unsafe fn ykpiv_connect(state: &mut YubiKey, wanted: *const c_char) -> Resul
     _ykpiv_begin_transaction(state)?;
 
     let res = _ykpiv_select_application(state);
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -782,7 +782,7 @@ pub unsafe fn ykpiv_transfer_data(
     }
 
     let res = _ykpiv_transfer_data(state, templ, in_data, in_len, out_data, out_len, sw);
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -878,7 +878,7 @@ pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Res
                 mgm_key.is_null(),
                 "didn't expect mgm key to be set by failing op!"
             );
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return Err(ErrorKind::AlgorithmError);
         }
 
@@ -895,12 +895,12 @@ pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Res
         res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
 
         if res.is_err() {
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return res;
         }
 
         if sw != SW_SUCCESS {
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return Err(ErrorKind::AuthenticationError);
         }
 
@@ -923,7 +923,7 @@ pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Res
         );
 
         if drc != DesErrorKind::Ok {
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return Err(ErrorKind::AuthenticationError);
         }
 
@@ -949,7 +949,7 @@ pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Res
                 eprintln!("Failed getting randomness for authentication.");
             }
 
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return Err(ErrorKind::RandomnessError);
         }
 
@@ -963,12 +963,12 @@ pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Res
         res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
 
         if res.is_err() {
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return res;
         }
 
         if sw != SW_SUCCESS {
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return Err(ErrorKind::AuthenticationError);
         }
 
@@ -1001,7 +1001,7 @@ pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Res
         des_destroy_key(mgm_key);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1040,7 +1040,7 @@ pub(crate) unsafe fn ykpiv_set_mgmkey2(
                 0 => 0xff,
                 1 => 0xfe,
                 _ => {
-                    _ykpiv_end_transaction(state);
+                    let _ = _ykpiv_end_transaction(state);
                     return Err(ErrorKind::GenericError);
                 }
             };
@@ -1065,7 +1065,7 @@ pub(crate) unsafe fn ykpiv_set_mgmkey2(
     }
 
     apdu.zeroize();
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1220,7 +1220,7 @@ pub unsafe fn ykpiv_sign_data(
         state, raw_in, in_len, sign_out, out_len, algorithm, key, false,
     );
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1239,7 +1239,7 @@ pub unsafe fn ykpiv_decrypt_data(
     // don't attempt to reselect in crypt operations to avoid problems with PIN_ALWAYS
 
     let res = _general_authenticate(state, input, input_len, out, out_len, algorithm, key, true);
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1285,7 +1285,7 @@ pub unsafe fn ykpiv_get_version(state: &mut YubiKey) -> Result<String, ErrorKind
         res = _ykpiv_get_version(state);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res.map(|ver| format!("{}.{}.{}", ver.major, ver.minor, ver.patch))
 }
 
@@ -1426,7 +1426,7 @@ pub unsafe fn ykpiv_get_serial(state: &mut YubiKey) -> Result<u32, ErrorKind> {
         res = _ykpiv_get_serial(state, false);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1563,7 +1563,7 @@ pub unsafe fn ykpiv_verify_select(
         res = _verify(state, pin, pin_len);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1630,7 +1630,7 @@ pub unsafe fn ykpiv_set_pin_retries(
         }
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1744,7 +1744,7 @@ pub unsafe fn ykpiv_change_pin(
         }
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1770,7 +1770,7 @@ pub unsafe fn ykpiv_change_puk(
         res = _ykpiv_change_pin(state, 2, current_puk, current_puk_len, new_puk, new_puk_len);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1791,7 +1791,7 @@ pub unsafe fn ykpiv_unblock_pin(
         res = _ykpiv_change_pin(state, 1, puk, puk_len, new_pin, new_pin_len);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1810,7 +1810,7 @@ pub unsafe fn ykpiv_fetch_object(
         res = _ykpiv_fetch_object(state, object_id, data, len);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1894,7 +1894,7 @@ pub unsafe fn ykpiv_save_object(
         res = _ykpiv_save_object(state, object_id, indata, len);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -2135,7 +2135,7 @@ pub unsafe fn ykpiv_import_private_key(
     }
 
     key_data.zeroize();
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -2184,7 +2184,7 @@ pub unsafe fn ykpiv_attest(
         }
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -2219,7 +2219,7 @@ pub unsafe fn ykpiv_auth_getchallenge(state: &mut YubiKey) -> Result<[u8; 8], Er
         }
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -2253,7 +2253,7 @@ pub unsafe fn ykpiv_auth_verifyresponse(
     }
 
     apdu.zeroize();
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -2292,6 +2292,6 @@ pub unsafe fn ykpiv_auth_deauthenticate(state: &mut YubiKey) -> Result<(), Error
         res = Err(ErrorKind::GenericError);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }

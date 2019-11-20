@@ -110,7 +110,7 @@ pub unsafe fn ykpiv_util_get_cardid(
         }
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -158,7 +158,7 @@ pub unsafe fn ykpiv_util_set_cardid(
         );
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -188,7 +188,7 @@ pub unsafe fn ykpiv_util_get_cccid(state: &mut YubiKey, ccc: *mut CCCID) -> Resu
 
         if res.is_ok() {
             if len != CCC_TMPL.len() {
-                _ykpiv_end_transaction(state);
+                let _ = _ykpiv_end_transaction(state);
                 return Err(ErrorKind::GenericError);
             }
 
@@ -245,7 +245,7 @@ pub unsafe fn ykpiv_util_set_cccid(
         res = _ykpiv_save_object(state, YKPIV_OBJ_CAPABILITY as i32, buf.as_mut_ptr(), len);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -337,7 +337,7 @@ pub unsafe fn ykpiv_util_list_keys(
         p_data = calloc(CB_PAGE, 1) as (*mut u8);
 
         if p_data.is_null() {
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return Err(ErrorKind::MemoryError);
         }
 
@@ -429,7 +429,7 @@ pub unsafe fn ykpiv_util_list_keys(
         free(p_data as (*mut c_void));
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -476,7 +476,7 @@ pub unsafe fn ykpiv_util_read_cert(
         }
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -496,7 +496,7 @@ pub unsafe fn ykpiv_util_write_cert(
         res = _write_certificate(state, slot, data, data_len, certinfo);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -615,7 +615,7 @@ pub unsafe fn ykpiv_util_block_puk(state: &mut YubiKey) -> Result<(), ErrorKind>
                 }
             }
         } else {
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return res;
         }
     }
@@ -682,14 +682,14 @@ pub unsafe fn ykpiv_util_read_mscmap(
         );
 
         if res.is_err() {
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return res;
         }
 
         ptr = buf.as_mut_ptr();
 
         if cb_buf < CB_OBJ_TAG_MIN {
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return Ok(());
         }
 
@@ -698,7 +698,7 @@ pub unsafe fn ykpiv_util_read_mscmap(
             ptr = ptr.add(_ykpiv_get_length(ptr, &mut len));
 
             if len > cb_buf - (ptr as isize - buf.as_mut_ptr() as isize) as usize {
-                _ykpiv_end_transaction(state);
+                let _ = _ykpiv_end_transaction(state);
                 return Ok(());
             }
 
@@ -746,14 +746,14 @@ pub unsafe fn ykpiv_util_write_mscmap(
                 res = _ykpiv_save_object(state, YKPIV_OBJ_MSCMAP as i32, ptr::null_mut(), 0);
             }
 
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return res;
         }
 
         let req_len = 1 + _ykpiv_set_length(buf.as_mut_ptr(), data_len) + data_len;
 
         if req_len > _obj_size_max(state) {
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return Err(ErrorKind::SizeError);
         }
 
@@ -769,7 +769,7 @@ pub unsafe fn ykpiv_util_write_mscmap(
         res = _ykpiv_save_object(state, YKPIV_OBJ_MSCMAP as i32, buf.as_mut_ptr(), offset);
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -897,7 +897,7 @@ pub unsafe fn ykpiv_util_read_msroots(
         free(p_data as (*mut c_void));
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -925,14 +925,14 @@ pub unsafe fn ykpiv_util_write_msroots(
                 res = _ykpiv_save_object(state, YKPIV_OBJ_MSROOTS1 as i32, ptr::null_mut(), 0);
             }
 
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return res;
         }
 
         n_objs = (data_len / (cb_obj_max - 4)) + 1;
 
         if n_objs > 5 {
-            _ykpiv_end_transaction(state);
+            let _ = _ykpiv_end_transaction(state);
             return Err(ErrorKind::SizeError);
         }
 
@@ -977,7 +977,7 @@ pub unsafe fn ykpiv_util_write_msroots(
         }
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1356,7 +1356,7 @@ pub unsafe fn ykpiv_util_generate_key(
         free(ptr_exp as (*mut c_void));
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1517,7 +1517,7 @@ pub unsafe fn ykpiv_util_get_config(
         }
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1562,7 +1562,7 @@ pub unsafe fn ykpiv_util_set_pin_last_changed(state: &mut YubiKey) -> Result<(),
             }
         }
     }
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1645,7 +1645,7 @@ pub unsafe fn ykpiv_util_get_derived_mgm(
         }
     }
 
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1705,7 +1705,7 @@ pub unsafe fn ykpiv_util_get_protected_mgm(
     }
 
     data.zeroize();
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
     res
 }
 
@@ -1917,7 +1917,7 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
 
     data.zeroize();
     mgm_key.zeroize();
-    _ykpiv_end_transaction(state);
+    let _ = _ykpiv_end_transaction(state);
 
     res
 }
