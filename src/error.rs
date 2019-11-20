@@ -35,10 +35,6 @@ use std::fmt;
 /// Kinds of errors
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ErrorKind {
-    /// OK
-    // TODO(tarcieri): replace this with proper result types
-    Ok,
-
     /// Memory error
     MemoryError,
 
@@ -95,7 +91,6 @@ impl ErrorKind {
     /// assist in web searches for relevant information for these errors.
     pub fn name(self) -> &'static str {
         match self {
-            ErrorKind::Ok => "YKPIV_OK",
             ErrorKind::MemoryError => "YKPIV_MEMORY_ERROR",
             ErrorKind::PcscError => "YKPIV_PCSC_ERROR",
             ErrorKind::SizeError => "YKPIV_SIZE_ERROR",
@@ -118,7 +113,6 @@ impl ErrorKind {
     /// Error message
     pub fn msg(self) -> &'static str {
         match self {
-            ErrorKind::Ok => "OK",
             ErrorKind::MemoryError => "memory error",
             ErrorKind::PcscError => "PCSC error",
             ErrorKind::SizeError => "size error",
