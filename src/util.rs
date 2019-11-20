@@ -34,8 +34,10 @@
 #![allow(clippy::missing_safety_doc, clippy::too_many_arguments)]
 
 use crate::{consts::*, error::ErrorKind, internal::*, yubikey::*};
+use getrandom::getrandom;
 use libc::{calloc, free, memcpy, memmove, realloc, time};
 use log::{error, warn};
+use std::ops::DerefMut;
 use std::{ffi::CString, mem, os::raw::c_void, ptr};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -125,9 +127,7 @@ pub unsafe fn ykpiv_util_set_cardid(
     let mut res = Ok(());
 
     if cardid.is_null() {
-        if _ykpiv_prng_generate(id.as_mut_ptr(), id.len()) != PRngErrorKind::Ok {
-            return Err(ErrorKind::RandomnessError);
-        }
+        getrandom(&mut id).map_err(|_| ErrorKind::RandomnessError)?;
     } else {
         memcpy(
             id.as_mut_ptr() as (*mut c_void),
@@ -215,9 +215,7 @@ pub unsafe fn ykpiv_util_set_cccid(
     let len: usize;
 
     if ccc.is_null() {
-        if _ykpiv_prng_generate(id.as_mut_ptr(), id.len()) != PRngErrorKind::Ok {
-            return Err(ErrorKind::RandomnessError);
-        }
+        getrandom(&mut id).map_err(|_| ErrorKind::RandomnessError)?;
     } else {
         memcpy(
             id.as_mut_ptr() as (*mut c_void),
@@ -1593,7 +1591,6 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
     state: &mut YubiKey,
     mgm: *mut YkPivMgm,
 ) -> Result<(), ErrorKind> {
-    let mut prngrc: PRngErrorKind;
     let mut f_generate: bool;
     let mut mgm_key = Zeroizing::new([0u8; 24]);
     // TODO(tarcieri): replace vec with wrapper type that impls `Zeroize`
@@ -1632,9 +1629,8 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
     loop {
         if f_generate {
             // generate a new mgm key
-            prngrc = _ykpiv_prng_generate(mgm_key.as_mut_ptr(), mgm_key.len());
-            if prngrc != PRngErrorKind::Ok {
-                error!("could not generate new mgm, err = {:?}", prngrc);
+            if let Err(e) = getrandom(mgm_key.deref_mut()) {
+                error!("could not generate new mgm, err = {}", e);
                 let _ = _ykpiv_end_transaction(state);
                 return Err(ErrorKind::RandomnessError);
             }

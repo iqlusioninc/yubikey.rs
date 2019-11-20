@@ -39,9 +39,10 @@ use crate::{
     error::ErrorKind,
     internal::{
         des_decrypt, des_destroy_key, des_encrypt, des_import_key, yk_des_is_weak_key,
-        DesErrorKind, DesKey, PRngErrorKind, _ykpiv_prng_generate,
+        DesErrorKind, DesKey,
     },
 };
+use getrandom::getrandom;
 use libc::{c_char, free, malloc, memcmp, memcpy, memmove, memset, strlen, strncasecmp};
 use log::{error, info, trace, warn};
 use std::{convert::TryInto, ffi::CStr, mem, os::raw::c_void, ptr, slice};
@@ -851,26 +852,18 @@ pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Res
         apdu.data[1] = 20; // 2 + 8 + 2 +8
         apdu.data[2] = 0x80;
         apdu.data[3] = 8;
-        memcpy(
-            apdu.data[4..12].as_mut_ptr() as *mut c_void,
-            response.as_ptr() as *const c_void,
-            8,
-        );
+        apdu.data[4..12].copy_from_slice(&response);
         apdu.data[12] = 0x81;
         apdu.data[13] = 8;
 
-        if _ykpiv_prng_generate(data[14..20].as_mut_ptr(), 8) == PRngErrorKind::GeneralError {
+        if getrandom(&mut data[14..22]).is_err() {
             error!("failed getting randomness for authentication.");
             let _ = _ykpiv_end_transaction(state);
             return Err(ErrorKind::RandomnessError);
         }
+        challenge.copy_from_slice(&data[14..22]);
 
-        memcpy(
-            challenge.as_mut_ptr() as *mut c_void,
-            data[14..20].as_ptr() as *const c_void,
-            8,
-        );
-        apdu.lc = 20;
+        apdu.lc = 22;
 
         res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
 
