@@ -200,7 +200,7 @@ pub(crate) unsafe fn _ykpiv_done(state: &mut YubiKey, disconnect: bool) -> Resul
         ykpiv_disconnect(state);
     }
 
-    _cache_pin(state, ptr::null(), 0);
+    let _ = _cache_pin(state, ptr::null(), 0);
     Ok(())
 }
 
@@ -1527,7 +1527,7 @@ pub(crate) unsafe fn _verify(
         if !pin.is_null() && (pin_len != 0) {
             // Intentionally ignore errors.  If the PIN fails to save, it will only
             // be a problem if a reconnect is attempted.  Failure deferred until then.
-            _cache_pin(state, pin, pin_len);
+            let _ = _cache_pin(state, pin, pin_len);
         }
 
         Ok(sw & 0xf)
@@ -1740,7 +1740,7 @@ pub unsafe fn ykpiv_change_pin(
         if res.is_ok() && !new_pin.is_null() {
             // Intentionally ignore errors.  If the PIN fails to save, it will only
             // be a problem if a reconnect is attempted.  Failure deferred until then.
-            _cache_pin(state, new_pin, new_pin_len);
+            let _ = _cache_pin(state, new_pin, new_pin_len);
         }
     }
 
