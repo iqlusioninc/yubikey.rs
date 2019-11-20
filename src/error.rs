@@ -63,7 +63,10 @@ pub enum ErrorKind {
     ParseError,
 
     /// Wrong PIN
-    WrongPin { tries: i32 },
+    WrongPin {
+        /// Number of tries remaining
+        tries: i32,
+    },
 
     /// Invalid object
     InvalidObject,
