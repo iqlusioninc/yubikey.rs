@@ -2191,23 +2191,12 @@ pub unsafe fn ykpiv_attest(
 }
 
 /// Get an auth challenge
-pub unsafe fn ykpiv_auth_getchallenge(
-    state: &mut YubiKey,
-    challenge: *mut u8,
-    challenge_len: usize,
-) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_auth_getchallenge(state: &mut YubiKey) -> Result<[u8; 8], ErrorKind> {
     let mut data = [0u8; 261];
     let mut recv_len = data.len() as u32;
     let mut sw: i32 = 0;
-    let mut res = Ok(());
-
-    if challenge.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
-
-    if challenge_len != 8 {
-        return Err(ErrorKind::SizeError);
-    }
+    // TODO(str4d): What should the default value be if the application is not selected?
+    let mut res = Ok([0; 8]);
 
     _ykpiv_begin_transaction(state)?;
 
@@ -2221,18 +2210,14 @@ pub unsafe fn ykpiv_auth_getchallenge(
         apdu.data[1] = 0x02;
         apdu.data[2] = 0x81; //0x80;
 
-        res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
-
-        if res.is_err() {
-            if sw != SW_SUCCESS {
-                res = Err(ErrorKind::AuthenticationError);
-            } else {
-                memcpy(
-                    challenge as (*mut c_void),
-                    data.as_mut_ptr().offset(4isize) as (*const c_void),
-                    8usize,
-                );
-            }
+        if let Err(e) = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw) {
+            res = Err(e)
+        } else if sw != SW_SUCCESS {
+            res = Err(ErrorKind::AuthenticationError);
+        } else {
+            let mut challenge = [0; 8];
+            challenge.copy_from_slice(&data[4..12]);
+            res = Ok(challenge);
         }
     }
 
