@@ -547,7 +547,7 @@ pub unsafe fn ykpiv_util_block_puk(state: &mut YubiKey) -> Result<(), ErrorKind>
                         continue;
                     }
                     Err(e) => {
-                        if res != Err(ErrorKind::PinLocked) {
+                        if e != ErrorKind::PinLocked {
                             _currentBlock = 3;
                             continue;
                         }
