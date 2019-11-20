@@ -35,10 +35,6 @@ use std::fmt;
 /// Kinds of errors
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ErrorKind {
-    /// OK
-    // TODO(tarcieri): replace this with proper result types
-    Ok,
-
     /// Memory error
     MemoryError,
 
@@ -67,7 +63,10 @@ pub enum ErrorKind {
     ParseError,
 
     /// Wrong PIN
-    WrongPin,
+    WrongPin {
+        /// Number of tries remaining
+        tries: i32,
+    },
 
     /// Invalid object
     InvalidObject,
@@ -95,7 +94,6 @@ impl ErrorKind {
     /// assist in web searches for relevant information for these errors.
     pub fn name(self) -> &'static str {
         match self {
-            ErrorKind::Ok => "YKPIV_OK",
             ErrorKind::MemoryError => "YKPIV_MEMORY_ERROR",
             ErrorKind::PcscError => "YKPIV_PCSC_ERROR",
             ErrorKind::SizeError => "YKPIV_SIZE_ERROR",
@@ -105,7 +103,7 @@ impl ErrorKind {
             ErrorKind::GenericError => "YKPIV_GENERIC_ERROR",
             ErrorKind::KeyError => "YKPIV_KEY_ERROR",
             ErrorKind::ParseError => "YKPIV_PARSE_ERROR",
-            ErrorKind::WrongPin => "YKPIV_WRONG_PIN",
+            ErrorKind::WrongPin { .. } => "YKPIV_WRONG_PIN",
             ErrorKind::InvalidObject => "YKPIV_INVALID_OBJECT",
             ErrorKind::AlgorithmError => "YKPIV_ALGORITHM_ERROR",
             ErrorKind::PinLocked => "YKPIV_PIN_LOCKED",
@@ -118,7 +116,6 @@ impl ErrorKind {
     /// Error message
     pub fn msg(self) -> &'static str {
         match self {
-            ErrorKind::Ok => "OK",
             ErrorKind::MemoryError => "memory error",
             ErrorKind::PcscError => "PCSC error",
             ErrorKind::SizeError => "size error",
@@ -128,7 +125,7 @@ impl ErrorKind {
             ErrorKind::GenericError => "generic error",
             ErrorKind::KeyError => "key error",
             ErrorKind::ParseError => "parse error",
-            ErrorKind::WrongPin => "wrong pin",
+            ErrorKind::WrongPin { .. } => "wrong pin",
             ErrorKind::InvalidObject => "invalid object",
             ErrorKind::AlgorithmError => "algorithm error",
             ErrorKind::PinLocked => "PIN locked",
