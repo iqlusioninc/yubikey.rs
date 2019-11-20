@@ -35,8 +35,11 @@
 
 use crate::{consts::*, error::ErrorKind, internal::*, yubikey::*};
 use getrandom::getrandom;
+use hmac::Hmac;
 use libc::{calloc, free, memcpy, memmove, realloc, time};
 use log::{error, warn};
+use pbkdf2::pbkdf2;
+use sha1::Sha1;
 use std::ops::DerefMut;
 use std::{ffi::CString, mem, os::raw::c_void, ptr};
 use zeroize::{Zeroize, Zeroizing};
@@ -1463,18 +1466,13 @@ impl Drop for YkPivMgm {
 /// Get derived management key (MGM)
 pub unsafe fn ykpiv_util_get_derived_mgm(
     state: &mut YubiKey,
-    pin: *const u8,
-    pin_len: usize,
-    mgm: *mut YkPivMgm,
+    pin: &[u8],
+    mgm: &mut YkPivMgm,
 ) -> Result<(), ErrorKind> {
     let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_data: usize = data.len();
     let mut p_item: *mut u8 = ptr::null_mut();
     let mut cb_item: usize = 0;
-
-    if pin.is_null() || pin_len == 0 || mgm.is_null() {
-        return Err(ErrorKind::GenericError);
-    }
 
     _ykpiv_begin_transaction(state)?;
 
@@ -1503,25 +1501,13 @@ pub unsafe fn ykpiv_util_get_derived_mgm(
                     "derived mgm salt exists, but is incorrect size = {}",
                     cb_item,
                 );
+
+                let _ = _ykpiv_end_transaction(state);
+                return Err(ErrorKind::GenericError);
             }
 
-            let _ = _ykpiv_end_transaction(state);
-            return Err(ErrorKind::GenericError);
-        }
-
-        let p5rc = pkcs5_pbkdf2_sha1(
-            pin,
-            pin_len,
-            p_item,
-            cb_item,
-            ITER_MGM_PBKDF2,
-            (*mgm).0.as_mut_ptr(),
-            (*mgm).0.len(),
-        );
-
-        if p5rc != Pkcs5ErrorKind::Ok {
-            error!("pbkdf2 failure, err = {:?}", p5rc);
-            res = Err(ErrorKind::GenericError);
+            let salt = std::slice::from_raw_parts_mut(p_item, cb_item);
+            pbkdf2::<Hmac<Sha1>>(pin, &salt, ITER_MGM_PBKDF2, &mut (*mgm).0);
         }
     }
 

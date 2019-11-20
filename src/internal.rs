@@ -60,15 +60,6 @@ extern "C" {
     );
     fn DES_is_weak_key(key: *mut [u8; 8]) -> i32;
     fn DES_set_key_unchecked(key: *mut [u8; 8], schedule: *mut DesSubKey);
-    fn PKCS5_PBKDF2_HMAC_SHA1(
-        pass: *const u8,
-        passlen: i32,
-        salt: *const u8,
-        saltlen: i32,
-        iter: i32,
-        keylen: i32,
-        out: *mut u8,
-    ) -> i32;
 }
 
 /// DES-related errors
@@ -242,29 +233,6 @@ pub enum Pkcs5ErrorKind {
 
     /// General error
     GeneralError = -1,
-}
-
-/// Decrypt a PKCS#5 key
-pub unsafe fn pkcs5_pbkdf2_sha1(
-    password: *const u8,
-    cb_password: usize,
-    salt: *const u8,
-    cb_salt: usize,
-    iterations: usize,
-    key: *const u8,
-    cb_key: usize,
-) -> Pkcs5ErrorKind {
-    PKCS5_PBKDF2_HMAC_SHA1(
-        password,
-        cb_password as (i32),
-        salt,
-        cb_salt as (i32),
-        iterations as (i32),
-        cb_key as (i32),
-        key as (*mut u8),
-    );
-
-    Pkcs5ErrorKind::Ok
 }
 
 /// Strip whitespace
