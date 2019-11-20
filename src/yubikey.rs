@@ -558,7 +558,6 @@ pub unsafe fn ykpiv_list_readers(
 /// Reconnect to a YubiKey
 pub(crate) unsafe fn reconnect(state: &mut YubiKey) -> Result<(), ErrorKind> {
     let mut active_protocol: u32 = 0;
-    let mut tries: i32 = 0;
 
     if state.verbose != 0 {
         eprintln!("trying to reconnect to current reader.");
@@ -576,7 +575,7 @@ pub(crate) unsafe fn reconnect(state: &mut YubiKey) -> Result<(), ErrorKind> {
     _ykpiv_select_application(state)?;
 
     if !state.pin.is_null() {
-        ykpiv_verify(state, state.pin as *const c_char, &mut tries)
+        ykpiv_verify(state, state.pin as *const c_char).map(|_| ())
     } else {
         Ok(())
     }
@@ -1469,27 +1468,25 @@ pub(crate) unsafe fn _cache_pin(
 }
 
 /// Verify device PIN
-pub unsafe fn ykpiv_verify(
-    state: &mut YubiKey,
-    pin: *const c_char,
-    tries: *mut i32,
-) -> Result<(), ErrorKind> {
+///
+/// Returns the number of tries remaining both on success and on a wrong PIN.
+pub unsafe fn ykpiv_verify(state: &mut YubiKey, pin: *const c_char) -> Result<i32, ErrorKind> {
     ykpiv_verify_select(
         state,
         pin,
         if !pin.is_null() { strlen(pin) } else { 0 },
-        tries,
         false,
     )
 }
 
 /// Verify device PIN
+///
+/// Returns the number of tries remaining both on success and on a wrong PIN.
 pub(crate) unsafe fn _verify(
     state: &mut YubiKey,
     pin: *const c_char,
     pin_len: usize,
-    tries: *mut i32,
-) -> Result<(), ErrorKind> {
+) -> Result<i32, ErrorKind> {
     let mut data = [0u8; 261];
     let mut recv_len = data.len() as u32;
     let mut sw: i32 = 0;
@@ -1524,8 +1521,8 @@ pub(crate) unsafe fn _verify(
 
     apdu.zeroize();
 
-    if res.is_err() {
-        return res;
+    if let Err(e) = res {
+        return Err(e);
     }
 
     if sw == SW_SUCCESS {
@@ -1535,43 +1532,37 @@ pub(crate) unsafe fn _verify(
             _cache_pin(state, pin, pin_len);
         }
 
-        if !tries.is_null() {
-            *tries = sw & 0xf;
-        }
-        Ok(())
+        Ok(sw & 0xf)
     } else if sw >> 8 == 0x63 {
-        if !tries.is_null() {
-            *tries = sw & 0xf;
-        }
-        Err(ErrorKind::WrongPin)
+        Err(ErrorKind::WrongPin { tries: sw & 0xf })
     } else if sw == SW_ERR_AUTH_BLOCKED {
-        if !tries.is_null() {
-            *tries = 0;
-        }
-        Err(ErrorKind::WrongPin)
+        Err(ErrorKind::WrongPin { tries: 0 })
     } else {
         Err(ErrorKind::GenericError)
     }
 }
 
 /// Verify and select application
+///
+/// Returns the number of tries remaining both on success and on a wrong PIN.
 pub unsafe fn ykpiv_verify_select(
     state: &mut YubiKey,
     pin: *const c_char,
     pin_len: usize,
-    tries: *mut i32,
     force_select: bool,
-) -> Result<(), ErrorKind> {
-    let mut res = Ok(());
+) -> Result<i32, ErrorKind> {
+    let mut res = Ok(-1);
 
     _ykpiv_begin_transaction(state)?;
 
     if force_select {
-        res = _ykpiv_ensure_application_selected(state);
+        if let Err(e) = _ykpiv_ensure_application_selected(state) {
+            res = Err(e);
+        }
     }
 
     if res.is_ok() {
-        res = _verify(state, pin, pin_len, tries);
+        res = _verify(state, pin, pin_len);
     }
 
     _ykpiv_end_transaction(state);
@@ -1579,22 +1570,18 @@ pub unsafe fn ykpiv_verify_select(
 }
 
 /// Get the number of PIN retries
-pub unsafe fn ykpiv_get_pin_retries(state: &mut YubiKey, tries: *mut i32) -> Result<(), ErrorKind> {
-    if tries.is_null() {
-        return Err(ErrorKind::ArgumentError);
-    }
-
+pub unsafe fn ykpiv_get_pin_retries(state: &mut YubiKey) -> Result<i32, ErrorKind> {
     // Force a re-select to unverify, because once verified the spec dictates that
     // subsequent verify calls will return a "verification not needed" instead of
     // the number of tries left...
     _ykpiv_select_application(state)?;
 
-    let ykrc = ykpiv_verify(state, ptr::null(), tries);
+    let ykrc = ykpiv_verify(state, ptr::null());
 
     // WRONG_PIN is expected on successful query.
     match ykrc {
-        Ok(()) | Err(ErrorKind::WrongPin) => Ok(()),
-        e => e,
+        Ok(tries) | Err(ErrorKind::WrongPin { tries }) => Ok(tries),
+        Err(e) => Err(e),
     }
 }
 
@@ -1657,7 +1644,6 @@ pub(crate) unsafe fn _ykpiv_change_pin(
     current_pin_len: usize,
     new_pin: *const c_char,
     new_pin_len: usize,
-    tries: *mut i32,
 ) -> Result<(), ErrorKind> {
     let mut sw: i32 = 0;
     let mut templ = [0, YKPIV_INS_CHANGE_REFERENCE, 0, 0x80];
@@ -1721,11 +1707,7 @@ pub(crate) unsafe fn _ykpiv_change_pin(
 
     if sw != SW_SUCCESS {
         if sw >> 8 == 0x63 {
-            if !tries.is_null() {
-                *tries = sw & 0xf;
-            }
-
-            return Err(ErrorKind::WrongPin);
+            return Err(ErrorKind::WrongPin { tries: sw & 0xf });
         } else if sw == SW_ERR_AUTH_BLOCKED {
             return Err(ErrorKind::PinLocked);
         } else {
@@ -1749,22 +1731,13 @@ pub unsafe fn ykpiv_change_pin(
     current_pin_len: usize,
     new_pin: *const c_char,
     new_pin_len: usize,
-    tries: *mut i32,
 ) -> Result<(), ErrorKind> {
     let mut res = Err(ErrorKind::GenericError);
 
     _ykpiv_begin_transaction(state)?;
 
     if _ykpiv_ensure_application_selected(state).is_ok() {
-        res = _ykpiv_change_pin(
-            state,
-            0,
-            current_pin,
-            current_pin_len,
-            new_pin,
-            new_pin_len,
-            tries,
-        );
+        res = _ykpiv_change_pin(state, 0, current_pin, current_pin_len, new_pin, new_pin_len);
 
         if res.is_ok() && !new_pin.is_null() {
             // Intentionally ignore errors.  If the PIN fails to save, it will only
@@ -1790,22 +1763,13 @@ pub unsafe fn ykpiv_change_puk(
     current_puk_len: usize,
     new_puk: *const c_char,
     new_puk_len: usize,
-    tries: *mut i32,
 ) -> Result<(), ErrorKind> {
     let mut res = Err(ErrorKind::GenericError);
 
     _ykpiv_begin_transaction(state)?;
 
     if _ykpiv_ensure_application_selected(state).is_ok() {
-        res = _ykpiv_change_pin(
-            state,
-            2,
-            current_puk,
-            current_puk_len,
-            new_puk,
-            new_puk_len,
-            tries,
-        );
+        res = _ykpiv_change_pin(state, 2, current_puk, current_puk_len, new_puk, new_puk_len);
     }
 
     _ykpiv_end_transaction(state);
@@ -1820,14 +1784,13 @@ pub unsafe fn ykpiv_unblock_pin(
     puk_len: usize,
     new_pin: *const c_char,
     new_pin_len: usize,
-    tries: *mut i32,
 ) -> Result<(), ErrorKind> {
     let mut res = Err(ErrorKind::GenericError);
 
     _ykpiv_begin_transaction(state)?;
 
     if _ykpiv_ensure_application_selected(state).is_ok() {
-        res = _ykpiv_change_pin(state, 1, puk, puk_len, new_pin, new_pin_len, tries);
+        res = _ykpiv_change_pin(state, 1, puk, puk_len, new_pin, new_pin_len);
     }
 
     _ykpiv_end_transaction(state);

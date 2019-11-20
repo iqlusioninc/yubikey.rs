@@ -510,7 +510,7 @@ pub unsafe fn ykpiv_util_block_puk(state: &mut YubiKey) -> Result<(), ErrorKind>
     let mut _currentBlock;
     let mut res = Ok(());
     let mut puk = [0x30, 0x42, 0x41, 0x44, 0x46, 0x30, 0x30, 0x44];
-    let mut tries: i32 = -1;
+    let mut tries_remaining: i32 = -1;
     let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_data: usize = data.len();
     let mut p_item: *mut u8 = ptr::null_mut();
@@ -527,29 +527,34 @@ pub unsafe fn ykpiv_util_block_puk(state: &mut YubiKey) -> Result<(), ErrorKind>
 
     loop {
         if _currentBlock == 3 {
-            if tries != 0 {
-                res = ykpiv_change_puk(
+            if tries_remaining != 0 {
+                match ykpiv_change_puk(
                     state,
                     puk.as_ptr(),
                     mem::size_of::<*const c_char>(),
                     puk.as_ptr(),
                     mem::size_of::<*const c_char>(),
-                    &mut tries,
-                );
-
-                if res.is_ok() {
-                    let _rhs = 1;
-                    let mut _lhs = &mut puk[0];
-                    *_lhs += _rhs;
-                    _currentBlock = 3;
-                } else {
-                    if res != Err(ErrorKind::PinLocked) {
+                ) {
+                    Ok(()) => {
+                        let _rhs = 1;
+                        let mut _lhs = &mut puk[0];
+                        *_lhs += _rhs;
+                        _currentBlock = 3;
+                    }
+                    Err(ErrorKind::WrongPin { tries }) => {
+                        tries_remaining = tries;
                         _currentBlock = 3;
                         continue;
                     }
-                    tries = 0;
-                    res = Ok(());
-                    _currentBlock = 3;
+                    Err(e) => {
+                        if res != Err(ErrorKind::PinLocked) {
+                            _currentBlock = 3;
+                            continue;
+                        }
+                        tries_remaining = 0;
+                        res = Ok(());
+                        _currentBlock = 3;
+                    }
                 }
             } else {
                 let res = _read_metadata(state, TAG_ADMIN, data.as_mut_ptr(), &mut cb_data);

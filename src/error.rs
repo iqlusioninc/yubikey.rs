@@ -63,7 +63,7 @@ pub enum ErrorKind {
     ParseError,
 
     /// Wrong PIN
-    WrongPin,
+    WrongPin { tries: i32 },
 
     /// Invalid object
     InvalidObject,
@@ -100,7 +100,7 @@ impl ErrorKind {
             ErrorKind::GenericError => "YKPIV_GENERIC_ERROR",
             ErrorKind::KeyError => "YKPIV_KEY_ERROR",
             ErrorKind::ParseError => "YKPIV_PARSE_ERROR",
-            ErrorKind::WrongPin => "YKPIV_WRONG_PIN",
+            ErrorKind::WrongPin { .. } => "YKPIV_WRONG_PIN",
             ErrorKind::InvalidObject => "YKPIV_INVALID_OBJECT",
             ErrorKind::AlgorithmError => "YKPIV_ALGORITHM_ERROR",
             ErrorKind::PinLocked => "YKPIV_PIN_LOCKED",
@@ -122,7 +122,7 @@ impl ErrorKind {
             ErrorKind::GenericError => "generic error",
             ErrorKind::KeyError => "key error",
             ErrorKind::ParseError => "parse error",
-            ErrorKind::WrongPin => "wrong pin",
+            ErrorKind::WrongPin { .. } => "wrong pin",
             ErrorKind::InvalidObject => "invalid object",
             ErrorKind::AlgorithmError => "algorithm error",
             ErrorKind::PinLocked => "PIN locked",
