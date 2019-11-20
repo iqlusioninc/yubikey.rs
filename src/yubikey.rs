@@ -268,8 +268,7 @@ pub(crate) unsafe fn _ykpiv_select_application(state: &mut YubiKey) -> Result<()
     // can determine how to get the serial number, which for the NEO/Yk4
     // will result in another selection of the PIV applet.
 
-    res = _ykpiv_get_version(state, ptr::null_mut());
-    if let Err(e) = res.as_ref() {
+    if let Err(e) = _ykpiv_get_version(state) {
         if state.verbose != 0 {
             eprintln!("Failed to retrieve version: \'{}\'", e);
         }
@@ -1248,27 +1247,14 @@ pub unsafe fn ykpiv_decrypt_data(
 }
 
 /// Get the version of the PIV application installed on the YubiKey
-pub(crate) unsafe fn _ykpiv_get_version(
-    state: &mut YubiKey,
-    p_version: *mut Version,
-) -> Result<(), ErrorKind> {
+pub(crate) unsafe fn _ykpiv_get_version(state: &mut YubiKey) -> Result<Version, ErrorKind> {
     let mut data = [0u8; 261];
     let mut recv_len = data.len() as u32;
     let mut sw: i32 = 0;
 
     // get version from state if already from device
     if state.ver.major != 0 || state.ver.minor != 0 || state.ver.patch != 0 {
-        if !p_version.is_null() {
-            // TODO(tarcieri): use real references instead of pointers and memcpy!!!
-            #[allow(trivial_casts)]
-            memcpy(
-                p_version as *mut c_void,
-                &state.ver as *const Version as *const c_void,
-                mem::size_of::<Version>(),
-            );
-        }
-
-        return Ok(());
+        return Ok(state.ver);
     }
 
     // get version from device
@@ -1289,40 +1275,21 @@ pub(crate) unsafe fn _ykpiv_get_version(
     state.ver.minor = data[1];
     state.ver.patch = data[2];
 
-    if !p_version.is_null() {
-        // TODO(tarcieri): use real references instead of pointers and memcpy!!!
-        #[allow(trivial_casts)]
-        memcpy(
-            p_version as *mut c_void,
-            &state.ver as (*const Version) as (*const c_void),
-            mem::size_of::<Version>(),
-        );
-    }
-
-    Ok(())
+    Ok(state.ver)
 }
 
 /// Get the YubiKey's PIV application version as a string
 pub unsafe fn ykpiv_get_version(state: &mut YubiKey) -> Result<String, ErrorKind> {
-    let mut ver: Version = Version {
-        major: 0u8,
-        minor: 0u8,
-        patch: 0u8,
-    };
+    let mut res = Err(ErrorKind::GenericError);
 
     _ykpiv_begin_transaction(state)?;
 
     if _ykpiv_ensure_application_selected(state).is_ok() {
-        let res = _ykpiv_get_version(state, &mut ver);
-
-        if res.is_ok() {
-            _ykpiv_end_transaction(state);
-            return Ok(format!("{}.{}.{}", ver.major, ver.minor, ver.patch));
-        }
+        res = _ykpiv_get_version(state);
     }
 
     _ykpiv_end_transaction(state);
-    Err(ErrorKind::GenericError)
+    res.map(|ver| format!("{}.{}.{}", ver.major, ver.minor, ver.patch))
 }
 
 /// Get YubiKey device serial number
