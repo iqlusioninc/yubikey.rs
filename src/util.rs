@@ -41,7 +41,7 @@ use log::{error, warn};
 use pbkdf2::pbkdf2;
 use sha1::Sha1;
 use std::ops::DerefMut;
-use std::{ffi::CString, mem, os::raw::c_void, ptr};
+use std::{mem, os::raw::c_void, ptr};
 use zeroize::{Zeroize, Zeroizing};
 
 /// Cardholder Unique Identifier (CHUID) Template
@@ -1002,8 +1002,7 @@ pub unsafe fn ykpiv_util_generate_key(
         && state.ver.major == 4
         && (state.ver.minor < 3 || state.ver.minor == 3 && (state.ver.patch < 5))
     {
-        let setting_name = CString::new(SZ_SETTING_ROCA).unwrap();
-        setting_roca = setting_get_bool(setting_name.as_ptr(), true);
+        setting_roca = setting_get_bool(SZ_SETTING_ROCA, true);
 
         let psz_msg = match setting_roca.source {
             SettingSource::User => {
