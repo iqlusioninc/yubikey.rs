@@ -1607,12 +1607,13 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
         if ykrc.is_err() {
             // if set_mgmkey fails with KeyError, it means the generated key is weak
             // otherwise, log a warning, since the device mgm key is corrupt or we're in
-            // a yubikey where we can't set the mgm key
+            // a state where we can't set the mgm key
             if Err(Error::KeyError) != ykrc {
                 error!(
                     "could not set new derived mgm key, err = {}",
                     ykrc.as_ref().unwrap_err()
                 );
+
                 let _ = yubikey._ykpiv_end_transaction();
                 return ykrc;
             }
