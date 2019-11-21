@@ -515,7 +515,7 @@ pub unsafe fn ykpiv_util_block_puk(yubikey: &mut YubiKey) -> Result<(), Error> {
     }
 
     while tries_remaining != 0 {
-        res = yubikey.ykpiv_change_puk(puk.as_ptr(), puk.len(), puk.as_ptr(), puk.len());
+        res = yubikey.ykpiv_change_puk(&puk, &puk);
 
         match res {
             Ok(()) => puk[0] += 1,

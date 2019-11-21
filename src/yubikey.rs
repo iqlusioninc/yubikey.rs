@@ -40,7 +40,7 @@ use crate::{
     internal::{des_decrypt, des_encrypt, yk_des_is_weak_key, DesKey},
 };
 use getrandom::getrandom;
-use libc::{c_char, free, malloc, memcmp, memcpy, memmove, memset, strlen, strncasecmp};
+use libc::{c_char, memcmp, memcpy, memmove, memset, strlen, strncasecmp};
 use log::{error, info, trace, warn};
 use std::{ffi::CStr, os::raw::c_void, ptr, slice};
 use zeroize::Zeroize;
@@ -130,11 +130,11 @@ pub struct Version {
 
 /// YubiKey PIV state
 // TODO(tarcieri): reduce coupling to internal fields via `pub(crate)`
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct YubiKey {
     pub(crate) context: i32,
     pub(crate) card: i32,
-    pub(crate) pin: *mut u8,
+    pub(crate) pin: Option<Vec<u8>>,
     pub(crate) is_neo: bool,
     pub(crate) ver: Version,
     pub(crate) serial: u32,
@@ -146,7 +146,7 @@ impl YubiKey {
         YubiKey {
             context: -1,
             card: 0,
-            pin: ptr::null_mut(),
+            pin: None,
             is_neo: false,
             ver: Version {
                 major: 0,
@@ -163,7 +163,7 @@ impl YubiKey {
             self.ykpiv_disconnect();
         }
 
-        let _ = self._cache_pin(ptr::null(), 0);
+        self._cache_pin(&[]);
         Ok(())
     }
 
@@ -473,8 +473,10 @@ impl YubiKey {
 
         self._ykpiv_select_application()?;
 
-        if !self.pin.is_null() {
-            self.ykpiv_verify(self.pin as *const c_char).map(|_| ())
+        if let Some(pin) = self.pin.take() {
+            let ret = self.ykpiv_verify(&pin).map(|_| ());
+            self.pin = Some(pin);
+            ret
         } else {
             Ok(())
         }
@@ -1190,77 +1192,42 @@ impl YubiKey {
     }
 
     /// Cache PIN in memory
-    // TODO(tarcieri): better security around the cached PIN
-    pub(crate) unsafe fn _cache_pin(
-        &mut self,
-        pin: *const c_char,
-        len: usize,
-    ) -> Result<(), Error> {
-        if !pin.is_null() && (self.pin as *const c_char == pin) {
-            return Ok(());
-        }
-
-        if !self.pin.is_null() {
+    pub(crate) fn _cache_pin(&mut self, pin: &[u8]) {
+        if let Some(mut pin) = self.pin.take() {
             // Zeroize the old cached PIN
-            let old_len = strlen(self.pin as *const c_char);
-            let pin_slice = slice::from_raw_parts_mut(self.pin, old_len);
-            pin_slice.zeroize();
-
-            free(self.pin as (*mut c_void));
-            self.pin = ptr::null_mut();
+            pin.zeroize();
         }
 
-        if !pin.is_null() && len > 0 {
-            self.pin = malloc(len + 1) as (*mut u8);
-
-            if self.pin.is_null() {
-                return Err(Error::MemoryError);
-            }
-
-            memcpy(self.pin as (*mut c_void), pin as (*const c_void), len);
-            *self.pin.add(len) = 0u8;
+        if !pin.is_empty() {
+            self.pin = Some(pin.to_vec());
         }
-
-        Ok(())
     }
 
     /// Verify device PIN
     ///
     /// Returns the number of tries remaining both on success and on a wrong PIN.
-    pub unsafe fn ykpiv_verify(&mut self, pin: *const c_char) -> Result<i32, Error> {
-        self.ykpiv_verify_select(pin, if !pin.is_null() { strlen(pin) } else { 0 }, false)
+    pub unsafe fn ykpiv_verify(&mut self, pin: &[u8]) -> Result<i32, Error> {
+        self.ykpiv_verify_select(pin, false)
     }
 
     /// Verify device PIN
     ///
     /// Returns the number of tries remaining both on success and on a wrong PIN.
-    pub(crate) unsafe fn _verify(
-        &mut self,
-        pin: *const c_char,
-        pin_len: usize,
-    ) -> Result<i32, Error> {
+    pub(crate) unsafe fn _verify(&mut self, pin: &[u8]) -> Result<i32, Error> {
         let mut data = [0u8; 261];
         let mut recv_len = data.len() as u32;
         let mut sw: i32 = 0;
 
-        if pin_len > CB_PIN_MAX {
+        if pin.len() > CB_PIN_MAX {
             return Err(Error::SizeError);
         }
 
         let mut apdu = APDU::new(YKPIV_INS_VERIFY);
         apdu.params(0x00, 0x80);
 
-        if !pin.is_null() {
-            let mut data = [0xFF; CB_PIN_MAX];
-
-            memcpy(
-                data.as_mut_ptr() as *mut c_void,
-                pin as *const c_void,
-                pin_len,
-            );
-
-            apdu.data(data);
-        }
+        let mut pin_data = [0xFF; CB_PIN_MAX];
+        pin_data[0..pin.len()].copy_from_slice(pin);
+        apdu.data(pin_data);
 
         let res = self._send_data(
             apdu.to_bytes().as_slice(),
@@ -1274,11 +1241,7 @@ impl YubiKey {
         }
 
         if sw == SW_SUCCESS {
-            if !pin.is_null() && (pin_len != 0) {
-                // Intentionally ignore errors.  If the PIN fails to save, it will only
-                // be a problem if a reconnect is attempted.  Failure deferred until then.
-                let _ = self._cache_pin(pin, pin_len);
-            }
+            self._cache_pin(pin);
 
             Ok(sw & 0xf)
         } else if sw >> 8 == 0x63 {
@@ -1295,8 +1258,7 @@ impl YubiKey {
     /// Returns the number of tries remaining both on success and on a wrong PIN.
     pub unsafe fn ykpiv_verify_select(
         &mut self,
-        pin: *const c_char,
-        pin_len: usize,
+        pin: &[u8],
         force_select: bool,
     ) -> Result<i32, Error> {
         let mut res = Ok(-1);
@@ -1310,7 +1272,7 @@ impl YubiKey {
         }
 
         if res.is_ok() {
-            res = self._verify(pin, pin_len);
+            res = self._verify(pin);
         }
 
         let _ = self._ykpiv_end_transaction();
@@ -1324,7 +1286,7 @@ impl YubiKey {
         // the number of tries left...
         self._ykpiv_select_application()?;
 
-        let ykrc = self.ykpiv_verify(ptr::null());
+        let ykrc = self.ykpiv_verify(&[]);
 
         // WRONG_PIN is expected on successful query.
         match ykrc {
@@ -1387,18 +1349,15 @@ impl YubiKey {
     pub(crate) unsafe fn _ykpiv_change_pin(
         &mut self,
         action: i32,
-        current_pin: *const c_char,
-        current_pin_len: usize,
-        new_pin: *const c_char,
-        new_pin_len: usize,
+        current_pin: &[u8],
+        new_pin: &[u8],
     ) -> Result<(), Error> {
         let mut sw: i32 = 0;
         let mut templ = [0, YKPIV_INS_CHANGE_REFERENCE, 0, 0x80];
-        let mut indata = [0u8; 16];
         let mut data = [0u8; 255];
         let mut recv_len: usize = data.len();
 
-        if current_pin_len > 8 || new_pin_len > 8 {
+        if current_pin.len() > 8 || new_pin.len() > 8 {
             return Err(Error::SizeError);
         }
 
@@ -1408,33 +1367,9 @@ impl YubiKey {
             templ[3] = 0x81;
         }
 
-        memcpy(
-            indata.as_mut_ptr() as (*mut c_void),
-            current_pin as (*const c_void),
-            current_pin_len,
-        );
-
-        if current_pin_len < 8 {
-            memset(
-                indata.as_mut_ptr().add(current_pin_len) as *mut c_void,
-                0xff,
-                8 - current_pin_len,
-            );
-        }
-
-        memcpy(
-            indata.as_mut_ptr().offset(8) as *mut c_void,
-            new_pin as *const c_void,
-            new_pin_len,
-        );
-
-        if new_pin_len < 8 {
-            memset(
-                indata.as_mut_ptr().offset(8).add(new_pin_len) as *mut c_void,
-                0xff,
-                8 - new_pin_len,
-            );
-        }
+        let mut indata = [0xff; 16];
+        indata[0..current_pin.len()].copy_from_slice(current_pin);
+        indata[8..8 + new_pin.len()].copy_from_slice(new_pin);
 
         let res = self.ykpiv_transfer_data(
             templ.as_ptr(),
@@ -1472,22 +1407,18 @@ impl YubiKey {
     /// The default PIN code is 123456
     pub unsafe fn ykpiv_change_pin(
         &mut self,
-        current_pin: *const c_char,
-        current_pin_len: usize,
-        new_pin: *const c_char,
-        new_pin_len: usize,
+        current_pin: &[u8],
+        new_pin: &[u8],
     ) -> Result<(), Error> {
         let mut res = Err(Error::GenericError);
 
         self._ykpiv_begin_transaction()?;
 
         if self._ykpiv_ensure_application_selected().is_ok() {
-            res = self._ykpiv_change_pin(0, current_pin, current_pin_len, new_pin, new_pin_len);
+            res = self._ykpiv_change_pin(0, current_pin, new_pin);
 
-            if res.is_ok() && !new_pin.is_null() {
-                // Intentionally ignore errors.  If the PIN fails to save, it will only
-                // be a problem if a reconnect is attempted.  Failure deferred until then.
-                let _ = self._cache_pin(new_pin, new_pin_len);
+            if res.is_ok() {
+                self._cache_pin(new_pin);
             }
         }
 
@@ -1504,17 +1435,15 @@ impl YubiKey {
     /// The default PUK code is 12345678.
     pub unsafe fn ykpiv_change_puk(
         &mut self,
-        current_puk: *const c_char,
-        current_puk_len: usize,
-        new_puk: *const c_char,
-        new_puk_len: usize,
+        current_puk: &[u8],
+        new_puk: &[u8],
     ) -> Result<(), Error> {
         let mut res = Err(Error::GenericError);
 
         self._ykpiv_begin_transaction()?;
 
         if self._ykpiv_ensure_application_selected().is_ok() {
-            res = self._ykpiv_change_pin(2, current_puk, current_puk_len, new_puk, new_puk_len);
+            res = self._ykpiv_change_pin(2, current_puk, new_puk);
         }
 
         let _ = self._ykpiv_end_transaction();
@@ -1523,19 +1452,13 @@ impl YubiKey {
 
     /// Unblock a Personal Identification Number (PIN) using a previously
     /// configured PIN Unblocking Key (PUK).
-    pub unsafe fn ykpiv_unblock_pin(
-        &mut self,
-        puk: *const c_char,
-        puk_len: usize,
-        new_pin: *const c_char,
-        new_pin_len: usize,
-    ) -> Result<(), Error> {
+    pub unsafe fn ykpiv_unblock_pin(&mut self, puk: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         let mut res = Err(Error::GenericError);
 
         self._ykpiv_begin_transaction()?;
 
         if self._ykpiv_ensure_application_selected().is_ok() {
-            res = self._ykpiv_change_pin(1, puk, puk_len, new_pin, new_pin_len);
+            res = self._ykpiv_change_pin(1, puk, new_pin);
         }
 
         let _ = self._ykpiv_end_transaction();
