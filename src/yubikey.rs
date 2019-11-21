@@ -844,7 +844,7 @@ pub unsafe fn ykpiv_authenticate(
         des_encrypt(&mgm_key, &challenge, &mut response);
 
         // TODO(tarcieri): constant time comparison!
-        if response == &data[4..12] {
+        if response == data[4..12] {
             res = Ok(());
         } else {
             res = Err(ErrorKind::AuthenticationError);

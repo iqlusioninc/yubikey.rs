@@ -79,6 +79,7 @@ impl Drop for DesKey {
 }
 
 /// Encrypt with DES key
+#[allow(clippy::trivially_copy_pass_by_ref)]
 pub fn des_encrypt(key: &DesKey, input: &[u8; DES_LEN_DES], output: &mut [u8; DES_LEN_DES]) {
     output.copy_from_slice(input);
     TdesEde3::new(GenericArray::from_slice(&key.0))
@@ -86,6 +87,7 @@ pub fn des_encrypt(key: &DesKey, input: &[u8; DES_LEN_DES], output: &mut [u8; DE
 }
 
 /// Decrypt with DES key
+#[allow(clippy::trivially_copy_pass_by_ref)]
 pub fn des_decrypt(key: &DesKey, input: &[u8; DES_LEN_DES], output: &mut [u8; DES_LEN_DES]) {
     output.copy_from_slice(input);
     TdesEde3::new(GenericArray::from_slice(&key.0))
