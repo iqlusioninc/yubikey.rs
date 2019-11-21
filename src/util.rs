@@ -1003,7 +1003,7 @@ pub unsafe fn ykpiv_util_generate_key(
         && (state.ver.minor < 3 || state.ver.minor == 3 && (state.ver.patch < 5))
     {
         let setting_name = CString::new(SZ_SETTING_ROCA).unwrap();
-        setting_roca = setting_get_bool(setting_name.as_ptr(), true);
+        setting_roca = setting_get_bool(setting_name.to_string_lossy().as_ref(), true);
 
         let psz_msg = match setting_roca.source {
             SettingSource::User => {

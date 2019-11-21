@@ -40,6 +40,9 @@ use des::{
     TdesEde3,
 };
 use libc::{c_char, c_int, fclose, feof, fgets, fopen, getenv, sscanf, strcasecmp, strcmp};
+use std::fs::File;
+use std::io::{BufReader, Result as IoResult, BufRead};
+use std::path::Path;
 use std::ffi::{CStr, CString};
 use zeroize::Zeroize;
 
@@ -190,110 +193,66 @@ pub struct SettingBool {
 }
 
 /// Get a boolean config value
-pub unsafe fn _get_bool_config(sz_setting: *const c_char) -> SettingBool {
-    let mut setting: SettingBool = SettingBool {
-        value: false,
-        source: SettingSource::Default,
-    };
-    let mut sz_line = [0u8; 256];
-    let mut psz_name: *mut c_char;
-    let mut psz_value: *mut c_char;
-    let mut sz_name = [0u8; 256];
-    let mut sz_value = [0u8; 256];
+pub fn get_bool_config<P: AsRef<Path>>(setting: &str, file: P)
+    -> IoResult<Option<SettingBool>> {
 
-    let pf = fopen(
-        b"/etc/yubico/yubikeypiv.conf\0".as_ptr() as *const c_char,
-        b"r\0".as_ptr() as *const c_char,
+    let config_file_reader = BufReader::new(
+        File::open(file)?
     );
 
-    if pf.is_null() {
-        return setting;
+    let setting_len = setting.len();
+    for line in config_file_reader.lines() {
+        let line = line?;
+        // match a line of the form `<key>=<value>` where key == setting
+        if &line.as_str()[..setting_len] == setting  && &line.as_str()[setting_len..setting_len] == "="{
+            // check for specified "truthy" values
+            let truthy = &line[setting_len+1..] == "1" || &line[setting_len+1..] == "true";
+            return Ok(
+                Some(
+                    SettingBool {
+                        value: truthy,
+                        source: SettingSource::Admin
+                    }
+                )
+            )
+        }
     }
 
-    while feof(pf) == 0 {
-        if fgets(
-            sz_line.as_mut_ptr() as *mut c_char,
-            sz_line.len() as c_int,
-            pf,
-        )
-        .is_null()
-        {
-            continue;
-        }
-
-        if sz_line[0] == b'#' {
-            continue;
-        }
-
-        if sz_line[0] == b'\r' {
-            continue;
-        }
-
-        if sz_line[0] == b'\n' {
-            continue;
-        }
-
-        if sscanf(
-            sz_line.as_ptr() as *const c_char,
-            b"%255[^=]=%255s\0".as_ptr() as *const c_char,
-            sz_name.as_mut_ptr(),
-            sz_value.as_mut_ptr(),
-        ) != 2
-        {
-            continue;
-        }
-
-        psz_name = _strip_ws(sz_name.as_mut_ptr() as *mut c_char);
-
-        if strcasecmp(psz_name, sz_setting) != 0 {
-            continue;
-        }
-
-        psz_value = _strip_ws(sz_value.as_mut_ptr() as *mut c_char);
-        setting.source = SettingSource::Admin;
-        setting.value = strcmp(psz_value, b"1\0".as_ptr() as *const c_char) == 0
-            || strcasecmp(psz_value, b"true\0".as_ptr() as *const c_char) == 0;
-    }
-
-    fclose(pf);
-    setting
+    Ok(None)
 }
 
 /// Get a setting boolean from an environment variable
-pub unsafe fn _get_bool_env(sz_setting: *const c_char) -> SettingBool {
-    let mut setting: SettingBool = SettingBool {
-        value: false,
-        source: SettingSource::Default,
-    };
+pub fn get_bool_env(setting_name: &str) -> Option<SettingBool> {
+    let setting = format!("YUBIKEY_PIV_{}", setting_name.to_uppercase());
 
-    let sz_name = CString::new(format!(
-        "YUBIKEY_PIV_{}",
-        CStr::from_ptr(sz_setting).to_string_lossy()
-    ))
-    .unwrap();
-
-    let psz_value = getenv(sz_name.as_ptr());
-
-    if !psz_value.is_null() {
-        setting.source = SettingSource::User;
-        setting.value = strcmp(psz_value, b"1\0".as_ptr() as *const c_char) == 0
-            || strcasecmp(psz_value, b"true\0".as_ptr() as *const c_char) == 0;
+    match std::env::var(setting).ok() {
+        Some(val) => Some(
+                SettingBool {
+                    value: val.as_str() == "1" || val.as_str() == "true",
+                    source: SettingSource::User
+                }
+        ),
+        None => None
     }
-
-    setting
 }
 
 /// Get a setting boolean
-pub unsafe fn setting_get_bool(sz_setting: *const c_char, def: bool) -> SettingBool {
-    let mut setting = _get_bool_config(sz_setting);
-
-    if setting.source == SettingSource::Default {
-        setting = _get_bool_env(sz_setting);
+pub fn setting_get_bool(setting_name: &str, def: bool) -> SettingBool {
+    match get_bool_config(setting_name.as_ref(), "/etc/yubico/yubikeypiv.conf") {
+        Ok(Some(setting)) => setting,
+        Ok(None) => {
+            //try env instead
+            match get_bool_env(setting_name.as_ref()) {
+                Some(setting) => setting,
+                None => SettingBool {
+                    value: def,
+                    source: SettingSource::Default
+                }
+            }
+        }
+        _ => SettingBool { // ignore IO errors for now
+            value: def,
+            source: SettingSource::Default
+        }
     }
-
-    if setting.source == SettingSource::Default {
-        setting.value = def;
-    }
-
-    setting
 }
