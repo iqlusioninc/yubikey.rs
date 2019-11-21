@@ -1,7 +1,13 @@
 //! Application Protocol Data Unit (APDU)
 
 use std::fmt::{self, Debug};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
+
+/// Size of a serialized APDU (5 byte header + 255 bytes data)
+pub const APDU_SIZE: usize = 260;
+
+/// Buffer type (self-zeroizing byte vector)
+pub(crate) type Buffer = Zeroizing<Vec<u8>>;
 
 /// Application Protocol Data Unit (APDU).
 ///
@@ -10,29 +16,82 @@ use zeroize::Zeroize;
 #[derive(Clone)]
 pub struct APDU {
     /// Instruction class - indicates the type of command, e.g. interindustry or proprietary
-    pub cla: u8,
+    cla: u8,
 
     /// Instruction code - indicates the specific command, e.g. "write data"
-    pub ins: u8,
+    ins: u8,
 
     /// Instruction parameter 1 for the command, e.g. offset into file at which to write the data
-    pub p1: u8,
+    p1: u8,
 
     /// Instruction parameter 2 for the command
-    pub p2: u8,
+    p2: u8,
 
     /// Length of command - encodes the number of bytes of command data to follow
-    pub lc: u8,
+    lc: u8,
 
     /// Command data
-    pub data: [u8; 255],
+    data: [u8; 255],
 }
 
 impl APDU {
-    /// Get a mut pointer to this APDU
-    // TODO(tarcieri): eliminate pointers and use all safe references
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut APDU {
+    /// Create a new APDU with the given instruction code
+    pub fn new(ins: u8) -> Self {
+        let mut apdu = Self::default();
+        apdu.ins = ins;
+        apdu
+    }
+
+    /// Set this APDU's class
+    pub fn cla(&mut self, value: u8) -> &mut Self {
+        self.cla = value;
         self
+    }
+
+    /// Set this APDU's first parameter only
+    pub fn p1(&mut self, value: u8) -> &mut Self {
+        self.p1 = value;
+        self
+    }
+
+    /// Set both parameters for this APDU
+    pub fn params(&mut self, p1: u8, p2: u8) -> &mut Self {
+        self.p1 = p1;
+        self.p2 = p2;
+        self
+    }
+
+    /// Set the command data for this APDU.
+    ///
+    /// Panics if the byte slice is more than 255 bytes!
+    pub fn data(&mut self, bytes: impl AsRef<[u8]>) -> &mut Self {
+        assert_eq!(self.lc, 0, "APDU command already set!");
+
+        let bytes = bytes.as_ref();
+
+        assert!(
+            bytes.len() <= self.data.len(),
+            "APDU command data too large: {}-bytes",
+            bytes.len()
+        );
+
+        self.lc = bytes.len() as u8;
+        self.data[..bytes.len()].copy_from_slice(bytes);
+
+        self
+    }
+
+    /// Consume this APDU and return a self-zeroizing buffer
+    pub fn to_bytes(&self) -> Buffer {
+        let mut bytes = Vec::with_capacity(APDU_SIZE);
+        bytes.push(self.cla);
+        bytes.push(self.ins);
+        bytes.push(self.p1);
+        bytes.push(self.p2);
+        bytes.push(self.lc);
+        bytes.extend_from_slice(self.data.as_ref());
+
+        Zeroizing::new(bytes)
     }
 }
 
@@ -61,6 +120,12 @@ impl Default for APDU {
             lc: 0,
             data: [0u8; 255],
         }
+    }
+}
+
+impl Drop for APDU {
+    fn drop(&mut self) {
+        self.zeroize();
     }
 }
 

@@ -42,7 +42,7 @@ use crate::{
 use getrandom::getrandom;
 use libc::{c_char, free, malloc, memcmp, memcpy, memmove, memset, strlen, strncasecmp};
 use log::{error, info, trace, warn};
-use std::{convert::TryInto, ffi::CStr, mem, os::raw::c_void, ptr, slice};
+use std::{ffi::CStr, os::raw::c_void, ptr, slice};
 use zeroize::Zeroize;
 
 extern "C" {
@@ -90,7 +90,7 @@ extern "C" {
     fn SCardTransmit(
         hCard: i32,
         pioSendPci: *const c_void,
-        pbSendBuffer: *mut c_char,
+        pbSendBuffer: *const c_char,
         cbSendLength: u32,
         pioRecvPci: *const c_void,
         pbRecvBuffer: *mut u8,
@@ -197,18 +197,13 @@ impl YubiKey {
         let mut recv_len = data.len() as u32;
         let mut sw = 0i32;
 
-        let mut apdu = APDU::default();
-        apdu.ins = YKPIV_INS_SELECT_APPLICATION;
-        apdu.p1 = 0x04;
-        apdu.lc = AID.len() as u8;
+        let apdu = APDU::new(YKPIV_INS_SELECT_APPLICATION)
+            .p1(0x04)
+            .data(&AID)
+            .to_bytes();
 
-        memcpy(
-            apdu.data.as_mut_ptr() as *mut c_void,
-            AID.as_ptr() as *const c_void,
-            AID.len(),
-        );
-
-        if let Err(e) = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw) {
+        if let Err(e) = self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, &mut sw)
+        {
             error!("failed communicating with card: \'{}\'", e);
             return Err(e);
         }
@@ -537,37 +532,33 @@ impl YubiKey {
             let mut data = [0u8; 261];
             recv_len = data.len() as u32;
 
-            let mut apdu = APDU::default();
-            apdu.cla = *templ;
-            apdu.ins = *templ.offset(1);
-            apdu.p1 = *templ.offset(2);
-            apdu.p2 = *templ.offset(3);
-
-            if in_ptr.offset(0xff) < in_data.offset(in_len) {
-                apdu.cla = 0x10;
+            let cla = if in_ptr.offset(0xff) < in_data.offset(in_len) {
+                0x10
             } else {
                 this_size = in_data.offset(in_len) as usize - in_ptr as usize;
-            }
+                *templ
+            };
 
             trace!("going to send {} bytes in this go", this_size);
 
-            apdu.lc = this_size.try_into().unwrap();
-            memcpy(
-                apdu.data.as_mut_ptr() as *mut c_void,
-                in_ptr as *const c_void,
-                this_size,
-            );
+            let apdu = APDU::new(*templ.offset(1))
+                .cla(cla)
+                .params(*templ.offset(2), *templ.offset(3))
+                .data(slice::from_raw_parts(in_ptr, this_size))
+                .to_bytes();
 
-            res = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, sw);
+            res = self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, sw);
 
             if res.is_err() {
                 _currentBlock = 24;
                 break;
             }
+
             if *sw != SW_SUCCESS && (*sw >> 8 != 0x61) {
                 _currentBlock = 24;
                 break;
             }
+
             if (*out_len)
                 .wrapping_add(recv_len as (usize))
                 .wrapping_sub(2usize)
@@ -610,9 +601,9 @@ impl YubiKey {
                     *sw & 0xff
                 );
 
-                let mut apdu = APDU::default();
-                apdu.ins = YKPIV_INS_GET_RESPONSE_APDU;
-                res = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, sw);
+                let apdu = APDU::new(YKPIV_INS_GET_RESPONSE_APDU).to_bytes();
+
+                res = self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, sw);
 
                 if res.is_err() {
                     _currentBlock = 24;
@@ -686,20 +677,21 @@ impl YubiKey {
     /// Send data
     pub(crate) unsafe fn _send_data(
         &mut self,
-        apdu: &mut APDU,
+        apdu: impl AsRef<[u8]>,
         data: *mut u8,
         recv_len: *mut u32,
         sw: *mut i32,
     ) -> Result<(), Error> {
-        let send_len = apdu.lc as u32 + 5;
+        let send_len = apdu.as_ref().len() as u32;
+        let apdu_ptr = apdu.as_ref().as_ptr();
         let mut tmp_len = *recv_len;
 
-        trace!("> {:?}", apdu);
+        trace!("> {:?}", apdu.as_ref());
 
         let rc = SCardTransmit(
             self.card,
             SCARD_PCI_T1,
-            apdu.as_mut_ptr() as *mut i8,
+            apdu_ptr as *const i8,
             send_len,
             ptr::null(),
             data,
@@ -729,9 +721,6 @@ impl YubiKey {
         &mut self,
         key: Option<&[u8; DES_LEN_3DES]>,
     ) -> Result<(), Error> {
-        let mut data = [0u8; 261];
-        let mut recv_len = data.len() as u32;
-        let mut sw: i32 = 0;
         let mut res = Ok(());
 
         self._ykpiv_begin_transaction()?;
@@ -741,16 +730,16 @@ impl YubiKey {
             let mgm_key = DesKey::from_bytes(*key.unwrap_or(DEFAULT_AUTH_KEY));
 
             // get a challenge from the card
-            let mut apdu = APDU::default();
-            apdu.ins = YKPIV_INS_AUTHENTICATE;
-            apdu.p1 = YKPIV_ALGO_3DES; // triple des
-            apdu.p2 = YKPIV_KEY_CARDMGM; // management key
-            apdu.lc = 0x04;
-            apdu.data[0] = 0x7c;
-            apdu.data[1] = 0x02;
-            apdu.data[2] = 0x80;
+            let apdu = APDU::new(YKPIV_INS_AUTHENTICATE)
+                .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
+                .data(&[0x7c, 0x02, 0x80, 0x00])
+                .to_bytes();
 
-            res = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
+            let mut data = [0u8; 261];
+            let mut recv_len = data.len() as u32;
+            let mut sw: i32 = 0;
+
+            res = self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, &mut sw);
 
             if res.is_err() {
                 let _ = self._ykpiv_end_transaction();
@@ -768,28 +757,30 @@ impl YubiKey {
             des_decrypt(&mgm_key, &challenge, &mut response);
 
             recv_len = data.len() as u32;
-            apdu = APDU::default();
-            apdu.ins = YKPIV_INS_AUTHENTICATE;
-            apdu.p1 = YKPIV_ALGO_3DES; // triple des
-            apdu.p2 = YKPIV_KEY_CARDMGM; // management key
-            apdu.data[0] = 0x7c;
-            apdu.data[1] = 20; // 2 + 8 + 2 +8
-            apdu.data[2] = 0x80;
-            apdu.data[3] = 8;
-            apdu.data[4..12].copy_from_slice(&response);
-            apdu.data[12] = 0x81;
-            apdu.data[13] = 8;
+
+            let mut data = [0u8; 22];
+            data[0] = 0x7c;
+            data[1] = 20; // 2 + 8 + 2 +8
+            data[2] = 0x80;
+            data[3] = 8;
+            data[4..12].copy_from_slice(&response);
+            data[12] = 0x81;
+            data[13] = 8;
 
             if getrandom(&mut data[14..22]).is_err() {
                 error!("failed getting randomness for authentication.");
                 let _ = self._ykpiv_end_transaction();
                 return Err(Error::RandomnessError);
             }
+
             challenge.copy_from_slice(&data[14..22]);
 
-            apdu.lc = 22;
+            let apdu = APDU::new(YKPIV_INS_AUTHENTICATE)
+                .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
+                .data(&data)
+                .to_bytes();
 
-            res = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
+            res = self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, &mut sw);
 
             if res.is_err() {
                 let _ = self._ykpiv_end_transaction();
@@ -825,11 +816,7 @@ impl YubiKey {
         new_key: &[u8; DES_LEN_3DES],
         touch: u8,
     ) -> Result<(), Error> {
-        let mut data = [0u8; 261];
-        let mut recv_len = data.len() as u32;
-        let mut sw: i32 = 0;
         let mut res = Ok(());
-        let mut apdu = APDU::default();
 
         self._ykpiv_begin_transaction()?;
 
@@ -839,36 +826,41 @@ impl YubiKey {
                     "won't set new key '{:?}' since it's weak (with odd parity)",
                     new_key
                 );
-                res = Err(Error::KeyError);
-            } else {
-                apdu.ins = YKPIV_INS_SET_MGMKEY;
-                apdu.p1 = 0xff;
 
-                apdu.p2 = match touch {
-                    0 => 0xff,
-                    1 => 0xfe,
-                    _ => {
-                        let _ = self._ykpiv_end_transaction();
-                        return Err(Error::GenericError);
-                    }
-                };
+                let _ = self._ykpiv_end_transaction();
+                return Err(Error::KeyError);
+            }
 
-                apdu.lc = DES_LEN_3DES as u8 + 3;
-                apdu.data[0] = YKPIV_ALGO_3DES;
-                apdu.data[1] = YKPIV_KEY_CARDMGM;
-                apdu.data[2] = DES_LEN_3DES as u8;
-                apdu.data[3..3 + DES_LEN_3DES].copy_from_slice(new_key);
-
-                res = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
-
-                if res.is_ok() && sw != SW_SUCCESS {
-                    res = Err(Error::GenericError);
+            let p2 = match touch {
+                0 => 0xff,
+                1 => 0xfe,
+                _ => {
+                    let _ = self._ykpiv_end_transaction();
+                    return Err(Error::GenericError);
                 }
+            };
+
+            let mut data = [0u8; DES_LEN_3DES + 3];
+            data[0] = YKPIV_ALGO_3DES;
+            data[1] = YKPIV_KEY_CARDMGM;
+            data[2] = DES_LEN_3DES as u8;
+            data[3..3 + DES_LEN_3DES].copy_from_slice(new_key);
+
+            let apdu = APDU::new(YKPIV_INS_SET_MGMKEY)
+                .params(0xff, p2)
+                .data(&data)
+                .to_bytes();
+
+            let mut data = [0u8; 261];
+            let mut recv_len = data.len() as u32;
+            let mut sw: i32 = 0;
+            res = self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, &mut sw);
+
+            if res.is_ok() && sw != SW_SUCCESS {
+                res = Err(Error::GenericError);
             }
         }
 
-        apdu.zeroize();
-        let _ = self._ykpiv_end_transaction();
         res
     }
 
@@ -1046,10 +1038,9 @@ impl YubiKey {
         }
 
         // get version from device
-        let mut apdu = APDU::default();
-        apdu.ins = YKPIV_INS_GET_VERSION;
+        let apdu = APDU::new(YKPIV_INS_GET_VERSION).to_bytes();
 
-        self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw)?;
+        self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, &mut sw)?;
 
         if sw != SW_SUCCESS {
             return Err(Error::GenericError);
@@ -1084,7 +1075,7 @@ impl YubiKey {
     ///
     /// NOTE: caller must make sure that this is wrapped in a transaction for synchronized operation
     pub(crate) unsafe fn _ykpiv_get_serial(&mut self, f_force: bool) -> Result<u32, Error> {
-        let yk_applet: *const u8 = ptr::null();
+        let yk_applet = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01];
         let mut data = [0u8; 255];
         let mut recv_len = data.len() as u32;
         let mut sw: i32 = 0;
@@ -1099,18 +1090,14 @@ impl YubiKey {
             let mut temp = [0u8; 255];
             recv_len = temp.len() as u32;
 
-            let mut apdu = APDU::default();
-            apdu.ins = YKPIV_INS_SELECT_APPLICATION;
-            apdu.p1 = 0x04;
-            apdu.lc = mem::size_of_val(&yk_applet) as u8;
+            let apdu = APDU::new(YKPIV_INS_SELECT_APPLICATION)
+                .p1(0x04)
+                .data(&yk_applet)
+                .to_bytes();
 
-            memcpy(
-                apdu.data.as_mut_ptr() as *mut c_void,
-                yk_applet as *const c_void,
-                mem::size_of_val(&yk_applet),
-            );
-
-            if let Err(e) = self._send_data(&mut apdu, temp.as_mut_ptr(), &mut recv_len, &mut sw) {
+            if let Err(e) =
+                self._send_data(apdu.as_slice(), temp.as_mut_ptr(), &mut recv_len, &mut sw)
+            {
                 error!("failed communicating with card: '{}'", e);
                 return Err(e);
             }
@@ -1121,12 +1108,11 @@ impl YubiKey {
             }
 
             recv_len = temp.len() as u32;
-            apdu = APDU::default();
-            apdu.ins = 0x01;
-            apdu.p1 = 0x10;
-            apdu.lc = 0x00;
+            let apdu = APDU::new(0x01).p1(0x10).to_bytes();
 
-            if let Err(e) = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw) {
+            if let Err(e) =
+                self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, &mut sw)
+            {
                 error!("failed communicating with card: '{}'", e);
                 return Err(e);
             }
@@ -1137,18 +1123,14 @@ impl YubiKey {
             }
 
             recv_len = temp.len() as u32;
-            apdu = APDU::default();
-            apdu.ins = YKPIV_INS_SELECT_APPLICATION;
-            apdu.p1 = 0x04;
-            apdu.lc = mem::size_of_val(&AID) as u8;
+            let apdu = APDU::new(YKPIV_INS_SELECT_APPLICATION)
+                .p1(0x04)
+                .data(&AID)
+                .to_bytes();
 
-            memcpy(
-                apdu.data.as_mut_ptr() as *mut c_void,
-                AID.as_ptr() as *const c_void,
-                mem::size_of_val(&AID),
-            );
-
-            if let Err(e) = self._send_data(&mut apdu, temp.as_mut_ptr(), &mut recv_len, &mut sw) {
+            if let Err(e) =
+                self._send_data(apdu.as_slice(), temp.as_mut_ptr(), &mut recv_len, &mut sw)
+            {
                 error!("failed communicating with card: '{}'", e);
                 return Err(e);
             }
@@ -1159,10 +1141,11 @@ impl YubiKey {
             }
         } else {
             // get serial from yk5 and later devices using the f8 command
-            let mut apdu = APDU::default();
-            apdu.ins = YKPIV_INS_GET_SERIAL;
+            let apdu = APDU::new(YKPIV_INS_GET_SERIAL).to_bytes();
 
-            if let Err(e) = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw) {
+            if let Err(e) =
+                self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, &mut sw)
+            {
                 error!("failed communicating with card: '{}'", e);
                 return Err(e);
             }
@@ -1264,31 +1247,27 @@ impl YubiKey {
             return Err(Error::SizeError);
         }
 
-        let mut apdu = APDU::default();
-        apdu.ins = YKPIV_INS_VERIFY;
-        apdu.p1 = 0x00;
-        apdu.p2 = 0x80;
-        apdu.lc = if pin.is_null() { 0 } else { 0x08 };
+        let mut apdu = APDU::new(YKPIV_INS_VERIFY);
+        apdu.params(0x00, 0x80);
 
         if !pin.is_null() {
+            let mut data = [0xFF; CB_PIN_MAX];
+
             memcpy(
-                apdu.data.as_mut_ptr() as *mut c_void,
+                data.as_mut_ptr() as *mut c_void,
                 pin as *const c_void,
                 pin_len,
             );
 
-            if pin_len < CB_PIN_MAX {
-                memset(
-                    apdu.data.as_mut_ptr().add(pin_len) as *mut c_void,
-                    0xff,
-                    CB_PIN_MAX - pin_len,
-                );
-            }
+            apdu.data(data);
         }
 
-        let res = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
-
-        apdu.zeroize();
+        let res = self._send_data(
+            apdu.to_bytes().as_slice(),
+            data.as_mut_ptr(),
+            &mut recv_len,
+            &mut sw,
+        );
 
         if let Err(e) = res {
             return Err(e);
@@ -1943,16 +1922,14 @@ impl YubiKey {
         self._ykpiv_begin_transaction()?;
 
         if self._ykpiv_ensure_application_selected().is_ok() {
-            let mut apdu = APDU::default();
-            apdu.ins = YKPIV_INS_AUTHENTICATE;
-            apdu.p1 = YKPIV_ALGO_3DES; // triple des
-            apdu.p2 = YKPIV_KEY_CARDMGM; // management key
-            apdu.lc = 0x04;
-            apdu.data[0] = 0x7c;
-            apdu.data[1] = 0x02;
-            apdu.data[2] = 0x81; //0x80;
+            let apdu = APDU::new(YKPIV_INS_AUTHENTICATE)
+                .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
+                .data(&[0x7c, 0x02, 0x81, 0x00])
+                .to_bytes();
 
-            if let Err(e) = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw) {
+            if let Err(e) =
+                self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, &mut sw)
+            {
                 res = Err(e)
             } else if sw != SW_SUCCESS {
                 res = Err(Error::AuthenticationError);
@@ -1969,31 +1946,29 @@ impl YubiKey {
 
     /// Verify an auth response
     pub unsafe fn ykpiv_auth_verifyresponse(&mut self, response: [u8; 8]) -> Result<(), Error> {
+        self._ykpiv_begin_transaction()?;
+
+        let mut data = [
+            0x7c, 0x0a, 0x82, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        data[4..12].copy_from_slice(&response);
+
+        // send the response to the card and a challenge of our own.
+        let apdu = APDU::new(YKPIV_INS_AUTHENTICATE)
+            .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
+            .data(&data)
+            .to_bytes();
+
         let mut data = [0u8; 261];
         let mut recv_len = data.len() as u32;
         let mut sw: i32 = 0;
-
-        self._ykpiv_begin_transaction()?;
-
-        // send the response to the card and a challenge of our own.
-        let mut apdu = APDU::default();
-        apdu.ins = YKPIV_INS_AUTHENTICATE;
-        apdu.p1 = YKPIV_ALGO_3DES; // triple des
-        apdu.p2 = YKPIV_KEY_CARDMGM; // management key
-        apdu.data[0] = 0x7c;
-        apdu.data[1] = 0x0a; // 2 + 8
-        apdu.data[2] = 0x82;
-        apdu.data[3] = 8;
-        apdu.data[4..12].copy_from_slice(&response);
-        apdu.lc = 12;
-
-        let mut res = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
+        let mut res = self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, &mut sw);
 
         if res.is_ok() && sw != SW_SUCCESS {
             res = Err(Error::AuthenticationError);
         }
 
-        apdu.zeroize();
         let _ = self._ykpiv_end_transaction();
         res
     }
@@ -2006,18 +1981,12 @@ impl YubiKey {
 
         self._ykpiv_begin_transaction()?;
 
-        let mut apdu = APDU::default();
-        apdu.ins = YKPIV_INS_SELECT_APPLICATION;
-        apdu.p1 = 0x04;
-        apdu.lc = mem::size_of::<*const u8>() as u8;
+        let apdu = APDU::new(YKPIV_INS_SELECT_APPLICATION)
+            .p1(0x04)
+            .data(MGMT_AID)
+            .to_bytes();
 
-        memcpy(
-            apdu.data.as_mut_ptr() as *mut c_void,
-            MGMT_AID.as_ptr() as *const c_void,
-            MGMT_AID.len(),
-        );
-
-        let mut res = self._send_data(&mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
+        let mut res = self._send_data(apdu.as_slice(), data.as_mut_ptr(), &mut recv_len, &mut sw);
 
         if let Err(e) = &res {
             error!("failed communicating with card: \'{}\'", e);
