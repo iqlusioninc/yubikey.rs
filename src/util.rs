@@ -36,11 +36,12 @@
 use crate::{consts::*, error::Error, internal::*, yubikey::*};
 use getrandom::getrandom;
 use hmac::Hmac;
-use libc::{calloc, free, memcpy, memmove, realloc, time};
+use libc::{calloc, free, memcpy, memmove, realloc};
 use log::{error, warn};
 use pbkdf2::pbkdf2;
 use sha1::Sha1;
 use std::ops::DerefMut;
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{mem, os::raw::c_void, ptr};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -1399,7 +1400,16 @@ pub unsafe fn ykpiv_util_set_pin_last_changed(yubikey: &mut YubiKey) -> Result<(
             cb_data = 0;
         }
 
-        let mut tnow = time(ptr::null_mut());
+        // TODO(str4d): CB_ADMIN_TIMESTAMP indicates that the YubiKey stores the
+        // timestamp as a 32-bit value, and given that the C code directly wrote
+        // the output of time() as a byte array, I'm assuming that the YubiKey
+        // expects a little-endian timestamp (and implicitly truncating it). We
+        // should verify this!
+        let mut tnow = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time is always after the epoch")
+            .as_secs()
+            .to_le_bytes();
 
         res = {
             // TODO(tarcieri): get rid of memcpy and pointers, replace with slices!
@@ -1409,7 +1419,7 @@ pub unsafe fn ykpiv_util_set_pin_last_changed(yubikey: &mut YubiKey) -> Result<(
                 &mut cb_data,
                 CB_OBJ_MAX,
                 TAG_ADMIN_TIMESTAMP,
-                &mut tnow as *mut i64 as *mut u8,
+                tnow.as_mut_ptr(),
                 CB_ADMIN_TIMESTAMP,
             )
         };
