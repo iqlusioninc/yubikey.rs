@@ -33,7 +33,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 #![allow(clippy::missing_safety_doc, clippy::too_many_arguments)]
 
-use crate::{consts::*, error::ErrorKind, internal::*, yubikey::*};
+use crate::{consts::*, error::Error, internal::*, yubikey::*};
 use getrandom::getrandom;
 use hmac::Hmac;
 use libc::{calloc, free, memcpy, memmove, realloc, time};
@@ -86,16 +86,13 @@ pub static mut CCC_TMPL: &[u8] = &[
 pub struct CardId([u8; 16]);
 
 /// Get Card ID
-pub unsafe fn ykpiv_util_get_cardid(
-    state: &mut YubiKey,
-    cardid: *mut CardId,
-) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_get_cardid(state: &mut YubiKey, cardid: *mut CardId) -> Result<(), Error> {
     let mut buf = [0u8; CB_OBJ_MAX];
     let mut len = buf.len();
     let mut res = Ok(());
 
     if cardid.is_null() {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     _ykpiv_begin_transaction(state)?;
@@ -105,7 +102,7 @@ pub unsafe fn ykpiv_util_get_cardid(
 
         if res.is_ok() {
             if len != CHUID_TMPL.len() {
-                res = Err(ErrorKind::GenericError);
+                res = Err(Error::GenericError);
             } else {
                 memcpy(
                     (*cardid).0.as_mut_ptr() as (*mut c_void),
@@ -124,13 +121,13 @@ pub unsafe fn ykpiv_util_get_cardid(
 pub unsafe fn ykpiv_util_set_cardid(
     state: &mut YubiKey,
     cardid: *const CardId,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut id = [0u8; YKPIV_CARDID_SIZE];
     let mut buf = [0u8; CHUID_TMPL.len()];
     let mut res = Ok(());
 
     if cardid.is_null() {
-        getrandom(&mut id).map_err(|_| ErrorKind::RandomnessError)?;
+        getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
     } else {
         memcpy(
             id.as_mut_ptr() as (*mut c_void),
@@ -171,13 +168,13 @@ pub unsafe fn ykpiv_util_set_cardid(
 pub struct CCCID([u8; 14]);
 
 /// Get Cardholder Capability Container (CCC) ID
-pub unsafe fn ykpiv_util_get_cccid(state: &mut YubiKey, ccc: *mut CCCID) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_get_cccid(state: &mut YubiKey, ccc: *mut CCCID) -> Result<(), Error> {
     let mut res = Ok(());
     let mut buf = [0u8; CB_OBJ_MAX];
     let mut len = buf.len();
 
     if ccc.is_null() {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     _ykpiv_begin_transaction(state)?;
@@ -193,7 +190,7 @@ pub unsafe fn ykpiv_util_get_cccid(state: &mut YubiKey, ccc: *mut CCCID) -> Resu
         if res.is_ok() {
             if len != CCC_TMPL.len() {
                 let _ = _ykpiv_end_transaction(state);
-                return Err(ErrorKind::GenericError);
+                return Err(Error::GenericError);
             }
 
             memcpy(
@@ -208,17 +205,14 @@ pub unsafe fn ykpiv_util_get_cccid(state: &mut YubiKey, ccc: *mut CCCID) -> Resu
 }
 
 /// Get Cardholder Capability Container (CCC) ID
-pub unsafe fn ykpiv_util_set_cccid(
-    state: &mut YubiKey,
-    ccc: *const CCCID,
-) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_set_cccid(state: &mut YubiKey, ccc: *const CCCID) -> Result<(), Error> {
     let mut res = Ok(());
     let mut id = [0u8; 14];
     let mut buf = [0u8; 51];
     let len: usize;
 
     if ccc.is_null() {
-        getrandom(&mut id).map_err(|_| ErrorKind::RandomnessError)?;
+        getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
     } else {
         memcpy(
             id.as_mut_ptr() as (*mut c_void),
@@ -311,7 +305,7 @@ pub unsafe fn ykpiv_util_list_keys(
     key_count: *mut u8,
     data: *mut *mut YkPivKey,
     data_len: *mut usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut _currentBlock;
     let mut res = Ok(());
     let mut p_key: *mut YkPivKey;
@@ -326,7 +320,7 @@ pub unsafe fn ykpiv_util_list_keys(
     let CB_PAGE: usize = 4096;
 
     if data.is_null() || data_len.is_null() || key_count.is_null() {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     _ykpiv_begin_transaction(state)?;
@@ -340,7 +334,7 @@ pub unsafe fn ykpiv_util_list_keys(
 
         if p_data.is_null() {
             let _ = _ykpiv_end_transaction(state);
-            return Err(ErrorKind::MemoryError);
+            return Err(Error::MemoryError);
         }
 
         cb_data = CB_PAGE;
@@ -423,7 +417,7 @@ pub unsafe fn ykpiv_util_list_keys(
             }
             res = Ok(());
         } else {
-            res = Err(ErrorKind::MemoryError);
+            res = Err(Error::MemoryError);
         }
     }
 
@@ -441,13 +435,13 @@ pub unsafe fn ykpiv_util_read_cert(
     slot: u8,
     data: *mut *mut u8,
     data_len: *mut usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut res = Ok(());
     let mut buf = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_buf: usize = buf.len();
 
     if data.is_null() || data_len.is_null() {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     _ykpiv_begin_transaction(state)?;
@@ -466,7 +460,7 @@ pub unsafe fn ykpiv_util_read_cert(
             }
             .is_null()
             {
-                res = Err(ErrorKind::MemoryError);
+                res = Err(Error::MemoryError);
             } else {
                 memcpy(
                     *data as (*mut c_void),
@@ -489,7 +483,7 @@ pub unsafe fn ykpiv_util_write_cert(
     data: *mut u8,
     data_len: usize,
     certinfo: u8,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut res = Ok(());
 
     _ykpiv_begin_transaction(state)?;
@@ -503,12 +497,12 @@ pub unsafe fn ykpiv_util_write_cert(
 }
 
 /// Delete certificate
-pub unsafe fn ykpiv_util_delete_cert(state: &mut YubiKey, slot: u8) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_delete_cert(state: &mut YubiKey, slot: u8) -> Result<(), Error> {
     ykpiv_util_write_cert(state, slot, ptr::null_mut(), 0, 0)
 }
 
 /// Block PUK
-pub unsafe fn ykpiv_util_block_puk(state: &mut YubiKey) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_block_puk(state: &mut YubiKey) -> Result<(), Error> {
     let mut res = Ok(());
     let mut puk = [0x30, 0x42, 0x41, 0x44, 0x46, 0x30, 0x30, 0x44];
     let mut tries_remaining: i32 = -1;
@@ -530,12 +524,12 @@ pub unsafe fn ykpiv_util_block_puk(state: &mut YubiKey) -> Result<(), ErrorKind>
 
         match res {
             Ok(()) => puk[0] += 1,
-            Err(ErrorKind::WrongPin { tries }) => {
+            Err(Error::WrongPin { tries }) => {
                 tries_remaining = tries;
                 continue;
             }
             Err(e) => {
-                if e != ErrorKind::PinLocked {
+                if e != Error::PinLocked {
                     continue;
                 }
                 tries_remaining = 0;
@@ -625,7 +619,7 @@ pub unsafe fn ykpiv_util_read_mscmap(
     state: &mut YubiKey,
     containers: *mut *mut YkPivContainer,
     n_containers: *mut usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut res = Ok(());
     let mut buf = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_buf: usize = buf.len();
@@ -634,7 +628,7 @@ pub unsafe fn ykpiv_util_read_mscmap(
 
     if containers.is_null() || n_containers.is_null() {
         // TODO(str4d): Should this really continue on here?
-        res = Err(ErrorKind::GenericError);
+        res = Err(Error::GenericError);
     }
 
     _ykpiv_begin_transaction(state)?;
@@ -674,7 +668,7 @@ pub unsafe fn ykpiv_util_read_mscmap(
             *containers = calloc(len, 1) as (*mut YkPivContainer);
 
             if (*containers).is_null() {
-                res = Err(ErrorKind::MemoryError);
+                res = Err(Error::MemoryError);
             } else {
                 memcpy(*containers as (*mut c_void), ptr as (*const c_void), len);
                 *n_containers = len.wrapping_div(mem::size_of::<YkPivContainer>());
@@ -699,7 +693,7 @@ pub unsafe fn ykpiv_util_write_mscmap(
     state: &mut YubiKey,
     containers: *mut YkPivContainer,
     n_containers: usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut res = Ok(());
     let mut buf = [0u8; CB_OBJ_MAX];
     let mut offset: usize = 0;
@@ -710,7 +704,7 @@ pub unsafe fn ykpiv_util_write_mscmap(
     if _ykpiv_ensure_application_selected(state).is_ok() {
         if containers.is_null() || n_containers == 0 {
             if !containers.is_null() || n_containers != 0 {
-                res = Err(ErrorKind::GenericError);
+                res = Err(Error::GenericError);
             } else {
                 res = _ykpiv_save_object(state, YKPIV_OBJ_MSCMAP as i32, ptr::null_mut(), 0);
             }
@@ -723,7 +717,7 @@ pub unsafe fn ykpiv_util_write_mscmap(
 
         if req_len > _obj_size_max(state) {
             let _ = _ykpiv_end_transaction(state);
-            return Err(ErrorKind::SizeError);
+            return Err(Error::SizeError);
         }
 
         buf[offset] = TAG_MSCMAP;
@@ -747,7 +741,7 @@ pub unsafe fn ykpiv_util_read_msroots(
     state: &mut YubiKey,
     data: *mut *mut u8,
     data_len: *mut usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut _currentBlock = 0;
     let mut res;
     let mut buf = [0u8; YKPIV_OBJ_MAX_SIZE];
@@ -762,7 +756,7 @@ pub unsafe fn ykpiv_util_read_msroots(
     let mut offset: usize = 0;
 
     if data.is_null() || data_len.is_null() {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     _ykpiv_begin_transaction(state)?;
@@ -782,7 +776,7 @@ pub unsafe fn ykpiv_util_read_msroots(
 
     if p_data.is_null() {
         let _ = _ykpiv_end_transaction(state);
-        return Err(ErrorKind::MemoryError);
+        return Err(Error::MemoryError);
     }
 
     for object_id in YKPIV_OBJ_MSROOTS1..YKPIV_OBJ_MSROOTS5 {
@@ -863,7 +857,7 @@ pub unsafe fn ykpiv_util_read_msroots(
         *data_len = offset;
         res = Ok(());
     } else if _currentBlock == 16 {
-        res = Err(ErrorKind::MemoryError);
+        res = Err(Error::MemoryError);
     } else if _currentBlock != 21 {
         res = Ok(());
     }
@@ -881,7 +875,7 @@ pub unsafe fn ykpiv_util_write_msroots(
     state: &mut YubiKey,
     data: *mut u8,
     data_len: usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut res = Ok(());
     let mut buf = [0u8; CB_OBJ_MAX];
     let mut offset: usize;
@@ -895,7 +889,7 @@ pub unsafe fn ykpiv_util_write_msroots(
     if _ykpiv_ensure_application_selected(state).is_ok() {
         if data.is_null() || data_len == 0 {
             if !data.is_null() || data_len != 0 {
-                res = Err(ErrorKind::GenericError);
+                res = Err(Error::GenericError);
             } else {
                 res = _ykpiv_save_object(state, YKPIV_OBJ_MSROOTS1 as i32, ptr::null_mut(), 0);
             }
@@ -908,7 +902,7 @@ pub unsafe fn ykpiv_util_write_msroots(
 
         if n_objs > 5 {
             let _ = _ykpiv_end_transaction(state);
-            return Err(ErrorKind::SizeError);
+            return Err(Error::SizeError);
         }
 
         for i in 0..n_objs {
@@ -981,7 +975,7 @@ pub unsafe fn ykpiv_util_generate_key(
     exp_len: *mut usize,
     point: *mut *mut u8,
     point_len: *mut usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut res = Ok(());
     let mut in_data = [0u8; 11];
     let mut in_ptr = in_data.as_mut_ptr();
@@ -1031,7 +1025,7 @@ pub unsafe fn ykpiv_util_generate_key(
         );
 
         if !setting_roca.value {
-            return Err(ErrorKind::NotSupported);
+            return Err(Error::NotSupported);
         }
     }
 
@@ -1039,7 +1033,7 @@ pub unsafe fn ykpiv_util_generate_key(
         YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 => {
             if point.is_null() || point_len.is_null() {
                 error!("invalid output parameter for ECC algorithm");
-                return Err(ErrorKind::GenericError);
+                return Err(Error::GenericError);
             }
 
             *point = ptr::null_mut();
@@ -1048,7 +1042,7 @@ pub unsafe fn ykpiv_util_generate_key(
         YKPIV_ALGO_ECCP256 | YKPIV_ALGO_ECCP384 => {
             if modulus.is_null() || modulus_len.is_null() || exp.is_null() || exp_len.is_null() {
                 error!("invalid output parameter for RSA algorithm");
-                return Err(ErrorKind::GenericError);
+                return Err(Error::GenericError);
             }
 
             *modulus = ptr::null_mut();
@@ -1058,7 +1052,7 @@ pub unsafe fn ykpiv_util_generate_key(
         }
         _ => {
             error!("invalid algorithm specified");
-            return Err(ErrorKind::GenericError);
+            return Err(Error::GenericError);
         }
     }
 
@@ -1075,7 +1069,7 @@ pub unsafe fn ykpiv_util_generate_key(
         in_ptr = in_ptr.add(5);
 
         if in_data[4] == 0 {
-            res = Err(ErrorKind::AlgorithmError);
+            res = Err(Error::AlgorithmError);
             error!("unexpected algorithm");
         } else {
             if pin_policy != YKPIV_PINPOLICY_DEFAULT {
@@ -1111,11 +1105,11 @@ pub unsafe fn ykpiv_util_generate_key(
 
                 match sw {
                     SW_ERR_INCORRECT_SLOT => {
-                        res = Err(ErrorKind::KeyError);
+                        res = Err(Error::KeyError);
                         error!("{} (incorrect slot)", err_msg);
                     }
                     SW_ERR_INCORRECT_PARAM => {
-                        res = Err(ErrorKind::AlgorithmError);
+                        res = Err(Error::AlgorithmError);
 
                         if pin_policy != 0 {
                             error!("{} (pin policy not supported?)", err_msg);
@@ -1126,11 +1120,11 @@ pub unsafe fn ykpiv_util_generate_key(
                         }
                     }
                     SW_ERR_SECURITY_STATUS => {
-                        res = Err(ErrorKind::AuthenticationError);
+                        res = Err(Error::AuthenticationError);
                         error!("{} (not authenticated)", err_msg);
                     }
                     _ => {
-                        res = Err(ErrorKind::GenericError);
+                        res = Err(Error::GenericError);
                         error!("{} (error {:x})", err_msg, sw);
                     }
                 }
@@ -1140,7 +1134,7 @@ pub unsafe fn ykpiv_util_generate_key(
 
                 if *data_ptr != TAG_RSA_MODULUS {
                     error!("Failed to parse public key structure (modulus)");
-                    res = Err(ErrorKind::ParseError);
+                    res = Err(Error::ParseError);
                 } else {
                     data_ptr = data_ptr.add(1);
                     data_ptr = data_ptr.add(_ykpiv_get_length(data_ptr, &mut len));
@@ -1149,7 +1143,7 @@ pub unsafe fn ykpiv_util_generate_key(
 
                     if ptr_modulus.is_null() {
                         error!("failed to allocate memory for modulus");
-                        res = Err(ErrorKind::MemoryError);
+                        res = Err(Error::MemoryError);
                     } else {
                         memcpy(
                             ptr_modulus as *mut c_void,
@@ -1160,7 +1154,7 @@ pub unsafe fn ykpiv_util_generate_key(
                         data_ptr = data_ptr.add(len);
                         if *data_ptr != TAG_RSA_EXP {
                             error!("failed to parse public key structure (public exponent)");
-                            res = Err(ErrorKind::ParseError);
+                            res = Err(Error::ParseError);
                         } else {
                             data_ptr = data_ptr.add(1);
                             data_ptr = data_ptr.add(_ykpiv_get_length(data_ptr, &mut len));
@@ -1168,7 +1162,7 @@ pub unsafe fn ykpiv_util_generate_key(
                             ptr_exp = calloc(cb_exp, 1) as *mut u8;
                             if ptr_exp.is_null() {
                                 error!("failed to allocate memory for public exponent");
-                                res = Err(ErrorKind::MemoryError);
+                                res = Err(Error::MemoryError);
                             } else {
                                 memcpy(
                                     ptr_exp as (*mut c_void),
@@ -1201,7 +1195,7 @@ pub unsafe fn ykpiv_util_generate_key(
 
                 if tag != TAG_ECC_POINT {
                     error!("failed to parse public key structure");
-                    res = Err(ErrorKind::ParseError);
+                    res = Err(Error::ParseError);
                 } else {
                     // the curve point should always be determined by the curve
                     let len_byte = *data_ptr;
@@ -1209,14 +1203,14 @@ pub unsafe fn ykpiv_util_generate_key(
 
                     if len_byte as usize != len {
                         error!("unexpected length");
-                        res = Err(ErrorKind::AlgorithmError);
+                        res = Err(Error::AlgorithmError);
                     } else {
                         cb_point = len;
                         ptr_point = calloc(cb_point, 1) as (*mut u8);
 
                         if ptr_point.is_null() {
                             error!("failed to allocate memory for public point");
-                            res = Err(ErrorKind::MemoryError);
+                            res = Err(Error::MemoryError);
                         } else {
                             memcpy(
                                 ptr_point as (*mut c_void),
@@ -1231,7 +1225,7 @@ pub unsafe fn ykpiv_util_generate_key(
                 }
             } else {
                 error!("wrong algorithm");
-                res = Err(ErrorKind::AlgorithmError);
+                res = Err(Error::AlgorithmError);
             }
         }
     }
@@ -1290,7 +1284,7 @@ pub struct YkPivConfig {
 pub unsafe fn ykpiv_util_get_config(
     state: &mut YubiKey,
     config: *mut YkPivConfig,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_data: usize = mem::size_of::<[u8; YKPIV_OBJ_MAX_SIZE]>();
     let mut p_item: *mut u8 = ptr::null_mut();
@@ -1298,7 +1292,7 @@ pub unsafe fn ykpiv_util_get_config(
     let mut res = Ok(());
 
     if config.is_null() {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     (*config).protected_data_available = false;
@@ -1406,7 +1400,7 @@ pub unsafe fn ykpiv_util_get_config(
 }
 
 /// Set PIN last changed
-pub unsafe fn ykpiv_util_set_pin_last_changed(state: &mut YubiKey) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_set_pin_last_changed(state: &mut YubiKey) -> Result<(), Error> {
     let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_data = data.len();
     let mut res = Ok(());
@@ -1467,7 +1461,7 @@ pub unsafe fn ykpiv_util_get_derived_mgm(
     state: &mut YubiKey,
     pin: &[u8],
     mgm: &mut YkPivMgm,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_data: usize = data.len();
     let mut p_item: *mut u8 = ptr::null_mut();
@@ -1502,7 +1496,7 @@ pub unsafe fn ykpiv_util_get_derived_mgm(
                 );
 
                 let _ = _ykpiv_end_transaction(state);
-                return Err(ErrorKind::GenericError);
+                return Err(Error::GenericError);
             }
 
             let salt = std::slice::from_raw_parts_mut(p_item, cb_item);
@@ -1518,7 +1512,7 @@ pub unsafe fn ykpiv_util_get_derived_mgm(
 pub unsafe fn ykpiv_util_get_protected_mgm(
     state: &mut YubiKey,
     mgm: *mut YkPivMgm,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     // TODO(tarcieri): replace vec with wrapper type that impls `Zeroize`
     let mut data = Zeroizing::new([0u8; YKPIV_OBJ_MAX_SIZE].to_vec());
     let mut cb_data: usize = data.len();
@@ -1527,7 +1521,7 @@ pub unsafe fn ykpiv_util_get_protected_mgm(
     let mut res = Ok(());
 
     if mgm.is_null() {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     _ykpiv_begin_transaction(state)?;
@@ -1553,7 +1547,7 @@ pub unsafe fn ykpiv_util_get_protected_mgm(
                     "protected data contains mgm, but is the wrong size = {}",
                     cb_item,
                 );
-                res = Err(ErrorKind::AuthenticationError);
+                res = Err(Error::AuthenticationError);
             } else {
                 memcpy(
                     (*mgm).0.as_mut_ptr() as (*mut c_void),
@@ -1575,7 +1569,7 @@ pub unsafe fn ykpiv_util_get_protected_mgm(
 pub unsafe fn ykpiv_util_set_protected_mgm(
     state: &mut YubiKey,
     mgm: *mut YkPivMgm,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut f_generate: bool;
     let mut mgm_key = Zeroizing::new([0u8; 24]);
     // TODO(tarcieri): replace vec with wrapper type that impls `Zeroize`
@@ -1617,7 +1611,7 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
             if let Err(e) = getrandom(mgm_key.deref_mut()) {
                 error!("could not generate new mgm, err = {}", e);
                 let _ = _ykpiv_end_transaction(state);
-                return Err(ErrorKind::RandomnessError);
+                return Err(Error::RandomnessError);
             }
         }
 
@@ -1627,7 +1621,7 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
             // if set_mgmkey fails with KeyError, it means the generated key is weak
             // otherwise, log a warning, since the device mgm key is corrupt or we're in
             // a state where we can't set the mgm key
-            if Err(ErrorKind::KeyError) != ykrc {
+            if Err(Error::KeyError) != ykrc {
                 error!(
                     "could not set new derived mgm key, err = {}",
                     ykrc.as_ref().unwrap_err()
@@ -1756,7 +1750,7 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
 }
 
 /// Reset
-pub unsafe fn ykpiv_util_reset(state: &mut YubiKey) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_util_reset(state: &mut YubiKey) -> Result<(), Error> {
     let templ = [0, YKPIV_INS_RESET, 0, 0];
     let mut data = [0u8; 255];
     let mut recv_len = data.len();
@@ -1774,7 +1768,7 @@ pub unsafe fn ykpiv_util_reset(state: &mut YubiKey) -> Result<(), ErrorKind> {
 
     match (res.is_ok(), sw) {
         (true, SW_SUCCESS) => Ok(()),
-        _ => Err(ErrorKind::GenericError),
+        _ => Err(Error::GenericError),
     }
 }
 
@@ -1802,13 +1796,13 @@ unsafe fn _read_certificate(
     slot: u8,
     buf: *mut u8,
     buf_len: *mut usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut ptr: *mut u8;
     let object_id = ykpiv_util_slot_object(slot) as i32;
     let mut len: usize = 0;
 
     if object_id == -1 {
-        return Err(ErrorKind::InvalidObject);
+        return Err(Error::InvalidObject);
     }
 
     if _ykpiv_fetch_object(state, object_id, buf, buf_len).is_ok() {
@@ -1847,19 +1841,19 @@ unsafe fn _write_certificate(
     data: *mut u8,
     data_len: usize,
     certinfo: u8,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut buf = [0u8; CB_OBJ_MAX];
     let object_id = ykpiv_util_slot_object(slot) as i32;
     let mut offset: usize = 0;
     let mut req_len: usize;
 
     if object_id == -1 {
-        return Err(ErrorKind::InvalidObject);
+        return Err(Error::InvalidObject);
     }
 
     if data.is_null() || data_len == 0 {
         if !data.is_null() || data_len != 0 {
-            return Err(ErrorKind::GenericError);
+            return Err(Error::GenericError);
         }
 
         return _ykpiv_save_object(state, object_id, ptr::null_mut(), 0);
@@ -1870,7 +1864,7 @@ unsafe fn _write_certificate(
     req_len += data_len;
 
     if req_len < data_len || req_len > _obj_size_max(state) {
-        return Err(ErrorKind::SizeError);
+        return Err(Error::SizeError);
     }
 
     buf[offset] = TAG_CERT;
@@ -1908,13 +1902,13 @@ unsafe fn _get_metadata_item(
     tag: u8,
     pp_item: *mut *mut u8,
     pcb_item: *mut usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut p_temp: *mut u8 = data;
     let mut cb_temp: usize = 0;
     let mut tag_temp: u8;
 
     if data.is_null() || pp_item.is_null() || pcb_item.is_null() {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     *pp_item = ptr::null_mut();
@@ -1925,7 +1919,7 @@ unsafe fn _get_metadata_item(
         p_temp = p_temp.add(1);
 
         if !_ykpiv_has_valid_length(p_temp, data.add(cb_data) as usize - p_temp as usize) {
-            return Err(ErrorKind::SizeError);
+            return Err(Error::SizeError);
         }
 
         p_temp = p_temp.add(_ykpiv_get_length(p_temp, &mut cb_temp));
@@ -1943,7 +1937,7 @@ unsafe fn _get_metadata_item(
 
         Ok(())
     } else {
-        Err(ErrorKind::GenericError)
+        Err(Error::GenericError)
     }
 }
 
@@ -1966,7 +1960,7 @@ unsafe fn _set_metadata_item(
     tag: u8,
     p_item: *mut u8,
     cb_item: usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut p_temp: *mut u8 = data;
     let mut cb_temp: usize = 0;
     let mut tag_temp: u8 = 0;
@@ -1975,7 +1969,7 @@ unsafe fn _set_metadata_item(
     let cb_moved: isize;
 
     if data.is_null() || pcb_data.is_null() {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     while p_temp < data.add(*pcb_data) {
@@ -2001,7 +1995,7 @@ unsafe fn _set_metadata_item(
         cb_len = _get_length_size(cb_item) as (usize);
 
         if (*pcb_data).wrapping_add(cb_len).wrapping_add(cb_item) > cb_data_max {
-            return Err(ErrorKind::GenericError);
+            return Err(Error::GenericError);
         }
 
         *p_temp = tag;
@@ -2029,7 +2023,7 @@ unsafe fn _set_metadata_item(
             - cb_len as (isize));
 
     if (*pcb_data + cb_moved as usize) > cb_data_max {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     memmove(
@@ -2058,18 +2052,18 @@ unsafe fn _read_metadata(
     tag: u8,
     data: *mut u8,
     pcb_data: *mut usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut p_temp: *mut u8;
     let mut cb_temp: usize;
 
     if data.is_null() || pcb_data.is_null() || YKPIV_OBJ_MAX_SIZE > *pcb_data {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     let obj_id = match tag {
         TAG_ADMIN => YKPIV_OBJ_ADMIN_DATA,
         TAG_PROTECTED => YKPIV_OBJ_PRINTED,
-        _ => return Err(ErrorKind::InvalidObject),
+        _ => return Err(Error::InvalidObject),
     } as i32;
 
     cb_temp = *pcb_data;
@@ -2078,7 +2072,7 @@ unsafe fn _read_metadata(
     _ykpiv_fetch_object(state, obj_id, data, &mut cb_temp)?;
 
     if cb_temp < CB_OBJ_TAG_MIN {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
     p_temp = data;
 
@@ -2089,14 +2083,14 @@ unsafe fn _read_metadata(
             _old
         } as (i32)
     {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     p_temp = p_temp.add(_ykpiv_get_length(p_temp, pcb_data));
 
     if *pcb_data > cb_temp - (p_temp as isize - data as isize) as usize {
         *pcb_data = 0;
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     memmove(data as (*mut c_void), p_temp as (*const c_void), *pcb_data);
@@ -2109,18 +2103,18 @@ unsafe fn _write_metadata(
     tag: u8,
     data: *mut u8,
     cb_data: usize,
-) -> Result<(), ErrorKind> {
+) -> Result<(), Error> {
     let mut buf = [0u8; CB_OBJ_MAX]; // XXX REMEMBER TO ZERO
     let mut p_temp: *mut u8 = buf.as_mut_ptr();
 
     if cb_data > _obj_size_max(state) - CB_OBJ_TAG_MAX {
-        return Err(ErrorKind::GenericError);
+        return Err(Error::GenericError);
     }
 
     let obj_id = match tag {
         TAG_ADMIN => YKPIV_OBJ_ADMIN_DATA,
         TAG_PROTECTED => YKPIV_OBJ_PRINTED,
-        _ => return Err(ErrorKind::InvalidObject),
+        _ => return Err(Error::InvalidObject),
     } as i32;
 
     if data.is_null() || cb_data == 0 {

@@ -34,7 +34,7 @@ use std::fmt;
 
 /// Kinds of errors
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ErrorKind {
+pub enum Error {
     /// Memory error
     MemoryError,
 
@@ -87,71 +87,71 @@ pub enum ErrorKind {
     NotSupported,
 }
 
-impl ErrorKind {
+impl Error {
     /// Name of the error.
     ///
     /// These names map to the legacy names from the Yubico C library, to
     /// assist in web searches for relevant information for these errors.
     pub fn name(self) -> &'static str {
         match self {
-            ErrorKind::MemoryError => "YKPIV_MEMORY_ERROR",
-            ErrorKind::PcscError => "YKPIV_PCSC_ERROR",
-            ErrorKind::SizeError => "YKPIV_SIZE_ERROR",
-            ErrorKind::AppletError => "YKPIV_APPLET_ERROR",
-            ErrorKind::AuthenticationError => "YKPIV_AUTHENTICATION_ERROR",
-            ErrorKind::RandomnessError => "YKPIV_RANDOMNESS_ERROR",
-            ErrorKind::GenericError => "YKPIV_GENERIC_ERROR",
-            ErrorKind::KeyError => "YKPIV_KEY_ERROR",
-            ErrorKind::ParseError => "YKPIV_PARSE_ERROR",
-            ErrorKind::WrongPin { .. } => "YKPIV_WRONG_PIN",
-            ErrorKind::InvalidObject => "YKPIV_INVALID_OBJECT",
-            ErrorKind::AlgorithmError => "YKPIV_ALGORITHM_ERROR",
-            ErrorKind::PinLocked => "YKPIV_PIN_LOCKED",
-            ErrorKind::ArgumentError => "YKPIV_ARGUMENT_ERROR",
-            ErrorKind::RangeError => "YKPIV_RANGE_ERROR",
-            ErrorKind::NotSupported => "YKPIV_NOT_SUPPORTED",
+            Error::MemoryError => "YKPIV_MEMORY_ERROR",
+            Error::PcscError => "YKPIV_PCSC_ERROR",
+            Error::SizeError => "YKPIV_SIZE_ERROR",
+            Error::AppletError => "YKPIV_APPLET_ERROR",
+            Error::AuthenticationError => "YKPIV_AUTHENTICATION_ERROR",
+            Error::RandomnessError => "YKPIV_RANDOMNESS_ERROR",
+            Error::GenericError => "YKPIV_GENERIC_ERROR",
+            Error::KeyError => "YKPIV_KEY_ERROR",
+            Error::ParseError => "YKPIV_PARSE_ERROR",
+            Error::WrongPin { .. } => "YKPIV_WRONG_PIN",
+            Error::InvalidObject => "YKPIV_INVALID_OBJECT",
+            Error::AlgorithmError => "YKPIV_ALGORITHM_ERROR",
+            Error::PinLocked => "YKPIV_PIN_LOCKED",
+            Error::ArgumentError => "YKPIV_ARGUMENT_ERROR",
+            Error::RangeError => "YKPIV_RANGE_ERROR",
+            Error::NotSupported => "YKPIV_NOT_SUPPORTED",
         }
     }
 
     /// Error message
     pub fn msg(self) -> &'static str {
         match self {
-            ErrorKind::MemoryError => "memory error",
-            ErrorKind::PcscError => "PCSC error",
-            ErrorKind::SizeError => "size error",
-            ErrorKind::AppletError => "applet error",
-            ErrorKind::AuthenticationError => "authentication error",
-            ErrorKind::RandomnessError => "randomness error",
-            ErrorKind::GenericError => "generic error",
-            ErrorKind::KeyError => "key error",
-            ErrorKind::ParseError => "parse error",
-            ErrorKind::WrongPin { .. } => "wrong pin",
-            ErrorKind::InvalidObject => "invalid object",
-            ErrorKind::AlgorithmError => "algorithm error",
-            ErrorKind::PinLocked => "PIN locked",
-            ErrorKind::ArgumentError => "argument error",
-            ErrorKind::RangeError => "range error",
-            ErrorKind::NotSupported => "not supported",
+            Error::MemoryError => "memory error",
+            Error::PcscError => "PCSC error",
+            Error::SizeError => "size error",
+            Error::AppletError => "applet error",
+            Error::AuthenticationError => "authentication error",
+            Error::RandomnessError => "randomness error",
+            Error::GenericError => "generic error",
+            Error::KeyError => "key error",
+            Error::ParseError => "parse error",
+            Error::WrongPin { .. } => "wrong pin",
+            Error::InvalidObject => "invalid object",
+            Error::AlgorithmError => "algorithm error",
+            Error::PinLocked => "PIN locked",
+            Error::ArgumentError => "argument error",
+            Error::RangeError => "range error",
+            Error::NotSupported => "not supported",
         }
     }
 }
 
-impl fmt::Display for ErrorKind {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.msg())
     }
 }
 
-impl std::error::Error for ErrorKind {}
+impl std::error::Error for Error {}
 
 /// Get a string representation of this error
 // TODO(tarcieri): completely replace this with `Display`
-pub fn ykpiv_strerror(err: ErrorKind) -> &'static str {
+pub fn ykpiv_strerror(err: Error) -> &'static str {
     err.msg()
 }
 
 /// Get the name of this error
 // TODO(tarcieri): completely replace this with debug
-pub fn ykpiv_strerror_name(err: ErrorKind) -> &'static str {
+pub fn ykpiv_strerror_name(err: Error) -> &'static str {
     err.name()
 }
