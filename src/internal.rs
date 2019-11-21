@@ -39,11 +39,10 @@ use des::{
     block_cipher_trait::{generic_array::GenericArray, BlockCipher},
     TdesEde3,
 };
-use libc::{c_char, c_int, fclose, feof, fgets, fopen, getenv, sscanf, strcasecmp, strcmp};
+use libc::{c_char};
 use std::fs::File;
 use std::io::{BufReader, Result as IoResult, BufRead};
 use std::path::Path;
-use std::ffi::{CStr, CString};
 use zeroize::Zeroize;
 
 /// 3DES keys. The three subkeys are concatenated.
@@ -238,11 +237,11 @@ pub fn get_bool_env(setting_name: &str) -> Option<SettingBool> {
 
 /// Get a setting boolean
 pub fn setting_get_bool(setting_name: &str, def: bool) -> SettingBool {
-    match get_bool_config(setting_name.as_ref(), "/etc/yubico/yubikeypiv.conf") {
+    match get_bool_config(setting_name, "/etc/yubico/yubikeypiv.conf") {
         Ok(Some(setting)) => setting,
         Ok(None) => {
             //try env instead
-            match get_bool_env(setting_name.as_ref()) {
+            match get_bool_env(setting_name) {
                 Some(setting) => setting,
                 None => SettingBool {
                     value: def,
