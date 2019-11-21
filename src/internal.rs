@@ -1,9 +1,5 @@
 //! Internal functions (mostly 3DES)
 
-// TODO(tarcieri): replace OpenSSL extern "C" invocations with `des` crate
-// - crate: https://crates.io/crates/des
-// - docs: https://docs.rs/des/0
-
 // Adapted from yubico-piv-tool:
 // <https://github.com/Yubico/yubico-piv-tool/>
 //
