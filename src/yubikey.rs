@@ -37,10 +37,7 @@ use crate::{
     apdu::APDU,
     consts::*,
     error::ErrorKind,
-    internal::{
-        des_decrypt, des_destroy_key, des_encrypt, des_import_key, yk_des_is_weak_key,
-        DesErrorKind, DesKey,
-    },
+    internal::{des_decrypt, des_encrypt, yk_des_is_weak_key, DesKey},
 };
 use getrandom::getrandom;
 use libc::{c_char, free, malloc, memcmp, memcpy, memmove, memset, strlen, strncasecmp};
@@ -766,37 +763,23 @@ pub(crate) unsafe fn _send_data(
 }
 
 /// Default authentication key
-pub const DEFAULT_AUTH_KEY: &[u8] = b"\x01\x02\x03\x04\x05\x06\x07\x08\x01\x02\x03\x04\x05\x06\x07\x08\x01\x02\x03\x04\x05\x06\x07\x08\0";
+pub const DEFAULT_AUTH_KEY: &[u8; DES_LEN_3DES] = b"\x01\x02\x03\x04\x05\x06\x07\x08\x01\x02\x03\x04\x05\x06\x07\x08\x01\x02\x03\x04\x05\x06\x07\x08";
 
 /// Authenticate to the card
-pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_authenticate(
+    state: &mut YubiKey,
+    key: Option<&[u8; DES_LEN_3DES]>,
+) -> Result<(), ErrorKind> {
     let mut data = [0u8; 261];
-    let mut challenge = [0u8; 8];
     let mut recv_len = data.len() as u32;
     let mut sw: i32 = 0;
-    let mut drc: DesErrorKind;
-    let mut mgm_key: *mut DesKey = ptr::null_mut();
-    let mut out_len: usize;
     let mut res = Ok(());
 
     _ykpiv_begin_transaction(state)?;
 
     if _ykpiv_ensure_application_selected(state).is_ok() {
-        if key.is_null() {
-            key = DEFAULT_AUTH_KEY.as_ptr();
-        }
-
-        // set up our key
-        drc = des_import_key(1i32, key, (8i32 * 3i32) as (usize), &mut mgm_key);
-
-        if drc != DesErrorKind::Ok {
-            assert!(
-                mgm_key.is_null(),
-                "didn't expect mgm key to be set by failing op!"
-            );
-            let _ = _ykpiv_end_transaction(state);
-            return Err(ErrorKind::AlgorithmError);
-        }
+        // use the provided mgm key to authenticate; if it hasn't been provided, use default
+        let mgm_key = DesKey::from_bytes(*key.unwrap_or(DEFAULT_AUTH_KEY));
 
         // get a challenge from the card
         let mut apdu = APDU::default();
@@ -813,35 +796,17 @@ pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Res
         if res.is_err() {
             let _ = _ykpiv_end_transaction(state);
             return res;
-        }
-
-        if sw != SW_SUCCESS {
+        } else if sw != SW_SUCCESS {
             let _ = _ykpiv_end_transaction(state);
             return Err(ErrorKind::AuthenticationError);
         }
 
-        memcpy(
-            challenge.as_mut_ptr() as *mut c_void,
-            data.as_ptr().offset(4) as *const c_void,
-            8,
-        );
+        let mut challenge = [0u8; 8];
+        challenge.copy_from_slice(&data[4..12]);
 
         // send a response to the cards challenge and a challenge of our own.
         let mut response = [0u8; 8];
-        out_len = response.len();
-
-        drc = des_decrypt(
-            mgm_key,
-            challenge.as_ptr(),
-            challenge.len(),
-            response.as_mut_ptr(),
-            &mut out_len,
-        );
-
-        if drc != DesErrorKind::Ok {
-            let _ = _ykpiv_end_transaction(state);
-            return Err(ErrorKind::AuthenticationError);
-        }
+        des_decrypt(&mgm_key, &challenge, &mut response);
 
         recv_len = data.len() as u32;
         apdu = APDU::default();
@@ -870,40 +835,20 @@ pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Res
         if res.is_err() {
             let _ = _ykpiv_end_transaction(state);
             return res;
-        }
-
-        if sw != SW_SUCCESS {
+        } else if sw != SW_SUCCESS {
             let _ = _ykpiv_end_transaction(state);
             return Err(ErrorKind::AuthenticationError);
         }
 
         // compare the response from the card with our challenge
-        let mut response = [0u8; 8];
-        out_len = response.len();
-        drc = des_encrypt(
-            mgm_key,
-            challenge.as_ptr(),
-            mem::size_of::<[u8; 8]>(),
-            response.as_mut_ptr(),
-            &mut out_len,
-        );
+        des_encrypt(&mgm_key, &challenge, &mut response);
 
-        if drc == DesErrorKind::Ok
-            // TODO(tarcieri): constant time comparison!
-            && memcmp(
-                response.as_mut_ptr() as *const c_void,
-                data.as_mut_ptr().offset(4) as *const c_void,
-                8,
-            ) == 0
-        {
+        // TODO(tarcieri): constant time comparison!
+        if response == &data[4..12] {
             res = Ok(());
         } else {
             res = Err(ErrorKind::AuthenticationError);
         }
-    }
-
-    if !mgm_key.is_null() {
-        des_destroy_key(mgm_key);
     }
 
     let _ = _ykpiv_end_transaction(state);
@@ -911,14 +856,17 @@ pub unsafe fn ykpiv_authenticate(state: &mut YubiKey, mut key: *const u8) -> Res
 }
 
 /// Set the management key (MGM)
-pub unsafe fn ykpiv_set_mgmkey(state: &mut YubiKey, new_key: *const u8) -> Result<(), ErrorKind> {
+pub unsafe fn ykpiv_set_mgmkey(
+    state: &mut YubiKey,
+    new_key: &[u8; DES_LEN_3DES],
+) -> Result<(), ErrorKind> {
     ykpiv_set_mgmkey2(state, new_key, 0)
 }
 
 /// Set the management key (MGM)
 pub(crate) unsafe fn ykpiv_set_mgmkey2(
     state: &mut YubiKey,
-    new_key: *const u8,
+    new_key: &[u8; DES_LEN_3DES],
     touch: u8,
 ) -> Result<(), ErrorKind> {
     let mut data = [0u8; 261];
@@ -930,12 +878,13 @@ pub(crate) unsafe fn ykpiv_set_mgmkey2(
     _ykpiv_begin_transaction(state)?;
 
     if _ykpiv_ensure_application_selected(state).is_ok() {
-        if yk_des_is_weak_key(new_key, (8i32 * 3i32) as (usize)) {
+        if yk_des_is_weak_key(new_key) {
             error!(
                 "won't set new key '{:?}' since it's weak (with odd parity)",
-                slice::from_raw_parts(new_key, DES_LEN_3DES)
+                new_key
             );
             res = Err(ErrorKind::KeyError);
+        } else {
             apdu.ins = YKPIV_INS_SET_MGMKEY;
             apdu.p1 = 0xff;
 
@@ -952,16 +901,11 @@ pub(crate) unsafe fn ykpiv_set_mgmkey2(
             apdu.data[0] = YKPIV_ALGO_3DES;
             apdu.data[1] = YKPIV_KEY_CARDMGM;
             apdu.data[2] = DES_LEN_3DES as u8;
-            memcpy(
-                apdu.data.as_mut_ptr().offset(3) as *mut c_void,
-                new_key as *const c_void,
-                DES_LEN_3DES,
-            );
-        } else {
+            apdu.data[3..3 + DES_LEN_3DES].copy_from_slice(new_key);
+
             res = _send_data(state, &mut apdu, data.as_mut_ptr(), &mut recv_len, &mut sw);
 
-            // TODO(str4d): Shouldn't this be res.is_ok()?
-            if res.is_err() && sw != SW_SUCCESS {
+            if res.is_ok() && sw != SW_SUCCESS {
                 res = Err(ErrorKind::GenericError);
             }
         }

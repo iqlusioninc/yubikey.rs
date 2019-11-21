@@ -39,189 +39,116 @@
 #![allow(clippy::missing_safety_doc)]
 
 use crate::consts::*;
-use libc::{
-    c_char, c_int, fclose, feof, fgets, fopen, free, getenv, malloc, memcpy, memset, sscanf,
-    strcasecmp, strcmp,
+use des::{
+    block_cipher_trait::{generic_array::GenericArray, BlockCipher},
+    TdesEde3,
 };
-use std::{
-    ffi::{CStr, CString},
-    mem,
-    os::raw::c_void,
-};
+use libc::{c_char, c_int, fclose, feof, fgets, fopen, getenv, sscanf, strcasecmp, strcmp};
+use std::ffi::{CStr, CString};
+use zeroize::Zeroize;
 
-extern "C" {
-    fn DES_ecb3_encrypt(
-        input: *mut [u8; 8],
-        output: *mut [u8; 8],
-        ks1: *mut DesSubKey,
-        ks2: *mut DesSubKey,
-        ks3: *mut DesSubKey,
-        enc: i32,
-    );
-    fn DES_is_weak_key(key: *mut [u8; 8]) -> i32;
-    fn DES_set_key_unchecked(key: *mut [u8; 8], schedule: *mut DesSubKey);
+/// 3DES keys. The three subkeys are concatenated.
+pub struct DesKey([u8; DES_LEN_3DES]);
+
+impl DesKey {
+    pub fn from_bytes(bytes: [u8; DES_LEN_3DES]) -> Self {
+        DesKey(bytes)
+    }
+
+    pub fn write(&self, out: &mut [u8]) {
+        out.copy_from_slice(&self.0);
+    }
 }
 
-/// DES-related errors
-#[allow(non_camel_case_types)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[repr(i32)]
-pub enum DesErrorKind {
-    /// Ok
-    Ok = 0,
-
-    /// Invalid parameter
-    InvalidParameter = -1,
-
-    /// Buffer too small
-    BufferTooSmall = -2,
-
-    /// Memory error
-    MemoryError = -3,
-
-    /// General error
-    GeneralError = -4,
+impl AsRef<[u8; 24]> for DesKey {
+    fn as_ref(&self) -> &[u8; 24] {
+        &self.0
+    }
 }
 
-/// 3DES subkeys
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct DesSubKey([u8; 16]);
-
-/// 3DES keys
-#[derive(Copy, Clone)]
-pub struct DesKey {
-    /// subkey 1
-    pub ks1: DesSubKey,
-
-    /// subkey 2
-    pub ks2: DesSubKey,
-
-    /// subkey 3
-    pub ks3: DesSubKey,
+impl Zeroize for DesKey {
+    fn zeroize(&mut self) {
+        self.0.zeroize();
+    }
 }
 
-/// Import DES key
-pub unsafe fn des_import_key(
-    key_type: i32,
-    keyraw: *const u8,
-    keyrawlen: usize,
-    key: *mut *mut DesKey,
-) -> DesErrorKind {
-    let mut key_tmp = [0u8; 8];
-    let cb_expectedkey: usize;
-    let cb_keysize: usize;
-
-    if key_type != DES_TYPE_3DES as i32 {
-        return DesErrorKind::InvalidParameter;
+impl Drop for DesKey {
+    fn drop(&mut self) {
+        self.zeroize();
     }
-
-    cb_expectedkey = (8i32 * 3i32) as (usize);
-    cb_keysize = 8usize;
-
-    if cb_keysize > 8 {
-        return DesErrorKind::MemoryError;
-    }
-
-    if key.is_null() || keyraw.is_null() || keyrawlen != cb_expectedkey {
-        return DesErrorKind::InvalidParameter;
-    }
-
-    *key = malloc(mem::size_of::<DesKey>()) as (*mut DesKey);
-
-    if (*key).is_null() {
-        return DesErrorKind::MemoryError;
-    }
-
-    memset(*key as (*mut c_void), 0i32, mem::size_of::<DesKey>());
-
-    memcpy(
-        key_tmp.as_mut_ptr() as (*mut c_void),
-        keyraw as (*const c_void),
-        cb_keysize,
-    );
-
-    DES_set_key_unchecked(&mut key_tmp, &mut (**key).ks1);
-
-    memcpy(
-        key_tmp.as_mut_ptr() as (*mut c_void),
-        keyraw.add(cb_keysize) as (*const c_void),
-        cb_keysize,
-    );
-
-    DES_set_key_unchecked(&mut key_tmp, &mut (**key).ks2);
-
-    memcpy(
-        key_tmp.as_mut_ptr() as (*mut c_void),
-        keyraw.add(2usize.wrapping_mul(cb_keysize)) as (*const c_void),
-        cb_keysize,
-    );
-
-    DES_set_key_unchecked(&mut key_tmp, &mut (**key).ks3);
-
-    DesErrorKind::Ok
-}
-
-/// Destroy DES key
-pub unsafe fn des_destroy_key(key: *mut DesKey) -> DesErrorKind {
-    if !key.is_null() {
-        free(key as (*mut c_void));
-    }
-
-    DesErrorKind::Ok
 }
 
 /// Encrypt with DES key
-pub unsafe fn des_encrypt(
-    key: *mut DesKey,
-    input: *const u8,
-    inputlen: usize,
-    out: *mut u8,
-    outlen: *mut usize,
-) -> DesErrorKind {
-    if key.is_null() || outlen.is_null() || *outlen < inputlen || input.is_null() || out.is_null() {
-        return DesErrorKind::InvalidParameter;
-    }
-
-    DES_ecb3_encrypt(
-        input as *mut [u8; 8],
-        out as *mut [u8; 8],
-        &mut (*key).ks1,
-        &mut (*key).ks2,
-        &mut (*key).ks3,
-        1,
-    );
-
-    DesErrorKind::Ok
+pub fn des_encrypt(key: &DesKey, input: &[u8; DES_LEN_DES], output: &mut [u8; DES_LEN_DES]) {
+    output.copy_from_slice(input);
+    TdesEde3::new(GenericArray::from_slice(&key.0))
+        .encrypt_block(GenericArray::from_mut_slice(output));
 }
 
 /// Decrypt with DES key
-pub unsafe fn des_decrypt(
-    key: *mut DesKey,
-    in_: *const u8,
-    inlen: usize,
-    out: *mut u8,
-    outlen: *mut usize,
-) -> DesErrorKind {
-    if key.is_null() || outlen.is_null() || *outlen < inlen || in_.is_null() || out.is_null() {
-        return DesErrorKind::InvalidParameter;
-    }
-
-    DES_ecb3_encrypt(
-        in_ as *mut [u8; 8],
-        out as *mut [u8; 8],
-        &mut (*key).ks1,
-        &mut (*key).ks2,
-        &mut (*key).ks3,
-        0,
-    );
-
-    DesErrorKind::Ok
+pub fn des_decrypt(key: &DesKey, input: &[u8; DES_LEN_DES], output: &mut [u8; DES_LEN_DES]) {
+    output.copy_from_slice(input);
+    TdesEde3::new(GenericArray::from_slice(&key.0))
+        .encrypt_block(GenericArray::from_mut_slice(output));
 }
 
 /// Is the given DES key weak?
-pub unsafe fn yk_des_is_weak_key(key: *const u8, _cb_key: usize) -> bool {
-    DES_is_weak_key(key as (*mut [u8; 8])) != 0
+pub fn yk_des_is_weak_key(key: &[u8; DES_LEN_3DES]) -> bool {
+    /// Weak and semi weak keys as taken from
+    /// %A D.W. Davies
+    /// %A W.L. Price
+    /// %T Security for Computer Networks
+    /// %I John Wiley & Sons
+    /// %D 1984
+    const weak_keys: [[u8; DES_LEN_DES]; 16] = [
+        // weak keys
+        [0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+        [0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE],
+        [0x1F, 0x1F, 0x1F, 0x1F, 0x0E, 0x0E, 0x0E, 0x0E],
+        [0xE0, 0xE0, 0xE0, 0xE0, 0xF1, 0xF1, 0xF1, 0xF1],
+        // semi-weak keys
+        [0x01, 0xFE, 0x01, 0xFE, 0x01, 0xFE, 0x01, 0xFE],
+        [0xFE, 0x01, 0xFE, 0x01, 0xFE, 0x01, 0xFE, 0x01],
+        [0x1F, 0xE0, 0x1F, 0xE0, 0x0E, 0xF1, 0x0E, 0xF1],
+        [0xE0, 0x1F, 0xE0, 0x1F, 0xF1, 0x0E, 0xF1, 0x0E],
+        [0x01, 0xE0, 0x01, 0xE0, 0x01, 0xF1, 0x01, 0xF1],
+        [0xE0, 0x01, 0xE0, 0x01, 0xF1, 0x01, 0xF1, 0x01],
+        [0x1F, 0xFE, 0x1F, 0xFE, 0x0E, 0xFE, 0x0E, 0xFE],
+        [0xFE, 0x1F, 0xFE, 0x1F, 0xFE, 0x0E, 0xFE, 0x0E],
+        [0x01, 0x1F, 0x01, 0x1F, 0x01, 0x0E, 0x01, 0x0E],
+        [0x1F, 0x01, 0x1F, 0x01, 0x0E, 0x01, 0x0E, 0x01],
+        [0xE0, 0xFE, 0xE0, 0xFE, 0xF1, 0xFE, 0xF1, 0xFE],
+        [0xFE, 0xE0, 0xFE, 0xE0, 0xFE, 0xF1, 0xFE, 0xF1],
+    ];
+
+    // set odd parity of key
+    let mut tmp = [0u8; DES_LEN_3DES];
+    for i in 0..DES_LEN_3DES {
+        // count number of set bits in byte, excluding the low-order bit - SWAR method
+        let mut c = key[i] & 0xFE;
+
+        c = (c & 0x55) + ((c >> 1) & 0x55);
+        c = (c & 0x33) + ((c >> 2) & 0x33);
+        c = (c & 0x0F) + ((c >> 4) & 0x0F);
+
+        // if count is even, set low key bit to 1, otherwise 0
+        tmp[i] = (key[i] & 0xFE) | (if c & 0x01 == 0x01 { 0x00 } else { 0x01 });
+    }
+
+    // check odd parity key against table by DES key block
+    let mut rv = false;
+    for weak_key in weak_keys.iter() {
+        if weak_key == &tmp[0..DES_LEN_DES]
+            || weak_key == &tmp[DES_LEN_DES..2 * DES_LEN_DES]
+            || weak_key == &tmp[2 * DES_LEN_DES..3 * DES_LEN_DES]
+        {
+            rv = true;
+            break;
+        }
+    }
+
+    tmp.zeroize();
+    rv
 }
 
 /// PKCS#5 error types

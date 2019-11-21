@@ -1622,7 +1622,7 @@ pub unsafe fn ykpiv_util_set_protected_mgm(
             }
         }
 
-        let ykrc = ykpiv_set_mgmkey(state, mgm_key.as_mut_ptr());
+        let ykrc = ykpiv_set_mgmkey(state, &mgm_key);
 
         if ykrc.is_err() {
             // if set_mgmkey fails with KeyError, it means the generated key is weak
