@@ -30,17 +30,14 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// TODO(tarcieri): investigate and remove dead code
-#![allow(non_upper_case_globals, dead_code)]
-#![allow(clippy::missing_safety_doc)]
-
 use crate::consts::*;
 use des::{
     block_cipher_trait::{generic_array::GenericArray, BlockCipher},
     TdesEde3,
 };
-use libc::{c_char, c_int, fclose, feof, fgets, fopen, getenv, sscanf, strcasecmp, strcmp};
-use std::ffi::{CStr, CString};
+use std::env;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use zeroize::Zeroize;
 
 /// 3DES keys. The three subkeys are concatenated.
@@ -49,10 +46,6 @@ pub struct DesKey([u8; DES_LEN_3DES]);
 impl DesKey {
     pub fn from_bytes(bytes: [u8; DES_LEN_3DES]) -> Self {
         DesKey(bytes)
-    }
-
-    pub fn write(&self, out: &mut [u8]) {
-        out.copy_from_slice(&self.0);
     }
 }
 
@@ -98,7 +91,7 @@ pub fn yk_des_is_weak_key(key: &[u8; DES_LEN_3DES]) -> bool {
     /// %T Security for Computer Networks
     /// %I John Wiley & Sons
     /// %D 1984
-    const weak_keys: [[u8; DES_LEN_DES]; 16] = [
+    const WEAK_KEYS: [[u8; DES_LEN_DES]; 16] = [
         // weak keys
         [0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
         [0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE],
@@ -135,7 +128,7 @@ pub fn yk_des_is_weak_key(key: &[u8; DES_LEN_3DES]) -> bool {
 
     // check odd parity key against table by DES key block
     let mut rv = false;
-    for weak_key in weak_keys.iter() {
+    for weak_key in WEAK_KEYS.iter() {
         if weak_key == &tmp[0..DES_LEN_DES]
             || weak_key == &tmp[DES_LEN_DES..2 * DES_LEN_DES]
             || weak_key == &tmp[2 * DES_LEN_DES..3 * DES_LEN_DES]
@@ -147,23 +140,6 @@ pub fn yk_des_is_weak_key(key: &[u8; DES_LEN_3DES]) -> bool {
 
     tmp.zeroize();
     rv
-}
-
-/// PKCS#5 error types
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[repr(i32)]
-pub enum Pkcs5ErrorKind {
-    /// OK
-    Ok = 0,
-
-    /// General error
-    GeneralError = -1,
-}
-
-/// Strip whitespace
-// TODO(tarcieri): implement this
-pub unsafe fn _strip_ws(sz: *mut c_char) -> *mut c_char {
-    sz
 }
 
 /// Source of how a setting was configured
@@ -190,105 +166,65 @@ pub struct SettingBool {
 }
 
 /// Get a boolean config value
-pub unsafe fn _get_bool_config(sz_setting: *const c_char) -> SettingBool {
+pub fn _get_bool_config(key: &str) -> SettingBool {
     let mut setting: SettingBool = SettingBool {
         value: false,
         source: SettingSource::Default,
     };
-    let mut sz_line = [0u8; 256];
-    let mut psz_name: *mut c_char;
-    let mut psz_value: *mut c_char;
-    let mut sz_name = [0u8; 256];
-    let mut sz_value = [0u8; 256];
 
-    let pf = fopen(
-        b"/etc/yubico/yubikeypiv.conf\0".as_ptr() as *const c_char,
-        b"r\0".as_ptr() as *const c_char,
-    );
+    if let Ok(f) = File::open("/etc/yubico/yubikeypiv.conf") {
+        for line in BufReader::new(f).lines() {
+            let line = match line {
+                Ok(line) => line,
+                _ => continue,
+            };
 
-    if pf.is_null() {
-        return setting;
+            if line.starts_with('#') || line.starts_with('\r') || line.starts_with('\n') {
+                continue;
+            }
+
+            let (name, value) = {
+                let mut parts = line.splitn(1, '=');
+                let name = parts.next();
+                let value = parts.next();
+                match (name, value, parts.next()) {
+                    (Some(name), Some(value), None) => (name.trim(), value.trim()),
+                    _ => continue,
+                }
+            };
+
+            if name == key {
+                setting.source = SettingSource::Admin;
+                setting.value = value == "1" || value == "true";
+                break;
+            }
+        }
     }
 
-    while feof(pf) == 0 {
-        if fgets(
-            sz_line.as_mut_ptr() as *mut c_char,
-            sz_line.len() as c_int,
-            pf,
-        )
-        .is_null()
-        {
-            continue;
-        }
-
-        if sz_line[0] == b'#' {
-            continue;
-        }
-
-        if sz_line[0] == b'\r' {
-            continue;
-        }
-
-        if sz_line[0] == b'\n' {
-            continue;
-        }
-
-        if sscanf(
-            sz_line.as_ptr() as *const c_char,
-            b"%255[^=]=%255s\0".as_ptr() as *const c_char,
-            sz_name.as_mut_ptr(),
-            sz_value.as_mut_ptr(),
-        ) != 2
-        {
-            continue;
-        }
-
-        psz_name = _strip_ws(sz_name.as_mut_ptr() as *mut c_char);
-
-        if strcasecmp(psz_name, sz_setting) != 0 {
-            continue;
-        }
-
-        psz_value = _strip_ws(sz_value.as_mut_ptr() as *mut c_char);
-        setting.source = SettingSource::Admin;
-        setting.value = strcmp(psz_value, b"1\0".as_ptr() as *const c_char) == 0
-            || strcasecmp(psz_value, b"true\0".as_ptr() as *const c_char) == 0;
-    }
-
-    fclose(pf);
     setting
 }
 
 /// Get a setting boolean from an environment variable
-pub unsafe fn _get_bool_env(sz_setting: *const c_char) -> SettingBool {
+pub fn _get_bool_env(key: &str) -> SettingBool {
     let mut setting: SettingBool = SettingBool {
         value: false,
         source: SettingSource::Default,
     };
 
-    let sz_name = CString::new(format!(
-        "YUBIKEY_PIV_{}",
-        CStr::from_ptr(sz_setting).to_string_lossy()
-    ))
-    .unwrap();
-
-    let psz_value = getenv(sz_name.as_ptr());
-
-    if !psz_value.is_null() {
+    if let Ok(value) = env::var(format!("YUBIKEY_PIV_{}", key)) {
         setting.source = SettingSource::User;
-        setting.value = strcmp(psz_value, b"1\0".as_ptr() as *const c_char) == 0
-            || strcasecmp(psz_value, b"true\0".as_ptr() as *const c_char) == 0;
+        setting.value = value == "1" || value == "true";
     }
 
     setting
 }
 
 /// Get a setting boolean
-pub unsafe fn setting_get_bool(sz_setting: *const c_char, def: bool) -> SettingBool {
-    let mut setting = _get_bool_config(sz_setting);
+pub fn setting_get_bool(key: &str, def: bool) -> SettingBool {
+    let mut setting = _get_bool_config(key);
 
     if setting.source == SettingSource::Default {
-        setting = _get_bool_env(sz_setting);
+        setting = _get_bool_env(key);
     }
 
     if setting.source == SettingSource::Default {
