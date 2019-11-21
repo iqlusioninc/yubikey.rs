@@ -30,9 +30,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#![allow(non_upper_case_globals)]
-#![allow(clippy::missing_safety_doc)]
-
 use crate::consts::*;
 use des::{
     block_cipher_trait::{generic_array::GenericArray, BlockCipher},
@@ -94,7 +91,7 @@ pub fn yk_des_is_weak_key(key: &[u8; DES_LEN_3DES]) -> bool {
     /// %T Security for Computer Networks
     /// %I John Wiley & Sons
     /// %D 1984
-    const weak_keys: [[u8; DES_LEN_DES]; 16] = [
+    const WEAK_KEYS: [[u8; DES_LEN_DES]; 16] = [
         // weak keys
         [0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
         [0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE],
@@ -131,7 +128,7 @@ pub fn yk_des_is_weak_key(key: &[u8; DES_LEN_3DES]) -> bool {
 
     // check odd parity key against table by DES key block
     let mut rv = false;
-    for weak_key in weak_keys.iter() {
+    for weak_key in WEAK_KEYS.iter() {
         if weak_key == &tmp[0..DES_LEN_DES]
             || weak_key == &tmp[DES_LEN_DES..2 * DES_LEN_DES]
             || weak_key == &tmp[2 * DES_LEN_DES..3 * DES_LEN_DES]
