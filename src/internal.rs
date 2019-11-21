@@ -30,8 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// TODO(tarcieri): investigate and remove dead code
-#![allow(non_upper_case_globals, dead_code)]
+#![allow(non_upper_case_globals)]
 #![allow(clippy::missing_safety_doc)]
 
 use crate::consts::*;
@@ -50,10 +49,6 @@ pub struct DesKey([u8; DES_LEN_3DES]);
 impl DesKey {
     pub fn from_bytes(bytes: [u8; DES_LEN_3DES]) -> Self {
         DesKey(bytes)
-    }
-
-    pub fn write(&self, out: &mut [u8]) {
-        out.copy_from_slice(&self.0);
     }
 }
 
@@ -148,17 +143,6 @@ pub fn yk_des_is_weak_key(key: &[u8; DES_LEN_3DES]) -> bool {
 
     tmp.zeroize();
     rv
-}
-
-/// PKCS#5 error types
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[repr(i32)]
-pub enum Pkcs5ErrorKind {
-    /// OK
-    Ok = 0,
-
-    /// General error
-    GeneralError = -1,
 }
 
 /// Source of how a setting was configured
