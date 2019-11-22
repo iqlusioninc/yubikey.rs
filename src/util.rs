@@ -475,8 +475,7 @@ pub unsafe fn ykpiv_util_read_cert(
 pub unsafe fn ykpiv_util_write_cert(
     yubikey: &mut YubiKey,
     slot: u8,
-    data: *mut u8,
-    data_len: usize,
+    data: &[u8],
     certinfo: u8,
 ) -> Result<(), Error> {
     let mut res = Ok(());
@@ -484,7 +483,7 @@ pub unsafe fn ykpiv_util_write_cert(
     yubikey._ykpiv_begin_transaction()?;
 
     if yubikey._ykpiv_ensure_application_selected().is_ok() {
-        res = _write_certificate(yubikey, slot, data, data_len, certinfo);
+        res = _write_certificate(yubikey, slot, data, certinfo);
     }
 
     let _ = yubikey._ykpiv_end_transaction();
@@ -493,7 +492,7 @@ pub unsafe fn ykpiv_util_write_cert(
 
 /// Delete certificate
 pub unsafe fn ykpiv_util_delete_cert(yubikey: &mut YubiKey, slot: u8) -> Result<(), Error> {
-    ykpiv_util_write_cert(yubikey, slot, ptr::null_mut(), 0, 0)
+    ykpiv_util_write_cert(yubikey, slot, &[], 0)
 }
 
 /// Block PUK
@@ -1835,46 +1834,42 @@ unsafe fn _read_certificate(
 unsafe fn _write_certificate(
     yubikey: &mut YubiKey,
     slot: u8,
-    data: *mut u8,
-    data_len: usize,
+    data: &[u8],
     certinfo: u8,
 ) -> Result<(), Error> {
     let mut buf = [0u8; CB_OBJ_MAX];
     let object_id = ykpiv_util_slot_object(slot) as i32;
-    let mut offset: usize = 0;
     let mut req_len: usize;
 
     if object_id == -1 {
         return Err(Error::InvalidObject);
     }
 
-    if data.is_null() || data_len == 0 {
-        if !data.is_null() || data_len != 0 {
-            return Err(Error::GenericError);
-        }
-
+    // check if data length is zero, this means that we intend to delete the object
+    if data.is_empty() {
         return yubikey._ykpiv_save_object(object_id, ptr::null_mut(), 0);
     }
 
-    req_len = 1 /* cert tag */ + 3 /* compression tag + data*/ + 2 /* lrc */;
-    req_len += _ykpiv_set_length(buf.as_mut_ptr(), data_len);
-    req_len += data_len;
+    // encode certificate data for storage
 
-    if req_len < data_len || req_len > _obj_size_max(yubikey) {
+    // calculate the required length of the encoded object
+    req_len = 1 /* cert tag */ + 3 /* compression tag + data*/ + 2 /* lrc */;
+    req_len += _ykpiv_set_length(buf.as_mut_ptr(), data.len());
+    req_len += data.len();
+
+    // - detect overflow of usize
+    // - obj_size_max includes limits for TLV encoding
+    if req_len < data.len() || req_len > _obj_size_max(yubikey) {
         return Err(Error::SizeError);
     }
 
+    let mut offset = 0;
     buf[offset] = TAG_CERT;
     offset += 1;
-    offset += _ykpiv_set_length(buf.as_mut_ptr().add(offset), data_len);
+    offset += _ykpiv_set_length(buf.as_mut_ptr().add(offset), data.len());
 
-    memcpy(
-        buf.as_mut_ptr().add(offset) as (*mut c_void),
-        data as (*const c_void),
-        data_len,
-    );
-
-    offset += data_len;
+    buf[offset..offset + data.len()].copy_from_slice(data);
+    offset += data.len();
 
     // write compression info and LRC trailer
     buf[offset] = TAG_CERT_COMPRESS;
@@ -1886,9 +1881,9 @@ unsafe fn _write_certificate(
     };
     buf[offset + 3] = TAG_CERT_LRC;
     buf[offset + 4] = 00;
-
     offset += 5;
 
+    // write onto device
     yubikey._ykpiv_save_object(object_id, buf.as_mut_ptr(), offset)
 }
 
