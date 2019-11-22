@@ -1270,7 +1270,7 @@ pub struct YkPivConfig {
 /// Get config
 pub unsafe fn ykpiv_util_get_config(
     yubikey: &mut YubiKey,
-    config: *mut YkPivConfig,
+    config: &mut YkPivConfig,
 ) -> Result<(), Error> {
     let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
     let mut cb_data: usize = mem::size_of::<[u8; YKPIV_OBJ_MAX_SIZE]>();
@@ -1278,15 +1278,11 @@ pub unsafe fn ykpiv_util_get_config(
     let mut cb_item: usize = 0;
     let mut res = Ok(());
 
-    if config.is_null() {
-        return Err(Error::GenericError);
-    }
-
-    (*config).protected_data_available = false;
-    (*config).puk_blocked = false;
-    (*config).puk_noblock_on_upgrade = false;
-    (*config).pin_last_changed = 0;
-    (*config).mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_MANUAL;
+    config.protected_data_available = false;
+    config.puk_blocked = false;
+    config.puk_noblock_on_upgrade = false;
+    config.pin_last_changed = 0;
+    config.mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_MANUAL;
 
     yubikey._ykpiv_begin_transaction()?;
 
@@ -1302,11 +1298,11 @@ pub unsafe fn ykpiv_util_get_config(
             .is_ok()
             {
                 if *p_item & ADMIN_FLAGS_1_PUK_BLOCKED != 0 {
-                    (*config).puk_blocked = true;
+                    config.puk_blocked = true;
                 }
 
                 if *p_item & ADMIN_FLAGS_1_PROTECTED_MGM != 0 {
-                    (*config).mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED;
+                    config.mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED;
                 }
             }
             if _get_metadata_item(
@@ -1318,10 +1314,10 @@ pub unsafe fn ykpiv_util_get_config(
             )
             .is_ok()
             {
-                if (*config).mgm_type != YkPivConfigMgmType::YKPIV_CONFIG_MGM_MANUAL {
+                if config.mgm_type != YkPivConfigMgmType::YKPIV_CONFIG_MGM_MANUAL {
                     error!("conflicting types of mgm key administration configured");
                 } else {
-                    (*config).mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_DERIVED;
+                    config.mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_DERIVED;
                 }
             }
 
@@ -1340,7 +1336,7 @@ pub unsafe fn ykpiv_util_get_config(
                     // TODO(tarcieri): get rid of memcpy and pointers, replace with slices!
                     #[allow(trivial_casts)]
                     memcpy(
-                        &mut (*config).pin_last_changed as (*mut u32) as (*mut c_void),
+                        &mut config.pin_last_changed as (*mut u32) as (*mut c_void),
                         p_item as (*const c_void),
                         cb_item,
                     );
@@ -1350,7 +1346,7 @@ pub unsafe fn ykpiv_util_get_config(
 
         cb_data = YKPIV_OBJ_MAX_SIZE;
         if _read_metadata(yubikey, TAG_PROTECTED, data.as_mut_ptr(), &mut cb_data).is_ok() {
-            (*config).protected_data_available = true;
+            config.protected_data_available = true;
 
             res = _get_metadata_item(
                 data.as_mut_ptr(),
@@ -1361,7 +1357,7 @@ pub unsafe fn ykpiv_util_get_config(
             );
 
             if res.is_ok() && *p_item & PROTECTED_FLAGS_1_PUK_NOBLOCK != 0 {
-                (*config).puk_noblock_on_upgrade = true;
+                config.puk_noblock_on_upgrade = true;
             }
 
             res = _get_metadata_item(
@@ -1373,11 +1369,11 @@ pub unsafe fn ykpiv_util_get_config(
             );
 
             if res.is_ok() {
-                if (*config).mgm_type != YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED {
+                if config.mgm_type != YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED {
                     error!("conflicting types of mgm key administration configured - protected mgm exists");
                 }
 
-                (*config).mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED;
+                config.mgm_type = YkPivConfigMgmType::YKPIV_CONFIG_MGM_PROTECTED;
             }
         }
     }
