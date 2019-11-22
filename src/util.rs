@@ -301,7 +301,6 @@ pub unsafe fn ykpiv_util_list_keys(
     data: *mut *mut YkPivKey,
     data_len: *mut usize,
 ) -> Result<(), Error> {
-    let mut _currentBlock;
     let mut res = Ok(());
     let mut p_key: *mut YkPivKey;
     let mut p_data: *mut u8 = ptr::null_mut();
@@ -309,8 +308,6 @@ pub unsafe fn ykpiv_util_list_keys(
     let mut cb_data: usize;
     let mut offset: usize = 0;
     let mut buf = [0u8; YKPIV_OBJ_MAX_SIZE];
-    let mut cb_buf: usize;
-    let mut i: usize;
     let mut cb_realloc: usize;
     let CB_PAGE: usize = 4096;
 
@@ -321,10 +318,12 @@ pub unsafe fn ykpiv_util_list_keys(
     yubikey._ykpiv_begin_transaction()?;
 
     if yubikey._ykpiv_ensure_application_selected().is_ok() {
+        // init return parameters
         *key_count = 0;
         *data = ptr::null_mut();
         *data_len = 0;
 
+        // allocate initial page of buffer
         p_data = calloc(CB_PAGE, 1) as (*mut u8);
 
         if p_data.is_null() {
@@ -333,87 +332,84 @@ pub unsafe fn ykpiv_util_list_keys(
         }
 
         cb_data = CB_PAGE;
-        i = 0;
 
-        loop {
-            if i >= mem::size_of::<*const u8>() {
-                _currentBlock = 6;
-                break;
-            }
-
-            cb_buf = buf.len();
-            res = _read_certificate(yubikey, SLOTS[i], buf.as_mut_ptr(), &mut cb_buf);
-
-            if res.is_ok() && (cb_buf > 0) {
-                cb_realloc = if mem::size_of::<YkPivKey>()
-                    .wrapping_add(cb_buf)
-                    .wrapping_sub(1)
-                    > cb_data.wrapping_sub(offset)
-                {
-                    (if mem::size_of::<YkPivKey>()
+        for slot in &SLOTS {
+            if let Ok(cb_buf) = _read_certificate(yubikey, *slot, &mut buf) {
+                if cb_buf > 0 {
+                    // add current slot to result, grow result buffer if necessary
+                    cb_realloc = if mem::size_of::<YkPivKey>()
                         .wrapping_add(cb_buf)
                         .wrapping_sub(1)
-                        .wrapping_sub(cb_data.wrapping_sub(offset))
-                        > CB_PAGE
+                        > cb_data.wrapping_sub(offset)
                     {
-                        mem::size_of::<YkPivKey>()
+                        (if mem::size_of::<YkPivKey>()
                             .wrapping_add(cb_buf)
                             .wrapping_sub(1)
                             .wrapping_sub(cb_data.wrapping_sub(offset))
+                            > CB_PAGE
+                        {
+                            mem::size_of::<YkPivKey>()
+                                .wrapping_add(cb_buf)
+                                .wrapping_sub(1)
+                                .wrapping_sub(cb_data.wrapping_sub(offset))
+                        } else {
+                            CB_PAGE
+                        })
                     } else {
-                        CB_PAGE
-                    })
-                } else {
-                    0
-                };
+                        0
+                    };
 
-                if cb_realloc != 0 {
-                    if {
-                        p_temp = realloc(p_data as (*mut c_void), cb_data.wrapping_add(cb_realloc))
-                            as (*mut u8);
-                        p_temp
+                    if cb_realloc != 0 {
+                        if {
+                            p_temp =
+                                realloc(p_data as (*mut c_void), cb_data.wrapping_add(cb_realloc))
+                                    as (*mut u8);
+                            p_temp
+                        }
+                        .is_null()
+                        {
+                            if !p_data.is_null() {
+                                free(p_data as (*mut c_void));
+                            }
+
+                            let _ = yubikey._ykpiv_end_transaction();
+                            return Err(Error::MemoryError);
+                        }
+                        p_data = p_temp;
                     }
-                    .is_null()
-                    {
-                        _currentBlock = 15;
-                        break;
-                    }
-                    p_data = p_temp;
+
+                    cb_data = cb_data.wrapping_add(cb_realloc);
+
+                    // If ykpiv_key is misaligned or results in padding, this causes problems
+                    // in the array we return.  If this becomes a problem, we'll probably want
+                    // to go with a flat byte array.
+                    p_key = p_data.add(offset) as *mut YkPivKey;
+                    (*p_key).slot = *slot;
+                    (*p_key).cert_len = cb_buf as (u16);
+
+                    memcpy(
+                        (*p_key).cert.as_mut_ptr() as *mut c_void,
+                        buf.as_mut_ptr() as *const c_void,
+                        cb_buf,
+                    );
+
+                    offset = offset.wrapping_add(
+                        mem::size_of::<YkPivKey>()
+                            .wrapping_add(cb_buf)
+                            .wrapping_sub(1),
+                    );
+
+                    *key_count = (*key_count as i32 + 1) as u8;
                 }
-
-                cb_data = cb_data.wrapping_add(cb_realloc);
-                p_key = p_data.add(offset) as *mut YkPivKey;
-                (*p_key).slot = SLOTS[i];
-                (*p_key).cert_len = cb_buf as (u16);
-
-                memcpy(
-                    (*p_key).cert.as_mut_ptr() as *mut c_void,
-                    buf.as_mut_ptr() as *const c_void,
-                    cb_buf,
-                );
-
-                offset = offset.wrapping_add(
-                    mem::size_of::<YkPivKey>()
-                        .wrapping_add(cb_buf)
-                        .wrapping_sub(1),
-                );
-
-                *key_count = (*key_count as i32 + 1) as u8;
             }
-
-            i += 1;
         }
 
-        if _currentBlock == 6 {
-            *data = p_data as *mut YkPivKey;
-            p_data = ptr::null_mut();
-            if !data_len.is_null() {
-                *data_len = offset;
-            }
-            res = Ok(());
-        } else {
-            res = Err(Error::MemoryError);
+        *data = p_data as *mut YkPivKey;
+        p_data = ptr::null_mut();
+        if !data_len.is_null() {
+            *data_len = offset;
         }
+        res = Ok(());
     }
 
     if !p_data.is_null() {
@@ -433,7 +429,6 @@ pub unsafe fn ykpiv_util_read_cert(
 ) -> Result<(), Error> {
     let mut res = Ok(());
     let mut buf = [0u8; YKPIV_OBJ_MAX_SIZE];
-    let mut cb_buf: usize = buf.len();
 
     if data.is_null() || data_len.is_null() {
         return Err(Error::GenericError);
@@ -444,26 +439,28 @@ pub unsafe fn ykpiv_util_read_cert(
     if yubikey._ykpiv_ensure_application_selected().is_ok() {
         *data = ptr::null_mut();
         *data_len = 0;
-        res = _read_certificate(yubikey, slot, buf.as_mut_ptr(), &mut cb_buf);
-        if res.is_ok() {
-            if cb_buf == 0 {
-                *data = ptr::null_mut();
-                *data_len = 0;
-            } else if {
-                *data = calloc(cb_buf, 1) as *mut u8;
-                *data
+        match _read_certificate(yubikey, slot, &mut buf) {
+            Ok(cb_buf) => {
+                if cb_buf == 0 {
+                    *data = ptr::null_mut();
+                    *data_len = 0;
+                } else if {
+                    *data = calloc(cb_buf, 1) as *mut u8;
+                    *data
+                }
+                .is_null()
+                {
+                    res = Err(Error::MemoryError);
+                } else {
+                    memcpy(
+                        *data as (*mut c_void),
+                        buf.as_mut_ptr() as (*const c_void),
+                        cb_buf,
+                    );
+                    *data_len = cb_buf;
+                }
             }
-            .is_null()
-            {
-                res = Err(Error::MemoryError);
-            } else {
-                memcpy(
-                    *data as (*mut c_void),
-                    buf.as_mut_ptr() as (*const c_void),
-                    cb_buf,
-                );
-                *data_len = cb_buf;
-            }
+            Err(e) => res = Err(e),
         }
     }
 
@@ -1786,44 +1783,44 @@ pub fn ykpiv_util_slot_object(slot: u8) -> u32 {
 unsafe fn _read_certificate(
     yubikey: &mut YubiKey,
     slot: u8,
-    buf: *mut u8,
-    buf_len: *mut usize,
-) -> Result<(), Error> {
-    let mut ptr: *mut u8;
+    buf: &mut [u8],
+) -> Result<usize, Error> {
     let object_id = ykpiv_util_slot_object(slot) as i32;
-    let mut len: usize = 0;
 
     if object_id == -1 {
         return Err(Error::InvalidObject);
     }
 
-    if yubikey._ykpiv_fetch_object(object_id, buf, buf_len).is_ok() {
-        ptr = buf;
+    let mut buf_len = buf.len();
+    if yubikey
+        ._ykpiv_fetch_object(object_id, buf.as_mut_ptr(), &mut buf_len)
+        .is_ok()
+    {
+        // check that object contents are at least large enough to read the tag
+        if buf_len < CB_OBJ_TAG_MIN {
+            return Ok(0);
+        }
 
-        if *buf_len < CB_OBJ_TAG_MIN {
-            *buf_len = 0;
-            return Ok(());
-        } else if *{
-            let _old = ptr;
-            ptr = ptr.offset(1);
-            _old
-        } == TAG_CERT
-        {
-            ptr = ptr.add(_ykpiv_get_length(ptr, &mut len));
+        // check that first byte indicates "certificate" type
+        if buf[0] == TAG_CERT {
+            let mut len: usize = 0;
+            let offset = 1 + _ykpiv_get_length(buf.as_mut_ptr().add(1), &mut len);
 
-            if len > *buf_len - (ptr as isize - buf as isize) as usize {
-                *buf_len = 0;
-                return Ok(());
-            } else {
-                memmove(buf as (*mut c_void), ptr as (*const c_void), len);
-                *buf_len = len;
+            // check that decoded length represents object contents
+            if len > buf_len - offset {
+                return Ok(0);
             }
+
+            for i in 0..len {
+                buf[i] = buf[offset + i];
+            }
+            Ok(len)
+        } else {
+            Ok(0)
         }
     } else {
-        *buf_len = 0;
+        Ok(0)
     }
-
-    Ok(())
 }
 
 /// Write certificate
