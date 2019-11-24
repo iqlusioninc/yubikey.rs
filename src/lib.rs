@@ -9,6 +9,9 @@
 //! utilize PIV encryption and signing keys which can be generated, imported,
 //! and stored on YubiKey devices.
 //!
+//! See [Yubico's guide to PIV-enabled YubiKeys][6] for more information
+//! on which devices support PIV and the available functionality.
+//!
 //! Supported algorithms:
 //!
 //! - **Authentication**: `3DES`
@@ -24,23 +27,24 @@
 //!
 //! ## History
 //!
-//! This library is a Rust translation of the [yubico-piv-tool][6] utility by
+//! This library is a Rust translation of the [yubico-piv-tool][7] utility by
 //! Yubico, which was originally written in C. It was mechanically translated
-//! from C into Rust using [Corrode][7], and then subsequently heavily
+//! from C into Rust using [Corrode][8], and then subsequently heavily
 //! refactored into safer, more idiomatic Rust.
 //!
 //! For more information on `yubico-piv-tool` and background information on how
 //! the YubiKey implementation of PIV works in general, see the
-//! [Yubico PIV Tool Command Line Guide][8].
+//! [Yubico PIV Tool Command Line Guide][9].
 //!
 //! [1]: https://www.yubico.com/products/yubikey-hardware/
 //! [2]: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-73-4.pdf
 //! [3]: https://www.yubico.com/
 //! [4]: https://en.wikipedia.org/wiki/CCID_(protocol)
 //! [5]: https://www.nist.gov/
-//! [6]: https://github.com/Yubico/yubico-piv-tool/
-//! [7]: https://github.com/jameysharp/corrode
-//! [8]: https://www.yubico.com/wp-content/uploads/2016/05/Yubico_PIV_Tool_Command_Line_Guide_en.pdf
+//! [6]: https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html
+//! [7]: https://github.com/Yubico/yubico-piv-tool/
+//! [8]: https://github.com/jameysharp/corrode
+//! [9]: https://www.yubico.com/wp-content/uploads/2016/05/Yubico_PIV_Tool_Command_Line_Guide_en.pdf
 
 // Adapted from yubico-piv-tool:
 // <https://github.com/Yubico/yubico-piv-tool/>
@@ -86,10 +90,31 @@
 )]
 
 mod apdu;
+pub mod cccid;
+pub mod certificate;
+pub mod chuid;
+pub mod config;
 pub mod consts;
+pub mod container;
 pub mod error;
-mod internal;
-pub mod util;
+pub mod key;
+mod metadata;
+pub mod mgm;
+pub mod msroots;
+mod response;
+mod serialization;
+pub mod settings;
+mod transaction;
 pub mod yubikey;
 
-pub use self::yubikey::YubiKey;
+pub use self::{key::Key, mgm::MgmKey, yubikey::YubiKey};
+
+/// Algorithm identifiers
+// TODO(tarcieri): make this an enum
+pub type AlgorithmId = u8;
+
+/// Object identifiers
+pub type ObjectId = u32;
+
+/// Buffer type (self-zeroizing byte vector)
+pub(crate) type Buffer = zeroize::Zeroizing<Vec<u8>>;

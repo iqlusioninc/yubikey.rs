@@ -21,20 +21,51 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Install libpcsclite-dev
+        run: sudo apt-get install libpcsclite-dev
+
       - name: Run cargo check
         uses: actions-rs/cargo@v1
         with:
           command: check
+
+  # Need to install `libpscslite-dev` on Linux
+  linux:
+    name: Test Suite
+    strategy:
+      matrix:
+        toolchain:
+          - 1.39.0
+          - stable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v1
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+
+      - name: Install libpcsclite-dev
+        run: sudo apt-get install libpcsclite-dev
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        env:
+          RUSTFLAGS: -D warnings
+        with:
+          command: test
+          args: --release
 
   test:
     name: Test Suite
     strategy:
       matrix:
         platform:
-          - ubuntu-latest
           - macos-latest
-          # TODO: support Windows after eliminating C legacy
-          # - windows-latest
+          - windows-latest
         toolchain:
           - 1.39.0
           - stable
@@ -91,6 +122,9 @@ jobs:
         with:
           toolchain: stable
           override: true
+
+      - name: Install libpcsclite-dev
+        run: sudo apt-get install libpcsclite-dev
 
       - name: Install clippy
         run: rustup component add clippy

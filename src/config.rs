@@ -1,0 +1,126 @@
+//! YubiKey Configuration Values
+
+// Adapted from yubico-piv-tool:
+// <https://github.com/Yubico/yubico-piv-tool/>
+//
+// Copyright (c) 2014-2016 Yubico AB
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//   * Redistributions of source code must retain the above copyright
+//     notice, this list of conditions and the following disclaimer.
+//
+//   * Redistributions in binary form must reproduce the above
+//     copyright notice, this list of conditions and the following
+//     disclaimer in the documentation and/or other materials provided
+//     with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+use crate::{consts::*, error::Error, metadata, mgm::MgmType, yubikey::YubiKey};
+use log::error;
+use std::convert::TryInto;
+
+/// Config
+#[derive(Copy, Clone)]
+pub struct Config {
+    /// Protected data available
+    protected_data_available: bool,
+
+    /// PUK blocked
+    puk_blocked: bool,
+
+    /// No block on upgrade
+    puk_noblock_on_upgrade: bool,
+
+    /// PIN last changed
+    pin_last_changed: u32,
+
+    /// MGM type
+    mgm_type: MgmType,
+}
+
+impl Config {
+    /// Get YubiKey config
+    pub fn get(yubikey: &mut YubiKey) -> Result<Config, Error> {
+        let mut config = Config {
+            protected_data_available: false,
+            puk_blocked: false,
+            puk_noblock_on_upgrade: false,
+            pin_last_changed: 0,
+            mgm_type: MgmType::Manual,
+        };
+
+        let txn = yubikey.begin_transaction()?;
+
+        if let Ok(data) = metadata::read(&txn, TAG_ADMIN) {
+            if let Ok(item) = metadata::get_item(&data, TAG_ADMIN_FLAGS_1) {
+                if item.is_empty() {
+                    error!("empty response for admin flags metadata item! ignoring");
+                } else {
+                    if item[0] & ADMIN_FLAGS_1_PUK_BLOCKED != 0 {
+                        config.puk_blocked = true;
+                    }
+
+                    if item[0] & ADMIN_FLAGS_1_PROTECTED_MGM != 0 {
+                        config.mgm_type = MgmType::Protected;
+                    }
+                }
+            }
+
+            if metadata::get_item(&data, TAG_ADMIN_SALT).is_ok() {
+                if config.mgm_type != MgmType::Manual {
+                    error!("conflicting types of MGM key administration configured");
+                } else {
+                    config.mgm_type = MgmType::Derived;
+                }
+            }
+
+            if let Ok(item) = metadata::get_item(&data, TAG_ADMIN_TIMESTAMP) {
+                if item.len() != CB_ADMIN_TIMESTAMP {
+                    error!("pin timestamp in admin metadata is an invalid size");
+                } else {
+                    // TODO(tarcieri): double check this is little endian
+                    config.pin_last_changed = u32::from_le_bytes(item.try_into().unwrap());
+                }
+            }
+        }
+
+        if let Ok(data) = metadata::read(&txn, TAG_PROTECTED) {
+            config.protected_data_available = true;
+
+            if let Ok(item) = metadata::get_item(&data, TAG_PROTECTED_FLAGS_1) {
+                if item.is_empty() {
+                    error!("empty response for protected flags metadata item! ignoring");
+                } else if item[0] & PROTECTED_FLAGS_1_PUK_NOBLOCK != 0 {
+                    config.puk_noblock_on_upgrade = true;
+                }
+            }
+
+            if metadata::get_item(&data, TAG_PROTECTED_MGM).is_ok() {
+                if config.mgm_type != MgmType::Protected {
+                    error!(
+                        "conflicting types of mgm key administration configured: protected MGM exists"
+                    );
+                }
+
+                config.mgm_type = MgmType::Protected;
+            }
+        }
+
+        Ok(config)
+    }
+}

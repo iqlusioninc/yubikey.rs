@@ -1,20 +1,18 @@
 //! Application Protocol Data Unit (APDU)
 
+use crate::{error::Error, response::Response, transaction::Transaction, Buffer};
 use std::fmt::{self, Debug};
 use zeroize::{Zeroize, Zeroizing};
 
 /// Size of a serialized APDU (5 byte header + 255 bytes data)
 pub const APDU_SIZE: usize = 260;
 
-/// Buffer type (self-zeroizing byte vector)
-pub(crate) type Buffer = Zeroizing<Vec<u8>>;
-
 /// Application Protocol Data Unit (APDU).
 ///
 /// These messages are packets used to communicate with the YubiKey using the
 /// Chip Card Interface Device (CCID) protocol.
 #[derive(Clone)]
-pub struct APDU {
+pub(crate) struct APDU {
     /// Instruction class - indicates the type of command, e.g. interindustry or proprietary
     cla: u8,
 
@@ -79,6 +77,12 @@ impl APDU {
         self.data[..bytes.len()].copy_from_slice(bytes);
 
         self
+    }
+
+    /// Transmit this APDU using the given card transaction
+    pub fn transmit(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response, Error> {
+        let response_bytes = txn.transmit(&self.to_bytes(), recv_len)?;
+        Ok(Response::from_bytes(response_bytes))
     }
 
     /// Consume this APDU and return a self-zeroizing buffer

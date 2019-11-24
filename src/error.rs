@@ -30,7 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use std::fmt;
+use std::fmt::{self, Display};
 
 /// Kinds of errors
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -39,7 +39,10 @@ pub enum Error {
     MemoryError,
 
     /// PCSC error
-    PcscError,
+    PcscError {
+        /// Original PC/SC error
+        inner: Option<pcsc::Error>,
+    },
 
     /// Size error
     SizeError,
@@ -65,7 +68,7 @@ pub enum Error {
     /// Wrong PIN
     WrongPin {
         /// Number of tries remaining
-        tries: i32,
+        tries: u32,
     },
 
     /// Invalid object
@@ -95,7 +98,7 @@ impl Error {
     pub fn name(self) -> &'static str {
         match self {
             Error::MemoryError => "YKPIV_MEMORY_ERROR",
-            Error::PcscError => "YKPIV_PCSC_ERROR",
+            Error::PcscError { .. } => "YKPIV_PCSC_ERROR",
             Error::SizeError => "YKPIV_SIZE_ERROR",
             Error::AppletError => "YKPIV_APPLET_ERROR",
             Error::AuthenticationError => "YKPIV_AUTHENTICATION_ERROR",
@@ -117,7 +120,7 @@ impl Error {
     pub fn msg(self) -> &'static str {
         match self {
             Error::MemoryError => "memory error",
-            Error::PcscError => "PCSC error",
+            Error::PcscError { .. } => "PCSC error",
             Error::SizeError => "size error",
             Error::AppletError => "applet error",
             Error::AuthenticationError => "authentication error",
@@ -136,22 +139,26 @@ impl Error {
     }
 }
 
-impl fmt::Display for Error {
+impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.msg())
     }
 }
 
-impl std::error::Error for Error {}
-
-/// Get a string representation of this error
-// TODO(tarcieri): completely replace this with `Display`
-pub fn ykpiv_strerror(err: Error) -> &'static str {
-    err.msg()
+impl From<pcsc::Error> for Error {
+    fn from(err: pcsc::Error) -> Error {
+        Error::PcscError { inner: Some(err) }
+    }
 }
 
-/// Get the name of this error
-// TODO(tarcieri): completely replace this with debug
-pub fn ykpiv_strerror_name(err: Error) -> &'static str {
-    err.name()
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            #[allow(trivial_casts)] // why doesn't this work without the cast???
+            Error::PcscError { inner } => inner
+                .as_ref()
+                .map(|err| err as &(dyn std::error::Error + 'static)),
+            _ => None,
+        }
+    }
 }
