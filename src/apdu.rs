@@ -1,11 +1,41 @@
 //! Application Protocol Data Unit (APDU)
 
+// Adapted from yubico-piv-tool:
+// <https://github.com/Yubico/yubico-piv-tool/>
+//
+// Copyright (c) 2014-2016 Yubico AB
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//   * Redistributions of source code must retain the above copyright
+//     notice, this list of conditions and the following disclaimer.
+//
+//   * Redistributions in binary form must reproduce the above
+//     copyright notice, this list of conditions and the following
+//     disclaimer in the documentation and/or other materials provided
+//     with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 use crate::{error::Error, response::Response, transaction::Transaction, Buffer};
 use std::fmt::{self, Debug};
 use zeroize::{Zeroize, Zeroizing};
 
-/// Size of a serialized APDU (5 byte header + 255 bytes data)
-pub const APDU_SIZE: usize = 260;
+/// Maximum amount of command data that can be included in an APDU
+const APDU_DATA_MAX: usize = 0xFF;
 
 /// Application Protocol Data Unit (APDU).
 ///
@@ -13,31 +43,32 @@ pub const APDU_SIZE: usize = 260;
 /// Chip Card Interface Device (CCID) protocol.
 #[derive(Clone)]
 pub(crate) struct APDU {
-    /// Instruction class - indicates the type of command, e.g. interindustry or proprietary
+    /// Instruction class: indicates the type of command (e.g. inter-industry or proprietary)
     cla: u8,
 
-    /// Instruction code - indicates the specific command, e.g. "write data"
+    /// Instruction code: indicates the specific command (e.g. "write data")
     ins: u8,
 
-    /// Instruction parameter 1 for the command, e.g. offset into file at which to write the data
+    /// Instruction parameter 1 for the command (e.g. offset into file at which to write the data)
     p1: u8,
 
     /// Instruction parameter 2 for the command
     p2: u8,
 
-    /// Length of command - encodes the number of bytes of command data to follow
-    lc: u8,
-
-    /// Command data
-    data: [u8; 255],
+    /// Command data to be sent (`lc` is calculated as `data.len()`)
+    data: Vec<u8>,
 }
 
 impl APDU {
     /// Create a new APDU with the given instruction code
     pub fn new(ins: u8) -> Self {
-        let mut apdu = Self::default();
-        apdu.ins = ins;
-        apdu
+        Self {
+            cla: 0,
+            ins,
+            p1: 0,
+            p2: 0,
+            data: vec![],
+        }
     }
 
     /// Set this APDU's class
@@ -63,19 +94,18 @@ impl APDU {
     ///
     /// Panics if the byte slice is more than 255 bytes!
     pub fn data(&mut self, bytes: impl AsRef<[u8]>) -> &mut Self {
-        assert_eq!(self.lc, 0, "APDU command already set!");
+        assert!(self.data.is_empty(), "APDU command already set!");
 
         let bytes = bytes.as_ref();
 
         assert!(
-            bytes.len() <= self.data.len(),
-            "APDU command data too large: {}-bytes",
-            bytes.len()
+            bytes.len() <= APDU_DATA_MAX,
+            "APDU command data too long: {} (max: {})",
+            bytes.len(),
+            APDU_DATA_MAX
         );
 
-        self.lc = bytes.len() as u8;
-        self.data[..bytes.len()].copy_from_slice(bytes);
-
+        self.data.extend_from_slice(bytes);
         self
     }
 
@@ -87,14 +117,13 @@ impl APDU {
 
     /// Consume this APDU and return a self-zeroizing buffer
     pub fn to_bytes(&self) -> Buffer {
-        let mut bytes = Vec::with_capacity(APDU_SIZE);
+        let mut bytes = Vec::with_capacity(5 + self.data.len());
         bytes.push(self.cla);
         bytes.push(self.ins);
         bytes.push(self.p1);
         bytes.push(self.p2);
-        bytes.push(self.lc);
+        bytes.push(self.data.len() as u8);
         bytes.extend_from_slice(self.data.as_ref());
-
         Zeroizing::new(bytes)
     }
 }
@@ -108,22 +137,9 @@ impl Debug for APDU {
             self.ins,
             self.p1,
             self.p2,
-            self.lc,
-            &self.data[..]
+            self.data.len(),
+            self.data.as_slice()
         )
-    }
-}
-
-impl Default for APDU {
-    fn default() -> Self {
-        Self {
-            cla: 0,
-            ins: 0,
-            p1: 0,
-            p2: 0,
-            lc: 0,
-            data: [0u8; 255],
-        }
     }
 }
 
@@ -139,7 +155,6 @@ impl Zeroize for APDU {
         self.ins.zeroize();
         self.p1.zeroize();
         self.p2.zeroize();
-        self.lc.zeroize();
         self.data.zeroize();
     }
 }

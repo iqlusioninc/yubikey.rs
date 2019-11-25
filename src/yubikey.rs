@@ -155,7 +155,7 @@ impl YubiKey {
         Ok(yubikey)
     }
 
-    /// Connect to a YubiKey.
+    /// Connect to a YubiKey PC/SC card.
     fn connect(context: &Context, name: Option<&[u8]>) -> Result<Card, Error> {
         // ensure PC/SC context is valid
         context.is_valid()?;
@@ -178,7 +178,19 @@ impl YubiKey {
 
             info!("trying to connect to reader '{}'", reader.to_string_lossy());
 
-            return Ok(context.connect(reader, pcsc::ShareMode::Shared, pcsc::Protocols::T1)?);
+            match context.connect(reader, pcsc::ShareMode::Shared, pcsc::Protocols::T1) {
+                Ok(card) => {
+                    info!("connected to '{}' successfully", reader.to_string_lossy());
+                    return Ok(card);
+                }
+                Err(err) => {
+                    error!(
+                        "skipping '{}' due to connection error: {}",
+                        reader.to_string_lossy(),
+                        err
+                    );
+                }
+            }
         }
 
         error!("error: no usable reader found");
@@ -308,7 +320,7 @@ impl YubiKey {
     /// Get YubiKey device serial number.
     ///
     /// This always uses the cached version queried when the key is initialized.
-    pub fn get_serial(&mut self) -> Serial {
+    pub fn serial(&mut self) -> Serial {
         self.serial
     }
 
@@ -376,7 +388,7 @@ impl YubiKey {
     /// Change the Personal Identification Number (PIN).
     ///
     /// The default PIN code is 123456
-    pub unsafe fn change_pin(&mut self, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
+    pub fn change_pin(&mut self, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         {
             let txn = self.begin_transaction()?;
             txn.change_pin(CHREF_ACT_CHANGE_PIN, current_pin, new_pin)?;
@@ -390,7 +402,7 @@ impl YubiKey {
     }
 
     /// Set PIN last changed
-    pub unsafe fn set_pin_last_changed(yubikey: &mut YubiKey) -> Result<(), Error> {
+    pub fn set_pin_last_changed(yubikey: &mut YubiKey) -> Result<(), Error> {
         let mut data = [0u8; CB_BUF_MAX];
         let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
@@ -433,7 +445,7 @@ impl YubiKey {
     /// The PUK is part of the PIV standard that the YubiKey follows.
     ///
     /// The default PUK code is 12345678.
-    pub unsafe fn change_puk(&mut self, current_puk: &[u8], new_puk: &[u8]) -> Result<(), Error> {
+    pub fn change_puk(&mut self, current_puk: &[u8], new_puk: &[u8]) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
         txn.change_pin(CHREF_ACT_CHANGE_PUK, current_puk, new_puk)
     }
@@ -507,7 +519,7 @@ impl YubiKey {
 
     /// Unblock a Personal Identification Number (PIN) using a previously
     /// configured PIN Unblocking Key (PUK).
-    pub unsafe fn unblock_pin(&mut self, puk: &[u8], new_pin: &[u8]) -> Result<(), Error> {
+    pub fn unblock_pin(&mut self, puk: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
         txn.change_pin(CHREF_ACT_UNBLOCK_PIN, puk, new_pin)
     }
