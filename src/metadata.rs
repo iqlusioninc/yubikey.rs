@@ -36,21 +36,23 @@ use zeroize::Zeroizing;
 
 /// Get metadata item
 pub(crate) fn get_item(data: &[u8], tag: u8) -> Result<&[u8], Error> {
-    let data_len = data.len();
     let mut p_temp: *const u8 = data.as_ptr();
     let mut cb_temp: usize = 0;
     let mut tag_temp: u8;
 
     unsafe {
-        while p_temp < data.as_ptr().add(data_len) {
+        while p_temp < data.as_ptr().add(data.len()) {
             tag_temp = *p_temp;
             p_temp = p_temp.add(1);
-            let p_slice =
-                slice::from_raw_parts(p_temp, data.as_ptr() as usize + data_len - p_temp as usize);
+
+            let p_slice = slice::from_raw_parts(
+                p_temp,
+                data.as_ptr() as usize + data.len() - p_temp as usize,
+            );
 
             if !has_valid_length(
                 p_slice,
-                data.as_ptr().add(data_len) as usize - p_temp as usize,
+                data.as_ptr().add(data.len()) as usize - p_temp as usize,
             ) {
                 return Err(Error::SizeError);
             }
@@ -58,10 +60,15 @@ pub(crate) fn get_item(data: &[u8], tag: u8) -> Result<&[u8], Error> {
             p_temp = p_temp.add(get_length(p_slice, &mut cb_temp));
 
             if tag_temp == tag {
-                return Ok(slice::from_raw_parts(p_temp, cb_temp));
+                // found tag
+                break;
             }
 
             p_temp = p_temp.add(cb_temp);
+        }
+
+        if p_temp < data.as_ptr().add(data.len()) {
+            return Ok(slice::from_raw_parts(p_temp, cb_temp));
         }
     }
 
