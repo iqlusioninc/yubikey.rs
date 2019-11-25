@@ -1,17 +1,17 @@
 //! YubiKey PC/SC transactions
 
+use crate::{apdu::APDU, consts::*, error::Error, yubikey::*, Buffer};
+#[cfg(feature = "untested")]
 use crate::{
-    apdu::APDU,
-    consts::*,
-    error::Error,
     mgm::MgmKey,
     response::{Response, StatusWords},
     serialization::*,
-    yubikey::*,
-    Buffer, ObjectId,
+    ObjectId,
 };
 use log::{error, trace};
-use std::{convert::TryInto, ptr};
+use std::convert::TryInto;
+#[cfg(feature = "untested")]
+use std::ptr;
 use zeroize::Zeroizing;
 
 /// Exclusive transaction with the YubiKey's PC/SC card.
@@ -164,6 +164,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Verify device PIN.
+    #[cfg(feature = "untested")]
     pub fn verify_pin(&self, pin: &[u8]) -> Result<(), Error> {
         // TODO(tarcieri): allow unpadded (with `0xFF`) PIN shorter than CB_PIN_MAX?
         if pin.len() != CB_PIN_MAX {
@@ -184,6 +185,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Change the PIN
+    #[cfg(feature = "untested")]
     pub fn change_pin(&self, action: i32, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         let mut templ = [0, YKPIV_INS_CHANGE_REFERENCE, 0, 0x80];
         let mut indata = Zeroizing::new([0u8; 16]);
@@ -243,6 +245,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Set the management key (MGM).
+    #[cfg(feature = "untested")]
     pub fn set_mgm_key(&self, new_key: &MgmKey, touch: Option<u8>) -> Result<(), Error> {
         let p2 = match touch.unwrap_or_default() {
             0 => 0xff,
@@ -276,6 +279,7 @@ impl<'tx> Transaction<'tx> {
     /// This is the common backend for all public key encryption and signing
     /// operations.
     // TODO(tarcieri): refactor this to be less gross/coupled.
+    #[cfg(feature = "untested")]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn authenticated_command(
         &self,
@@ -392,6 +396,7 @@ impl<'tx> Transaction<'tx> {
     /// messages into smaller APDU-sized messages (using the provided APDU
     /// template to construct them), and then sending those via
     /// [`Transaction::transmit`].
+    #[cfg(feature = "untested")]
     pub fn transfer_data(
         &self,
         templ: &[u8],
@@ -475,6 +480,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Fetch an object
+    #[cfg(feature = "untested")]
     pub fn fetch_object(&self, object_id: ObjectId) -> Result<Buffer, Error> {
         let mut indata = [0u8; 5];
         let templ = [0, YKPIV_INS_GET_DATA, 0x3f, 0xff];
@@ -518,6 +524,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Save an object
+    #[cfg(feature = "untested")]
     pub fn save_object(&self, object_id: ObjectId, indata: &[u8]) -> Result<(), Error> {
         let templ = [0, YKPIV_INS_PUT_DATA, 0x3f, 0xff];
 

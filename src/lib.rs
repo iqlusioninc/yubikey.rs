@@ -40,7 +40,7 @@
 //! code from upstream [yubico-piv-tool] has been translated into Rust
 //! presenting a safe interface, much of it is still untested.
 //!
-//! Please see the project's README.md for a complete status.
+//! Please see the [project's README.md for a complete status][status].
 //!
 //! ## History
 //!
@@ -83,6 +83,7 @@
 //! [YubiKey NEO]: https://support.yubico.com/support/solutions/articles/15000006494-yubikey-neo
 //! [YubiKey 4]: https://support.yubico.com/support/solutions/articles/15000006486-yubikey-4
 //! [YubiKey 5]: https://www.yubico.com/products/yubikey-5-overview/
+//! [status]: https://github.com/tarcieri/yubikey-piv.rs#status
 //! [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/
 //! [Corrode]: https://github.com/jameysharp/corrode
 //! [piv-tool-guide]: https://www.yubico.com/wp-content/uploads/2016/05/Yubico_PIV_Tool_Command_Line_Guide_en.pdf
@@ -134,24 +135,37 @@
 )]
 
 mod apdu;
+#[cfg(feature = "untested")]
 pub mod cccid;
+#[cfg(feature = "untested")]
 pub mod certificate;
+#[cfg(feature = "untested")]
 pub mod chuid;
+#[cfg(feature = "untested")]
 pub mod config;
 pub mod consts;
+#[cfg(feature = "untested")]
 pub mod container;
 pub mod error;
+#[cfg(feature = "untested")]
 pub mod key;
+#[cfg(feature = "untested")]
 mod metadata;
+#[cfg(feature = "untested")]
 pub mod mgm;
+#[cfg(feature = "untested")]
 pub mod msroots;
 mod response;
+#[cfg(feature = "untested")]
 mod serialization;
+#[cfg(feature = "untested")]
 pub mod settings;
 mod transaction;
 pub mod yubikey;
 
-pub use self::{key::Key, mgm::MgmKey, yubikey::YubiKey};
+#[cfg(feature = "untested")]
+pub use self::{key::Key, mgm::MgmKey};
+pub use yubikey::YubiKey;
 
 /// Algorithm identifiers
 // TODO(tarcieri): make this an enum

@@ -80,8 +80,11 @@ Legend:
 | 🚧 | Testing and validation in progress |
 | ⚠️ | Untested support                   |
 
-NOTE: Commands marked ⚠️ have not been properly tested and may contain bugs or
-not work at all.
+NOTE: Commands marked ⚠️ are disabled by default as they have have not been properly tested and may contain bugs or
+not work at all. USE AT YOUR OWN RISK!
+
+Enable the `untested` feature in your `Cargo.toml` to enable features marked ⚠️
+above.
 
 ## Testing
 

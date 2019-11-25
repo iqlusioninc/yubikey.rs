@@ -64,6 +64,7 @@ impl Response {
     }
 
     /// Create a new response from the given status words and buffer
+    #[cfg(feature = "untested")]
     pub fn new(status_words: StatusWords, buffer: Buffer) -> Response {
         Response {
             status_words,
@@ -77,6 +78,7 @@ impl Response {
     }
 
     /// Get the raw [`StatusWords`] code for this response.
+    #[cfg(feature = "untested")]
     pub fn code(&self) -> u32 {
         self.status_words.code()
     }
@@ -92,6 +94,7 @@ impl Response {
     }
 
     /// Consume this response, returning its buffer
+    #[cfg(feature = "untested")]
     pub fn into_buffer(self) -> Buffer {
         self.buffer
     }
