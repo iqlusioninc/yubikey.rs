@@ -79,8 +79,8 @@ impl MsRoots {
                 ptr = ptr.add(1);
             }
 
-            if ((TAG_MSROOTS_MID != tag) && (TAG_MSROOTS_END != tag))
-                || ((YKPIV_OBJ_MSROOTS5 == object_id) && (TAG_MSROOTS_END != tag))
+            if (TAG_MSROOTS_MID != tag || YKPIV_OBJ_MSROOTS5 == object_id)
+                && (TAG_MSROOTS_END != tag)
             {
                 // the current object doesn't contain a valid part of a msroots file
 
