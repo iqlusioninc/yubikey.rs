@@ -187,7 +187,7 @@ impl<'tx> Transaction<'tx> {
         let mut templ = [0, YKPIV_INS_CHANGE_REFERENCE, 0, 0x80];
         let mut indata = Zeroizing::new([0u8; 16]);
 
-        if current_pin.len() > 8 || new_pin.len() > 8 {
+        if current_pin.len() > CB_PIN_MAX || new_pin.len() > CB_PIN_MAX {
             return Err(Error::SizeError);
         }
 
@@ -200,11 +200,11 @@ impl<'tx> Transaction<'tx> {
         unsafe {
             ptr::copy(current_pin.as_ptr(), indata.as_mut_ptr(), current_pin.len());
 
-            if current_pin.len() < 8 {
+            if current_pin.len() < CB_PIN_MAX {
                 ptr::write_bytes(
                     indata.as_mut_ptr().add(current_pin.len()),
                     0xff,
-                    8 - current_pin.len(),
+                    CB_PIN_MAX - current_pin.len(),
                 );
             }
 
@@ -214,17 +214,17 @@ impl<'tx> Transaction<'tx> {
                 new_pin.len(),
             );
 
-            if new_pin.len() < 8 {
+            if new_pin.len() < CB_PIN_MAX {
                 ptr::write_bytes(
                     indata.as_mut_ptr().offset(8).add(new_pin.len()),
                     0xff,
-                    8 - new_pin.len(),
+                    CB_PIN_MAX - new_pin.len(),
                 );
             }
         }
 
         let status_words = self
-            .transfer_data(&templ, indata.as_ref(), 255)?
+            .transfer_data(&templ, indata.as_ref(), 0xFF)?
             .status_words();
 
         match status_words {
@@ -428,7 +428,7 @@ impl<'tx> Transaction<'tx> {
 
             if out_data.len() - response.buffer().len() - 2 > max_out {
                 error!(
-                    "output buffer to small: wanted to write {}, max was {}",
+                    "output buffer too small: wanted to write {}, max was {}",
                     out_data.len() - response.buffer().len() - 2,
                     max_out
                 );
@@ -444,7 +444,7 @@ impl<'tx> Transaction<'tx> {
             }
         }
 
-        while sw >> 8 != 0x61 {
+        while sw >> 8 == 0x61 {
             trace!(
                 "The card indicates there is {} bytes more data for us",
                 sw & 0xff

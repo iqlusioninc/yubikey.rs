@@ -379,7 +379,7 @@ impl YubiKey {
     pub unsafe fn change_pin(&mut self, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         {
             let txn = self.begin_transaction()?;
-            txn.change_pin(0, current_pin, new_pin)?;
+            txn.change_pin(CHREF_ACT_CHANGE_PIN, current_pin, new_pin)?;
         }
 
         if !new_pin.is_empty() {
@@ -391,7 +391,7 @@ impl YubiKey {
 
     /// Set PIN last changed
     pub unsafe fn set_pin_last_changed(yubikey: &mut YubiKey) -> Result<(), Error> {
-        let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
+        let mut data = [0u8; CB_BUF_MAX];
         let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
 
@@ -435,7 +435,7 @@ impl YubiKey {
     /// The default PUK code is 12345678.
     pub unsafe fn change_puk(&mut self, current_puk: &[u8], new_puk: &[u8]) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
-        txn.change_pin(2, current_puk, new_puk)
+        txn.change_pin(CHREF_ACT_CHANGE_PUK, current_puk, new_puk)
     }
 
     /// Block PUK: permanently prevent the PIN from becoming unblocked
@@ -449,7 +449,7 @@ impl YubiKey {
 
         while tries_remaining != 0 {
             // 2 -> change puk
-            let res = txn.change_pin(2, &puk, &puk);
+            let res = txn.change_pin(CHREF_ACT_CHANGE_PUK, &puk, &puk);
 
             match res {
                 Ok(()) => puk[0] += 1,
@@ -458,6 +458,8 @@ impl YubiKey {
                     continue;
                 }
                 Err(e) => {
+                    // depending on the firmware, tries may not be set to zero when the PUK is blocked,
+                    // instead, the return code will be PIN_LOCKED and tries will be unset
                     if e != Error::PinLocked {
                         continue;
                     }
@@ -481,7 +483,7 @@ impl YubiKey {
         }
 
         flags[0] |= ADMIN_FLAGS_1_PUK_BLOCKED;
-        let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
+        let mut data = [0u8; CB_BUF_MAX];
         let mut cb_data: usize = data.len();
 
         if metadata::set_item(
@@ -507,7 +509,7 @@ impl YubiKey {
     /// configured PIN Unblocking Key (PUK).
     pub unsafe fn unblock_pin(&mut self, puk: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
-        txn.change_pin(1, puk, new_pin)
+        txn.change_pin(CHREF_ACT_UNBLOCK_PIN, puk, new_pin)
     }
 
     /// Fetch an object from the YubiKey
@@ -815,6 +817,8 @@ impl YubiKey {
     /// Reset YubiKey.
     ///
     /// WARNING: this is a destructive operation which will destroy all keys!
+    ///
+    /// The reset function is only available when both pins are blocked.
     pub fn reset_device(&mut self) -> Result<(), Error> {
         let templ = [0, YKPIV_INS_RESET, 0, 0];
         let txn = self.begin_transaction()?;
