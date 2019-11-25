@@ -165,7 +165,7 @@ impl MgmKey {
 
     /// Set protected management key (MGM)
     pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
-        let mut data = Zeroizing::new(vec![0u8; YKPIV_OBJ_MAX_SIZE]);
+        let mut data = Zeroizing::new(vec![0u8; CB_BUF_MAX]);
 
         let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
@@ -207,7 +207,7 @@ impl MgmKey {
         }
 
         // set the protected mgm flag in admin data
-        cb_data = YKPIV_OBJ_MAX_SIZE;
+        cb_data = data.len();
 
         let mut flags_1 = [0u8; 1];
 

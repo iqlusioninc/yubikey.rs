@@ -455,7 +455,6 @@ impl<'tx> Transaction<'tx> {
             sw = response.status_words().code();
 
             if sw != StatusWords::Success.code() && (sw >> 8 != 0x61) {
-                // TODO(tarcieri): is this really OK?
                 return Ok(Response::new(sw.into(), Zeroizing::new(vec![])));
             }
 
@@ -484,7 +483,7 @@ impl<'tx> Transaction<'tx> {
         let indata_remaining = set_object(object_id, &mut indata);
         inlen -= indata_remaining.len();
 
-        let response = self.transfer_data(&templ, &indata[..inlen], YKPIV_OBJ_MAX_SIZE)?;
+        let response = self.transfer_data(&templ, &indata[..inlen], CB_BUF_MAX)?;
 
         if !response.is_success() {
             return Err(Error::GenericError);
@@ -523,7 +522,7 @@ impl<'tx> Transaction<'tx> {
         let templ = [0, YKPIV_INS_PUT_DATA, 0x3f, 0xff];
 
         // TODO(tarcieri): replace with vector
-        let mut data = [0u8; YKPIV_OBJ_MAX_SIZE];
+        let mut data = [0u8; CB_BUF_MAX];
 
         if indata.len() > CB_OBJ_MAX {
             return Err(Error::SizeError);

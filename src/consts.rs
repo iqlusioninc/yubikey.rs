@@ -229,8 +229,6 @@ pub const YKPIV_OBJ_MSROOTS3: u32 = 0x005f_ff13;
 pub const YKPIV_OBJ_MSROOTS4: u32 = 0x005f_ff14;
 pub const YKPIV_OBJ_MSROOTS5: u32 = 0x005f_ff15;
 
-pub const YKPIV_OBJ_MAX_SIZE: usize = 3072;
-
 pub const YKPIV_PINPOLICY_TAG: u8 = 0xaa;
 pub const YKPIV_PINPOLICY_DEFAULT: u8 = 0;
 pub const YKPIV_PINPOLICY_NEVER: u8 = 1;
