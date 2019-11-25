@@ -1,18 +1,30 @@
-//! [YubiKey][1] PIV: [Personal Identity Verification][2] support for
-//! [Yubico][3] devices using the Personal Computer/Smart Card ([PC/SC][4])
-//! interface as provided by the [`pcsc` crate][5].
+//! [YubiKey] PIV: [Personal Identity Verification][PIV] support for
+//! [Yubico] devices using the Personal Computer/Smart Card ([PC/SC])
+//! interface as provided by the [`pcsc` crate].
 //!
-//! **PIV** is a [NIST][6] standard for both *signing* and *encryption*
+//! **PIV** is a [NIST] standard for both *signing* and *encryption*
 //! using SmartCards and SmartCard-based hardware tokens like YubiKeys.
 //!
-//! This library natively implements the CCID protocol used to manage and
+//! This library natively implements the protocol used to manage and
 //! utilize PIV encryption and signing keys which can be generated, imported,
 //! and stored on YubiKey devices.
 //!
-//! See [Yubico's guide to PIV-enabled YubiKeys][7] for more information
+//! See [Yubico's guide to PIV-enabled YubiKeys][yk-guide] for more information
 //! on which devices support PIV and the available functionality.
 //!
-//! Supported algorithms:
+//! ## Minimum Supported Rust Version
+//!
+//! Rust 1.39+
+//!
+//! ## Supported YubiKeys
+//!
+//! - [YubiKey NEO] series
+//! - [YubiKey 4] series
+//! - [YubiKey 5] series
+//!
+//! NOTE: Nano and USB-C variants of the above are also supported
+//!
+//! ## Supported Algorithms
 //!
 //! - **Authentication**: `3DES`
 //! - **Encryption**: `RSA1024`, `RSA2048`, `ECCP256`, `ECCP384`
@@ -20,36 +32,63 @@
 //!   - RSASSA-PKCS#1v1.5: `RSA1024`, `RSA2048`
 //!   - ECDSA: `ECCP256`, `ECCP384`
 //!
+//! NOTE: RSASSA-PSS signatures and RSA-OAEP encryption may be supportable (TBD)
+//!
 //! ## Status
 //!
-//! This library is a work-in-progress translation and is not yet usable.
-//! Check back later for updates.
+//! This is a work-in-progress effort, and while much of the library-level
+//! code from upstream [yubico-piv-tool] has been translated into Rust
+//! presenting a safe interface, much of it is still untested.
 //!
-//! ## Minimum Supported Rust Version
-//!
-//! Rust 1.39+
+//! Please see the project's README.md for a complete status.
 //!
 //! ## History
 //!
-//! This library is a Rust translation of the [yubico-piv-tool][8] utility by
+//! This library is a Rust translation of the [yubico-piv-tool] utility by
 //! Yubico, which was originally written in C. It was mechanically translated
-//! from C into Rust using [Corrode][9], and then subsequently heavily
+//! from C into Rust using [Corrode], and then subsequently heavily
 //! refactored into safer, more idiomatic Rust.
 //!
-//! For more information on `yubico-piv-tool` and background information on how
+//! For more information on [yubico-piv-tool] and background information on how
 //! the YubiKey implementation of PIV works in general, see the
-//! [Yubico PIV Tool Command Line Guide][10].
+//! [Yubico PIV Tool Command Line Guide][piv-tool-guide].
 //!
-//! [1]: https://www.yubico.com/products/yubikey-hardware/
-//! [2]: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-73-4.pdf
-//! [3]: https://www.yubico.com/
-//! [4]: https://en.wikipedia.org/wiki/PC/SC
-//! [5]: https://github.com/bluetech/pcsc-rust
-//! [6]: https://www.nist.gov/
-//! [7]: https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html
-//! [8]: https://github.com/Yubico/yubico-piv-tool/
-//! [9]: https://github.com/jameysharp/corrode
-//! [10]: https://www.yubico.com/wp-content/uploads/2016/05/Yubico_PIV_Tool_Command_Line_Guide_en.pdf
+//! ## Security Warning
+//!
+//! No security audits of this crate have ever been performed. Presently it is in
+//! an experimental stage and may still contain high-severity issues.
+//!
+//! USE AT YOUR OWN RISK!
+//!
+//! ## Code of Conduct
+//!
+//! We abide by the [Contributor Covenant][cc-md] and ask that you do as well.
+//!
+//! For more information, please see [CODE_OF_CONDUCT.md][cc-md].
+//!
+//! ## License
+//!
+//! **yubikey-piv.rs** is a fork of and originally a mechanical translation from
+//! Yubico's [yubico-piv-tool], a C library/CLI program. The original library
+//! was licensed under a [2-Clause BSD License][BSDL], which this library inherits
+//! as a derived work.
+//!
+//! [YubiKey]: https://www.yubico.com/products/yubikey-hardware/
+//! [PIV]: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-73-4.pdf
+//! [Yubico]: https://www.yubico.com/
+//! [PC/SC]: https://en.wikipedia.org/wiki/PC/SC
+//! [`pcsc` crate]: https://github.com/bluetech/pcsc-rust
+//! [NIST]: https://www.nist.gov/
+//! [yk-guide]: https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html
+//! [YubiKey NEO]: https://support.yubico.com/support/solutions/articles/15000006494-yubikey-neo
+//! [YubiKey 4]: https://support.yubico.com/support/solutions/articles/15000006486-yubikey-4
+//! [YubiKey 5]: https://www.yubico.com/products/yubikey-5-overview/
+//! [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/
+//! [Corrode]: https://github.com/jameysharp/corrode
+//! [piv-tool-guide]: https://www.yubico.com/wp-content/uploads/2016/05/Yubico_PIV_Tool_Command_Line_Guide_en.pdf
+//! [cc-web]: https://contributor-covenant.org/
+//! [cc-md]: https://github.com/tarcieri/yubikey-piv.rs/blob/develop/CODE_OF_CONDUCT.md
+//! [BSDL]: https://opensource.org/licenses/BSD-2-Clause
 
 // Adapted from yubico-piv-tool:
 // <https://github.com/Yubico/yubico-piv-tool/>

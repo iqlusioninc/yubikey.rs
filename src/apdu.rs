@@ -39,8 +39,7 @@ const APDU_DATA_MAX: usize = 0xFF;
 
 /// Application Protocol Data Unit (APDU).
 ///
-/// These messages are packets used to communicate with the YubiKey using the
-/// Chip Card Interface Device (CCID) protocol.
+/// These messages are packets used to communicate with the YubiKey.
 #[derive(Clone)]
 pub(crate) struct APDU {
     /// Instruction class: indicates the type of command (e.g. inter-industry or proprietary)
