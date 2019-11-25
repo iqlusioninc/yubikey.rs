@@ -489,7 +489,7 @@ impl<'tx> Transaction<'tx> {
             return Err(Error::GenericError);
         }
 
-        let mut data = response.into_buffer();
+        let data = response.into_buffer();
         let mut outlen = 0;
 
         if data.len() < 2 || !has_valid_length(&data[1..], data.len() - 1) {
@@ -512,9 +512,9 @@ impl<'tx> Transaction<'tx> {
             return Err(Error::SizeError);
         }
 
-        // Remove the length tag
-        data.remove(0);
-        Ok(data)
+        Ok(Zeroizing::new(
+            data[(1 + offs)..(1 + offs + outlen)].to_vec(),
+        ))
     }
 
     /// Save an object
