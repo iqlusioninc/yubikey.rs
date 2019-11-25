@@ -117,6 +117,7 @@ impl Config {
                     );
                 }
 
+                // Always favor protected MGM
                 config.mgm_type = MgmType::Protected;
             }
         }

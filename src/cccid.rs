@@ -70,7 +70,7 @@ impl CCCID {
         }
 
         let mut cccid = [0u8; YKPIV_CCCID_SIZE];
-        cccid.copy_from_slice(&response[CHUID_GUID_OFFS..(CHUID_GUID_OFFS + YKPIV_CCCID_SIZE)]);
+        cccid.copy_from_slice(&response[CCC_ID_OFFS..(CCC_ID_OFFS + YKPIV_CCCID_SIZE)]);
         Ok(CCCID(cccid))
     }
 

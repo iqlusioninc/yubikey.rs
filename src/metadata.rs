@@ -81,6 +81,7 @@ pub(crate) fn set_item(
     let mut tag_temp: u8 = 0;
     let mut cb_len: usize = 0;
     let cb_item = p_item.len();
+    // Must be signed to have negative offsets
     let cb_moved: isize;
     let p_next: *mut u8;
 
@@ -108,6 +109,7 @@ pub(crate) fn set_item(
 
     if tag_temp != tag {
         if cb_item == 0 {
+            // We've been asked to delete an existing item that isn't in the blob
             return Ok(());
         }
 
@@ -238,6 +240,7 @@ pub(crate) fn write(
     };
 
     if data.is_empty() {
+        // Deleting metadata
         return txn.save_object(obj_id, &[]);
     }
 

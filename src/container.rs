@@ -146,7 +146,7 @@ impl Container {
             return Err(Error::ParseError);
         }
 
-        let mut name = [0u16; 40];
+        let mut name = [0u16; CONTAINER_NAME_LEN];
         let name_bytes_len = CONTAINER_NAME_LEN * 2;
 
         for (i, chunk) in bytes[..name_bytes_len].chunks_exact(2).enumerate() {

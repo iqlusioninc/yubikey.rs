@@ -45,11 +45,14 @@ pub const CB_ADMIN_SALT: usize = 16;
 pub const CB_ATR_MAX: usize = 33;
 
 pub const CB_BUF_MAX_NEO: usize = 2048;
+pub const CB_BUF_MAX_YK4: usize = 3072;
+pub const CB_BUF_MAX: usize = CB_BUF_MAX_YK4;
 
 pub const CB_ECC_POINTP256: usize = 65;
 pub const CB_ECC_POINTP384: usize = 97;
 
-pub const CB_OBJ_MAX: usize = 3063;
+pub const CB_OBJ_MAX_YK4: usize = CB_BUF_MAX_YK4 - 9;
+pub const CB_OBJ_MAX: usize = CB_OBJ_MAX_YK4;
 pub const CB_OBJ_MAX_NEO: usize = CB_BUF_MAX_NEO - 9;
 
 pub const CB_OBJ_TAG_MIN: usize = 2; // 1 byte tag + 1 byte len

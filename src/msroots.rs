@@ -134,7 +134,8 @@ impl MsRoots {
             return txn.save_object(YKPIV_OBJ_MSROOTS1, &[]);
         }
 
-        n_objs = (data_len / (cb_obj_max - 4)) + 1;
+        // Calculate number of objects required to store blob
+        n_objs = (data_len / (cb_obj_max - CB_OBJ_TAG_MAX)) + 1;
 
         if n_objs > 5 {
             return Err(Error::SizeError);
@@ -143,8 +144,8 @@ impl MsRoots {
         for i in 0..n_objs {
             offset = 0;
 
-            data_chunk = if cb_obj_max - 4 < data_len - data_offset {
-                cb_obj_max - 4
+            data_chunk = if cb_obj_max - CB_OBJ_TAG_MAX < data_len - data_offset {
+                cb_obj_max - CB_OBJ_TAG_MAX
             } else {
                 data_len - data_offset
             };

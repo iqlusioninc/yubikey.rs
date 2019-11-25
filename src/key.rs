@@ -288,9 +288,9 @@ pub fn generate(
                 return Err(Error::KeyError);
             }
             StatusWords::IncorrectParamError => {
-                if pin_policy != 0 {
+                if pin_policy != YKPIV_PINPOLICY_DEFAULT {
                     error!("{} (pin policy not supported?)", err_msg);
-                } else if touch_policy != 0 {
+                } else if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT {
                     error!("{} (touch policy not supported?)", err_msg);
                 } else {
                     error!("{} (algorithm not supported?)", err_msg);
@@ -324,6 +324,7 @@ pub fn generate(
             offset += 1;
             offset += get_length(&data[offset..], &mut len);
             let modulus = data[offset..(offset + len)].to_vec();
+            offset += len;
 
             if data[offset] != TAG_RSA_EXP {
                 error!("failed to parse public key structure (public exponent)");
@@ -352,6 +353,7 @@ pub fn generate(
                 error!("failed to parse public key structure");
                 return Err(Error::ParseError);
             }
+            offset += 1;
 
             // the curve point should always be determined by the curve
             let len_byte = data[offset];
