@@ -59,6 +59,14 @@ jobs:
           command: test
           args: --release
 
+      - name: Run cargo build --all-features
+        uses: actions-rs/cargo@v1
+        env:
+          RUSTFLAGS: -D warnings
+        with:
+          command: build
+          args: --all-features
+
   test:
     name: Test Suite
     strategy:
@@ -87,6 +95,14 @@ jobs:
         with:
           command: test
           args: --release
+
+      - name: Run cargo build --all-features
+        uses: actions-rs/cargo@v1
+        env:
+          RUSTFLAGS: -D warnings
+        with:
+          command: build
+          args: --all-features
 
   fmt:
     name: Rustfmt

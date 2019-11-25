@@ -33,19 +33,24 @@
 #![allow(non_snake_case, non_upper_case_globals)]
 #![allow(clippy::too_many_arguments, clippy::missing_safety_doc)]
 
+#[cfg(feature = "untested")]
 use crate::{
-    apdu::APDU, consts::*, error::Error, key::SlotId, metadata, mgm::MgmKey, response::StatusWords,
-    serialization::*, transaction::Transaction, Buffer, ObjectId,
+    apdu::APDU, key::SlotId, metadata, mgm::MgmKey, response::StatusWords, serialization::*,
+    ObjectId,
 };
+use crate::{consts::*, error::Error, transaction::Transaction, Buffer};
+#[cfg(feature = "untested")]
 use getrandom::getrandom;
 use log::{error, info, warn};
 use pcsc::{Card, Context};
+use std::fmt::{self, Display};
+#[cfg(feature = "untested")]
 use std::{
     convert::TryInto,
-    fmt::{self, Display},
     ptr, slice,
     time::{SystemTime, UNIX_EPOCH},
 };
+#[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
 /// PIV Application ID
@@ -96,6 +101,7 @@ pub struct Version {
 /// Almost all functionality in this library will require an open session
 /// with a YubiKey which is represented by this type.
 // TODO(tarcieri): reduce coupling to internal fields via `pub(crate)`
+#[cfg_attr(not(feature = "untested"), allow(dead_code))]
 pub struct YubiKey {
     pub(crate) card: Card,
     pub(crate) pin: Option<Buffer>,
@@ -198,6 +204,7 @@ impl YubiKey {
     }
 
     /// Reconnect to a YubiKey
+    #[cfg(feature = "untested")]
     pub fn reconnect(&mut self) -> Result<(), Error> {
         info!("trying to reconnect to current reader");
 
@@ -221,12 +228,40 @@ impl YubiKey {
     }
 
     /// Begin a transaction.
+    #[cfg(feature = "untested")]
     pub(crate) fn begin_transaction(&mut self) -> Result<Transaction<'_>, Error> {
         // TODO(tarcieri): reconnect support
         Ok(Transaction::new(&mut self.card)?)
     }
 
+    /// Get the YubiKey's PIV application version.
+    ///
+    /// This always uses the cached version queried when the key is initialized.
+    pub fn version(&mut self) -> Version {
+        self.version
+    }
+
+    /// Get YubiKey device serial number.
+    ///
+    /// This always uses the cached version queried when the key is initialized.
+    pub fn serial(&mut self) -> Serial {
+        self.serial
+    }
+
+    /// Get YubiKey device model
+    // TODO(tarcieri): use an emum for this
+    #[cfg(feature = "untested")]
+    pub fn device_model(&self) -> u32 {
+        if self.is_neo {
+            DEVTYPE_NEOr3
+        } else {
+            // TODO(tarcieri): YK5?
+            DEVTYPE_YK4
+        }
+    }
+
     /// Authenticate to the card using the provided management key (MGM).
+    #[cfg(feature = "untested")]
     pub fn authenticate(&mut self, mgm_key: MgmKey) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
 
@@ -280,7 +315,30 @@ impl YubiKey {
         Ok(())
     }
 
+    /// Deauthenticate
+    #[cfg(feature = "untested")]
+    pub fn deauthenticate(&mut self) -> Result<(), Error> {
+        let txn = self.begin_transaction()?;
+
+        let status_words = APDU::new(YKPIV_INS_SELECT_APPLICATION)
+            .p1(0x04)
+            .data(MGMT_AID)
+            .transmit(&txn, 255)?
+            .status_words();
+
+        if !status_words.is_success() {
+            error!(
+                "Failed selecting mgmt application: {:04x}",
+                status_words.code()
+            );
+            return Err(Error::GenericError);
+        }
+
+        Ok(())
+    }
+
     /// Sign data using a PIV key
+    #[cfg(feature = "untested")]
     pub fn sign_data(
         &mut self,
         raw_in: &[u8],
@@ -296,6 +354,7 @@ impl YubiKey {
     }
 
     /// Decrypt data using a PIV key
+    #[cfg(feature = "untested")]
     pub fn decrypt_data(
         &mut self,
         input: &[u8],
@@ -310,21 +369,8 @@ impl YubiKey {
         txn.authenticated_command(input, out, out_len, algorithm, key, true)
     }
 
-    /// Get the YubiKey's PIV application version.
-    ///
-    /// This always uses the cached version queried when the key is initialized.
-    pub fn version(&mut self) -> Version {
-        self.version
-    }
-
-    /// Get YubiKey device serial number.
-    ///
-    /// This always uses the cached version queried when the key is initialized.
-    pub fn serial(&mut self) -> Serial {
-        self.serial
-    }
-
     /// Verify device PIN.
+    #[cfg(feature = "untested")]
     pub fn verify_pin(&mut self, pin: &[u8]) -> Result<(), Error> {
         {
             let txn = self.begin_transaction()?;
@@ -339,6 +385,7 @@ impl YubiKey {
     }
 
     /// Get the number of PIN retries
+    #[cfg(feature = "untested")]
     pub fn get_pin_retries(&mut self) -> Result<u32, Error> {
         let txn = self.begin_transaction()?;
 
@@ -356,6 +403,7 @@ impl YubiKey {
     }
 
     /// Set the number of PIN retries
+    #[cfg(feature = "untested")]
     pub fn set_pin_retries(&mut self, pin_tries: usize, puk_tries: usize) -> Result<(), Error> {
         // Special case: if either retry count is 0, it's a successful no-op
         if pin_tries == 0 || puk_tries == 0 {
@@ -388,6 +436,7 @@ impl YubiKey {
     /// Change the Personal Identification Number (PIN).
     ///
     /// The default PIN code is 123456
+    #[cfg(feature = "untested")]
     pub fn change_pin(&mut self, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         {
             let txn = self.begin_transaction()?;
@@ -402,6 +451,7 @@ impl YubiKey {
     }
 
     /// Set PIN last changed
+    #[cfg(feature = "untested")]
     pub fn set_pin_last_changed(yubikey: &mut YubiKey) -> Result<(), Error> {
         let mut data = [0u8; CB_BUF_MAX];
         let max_size = yubikey.obj_size_max();
@@ -445,12 +495,14 @@ impl YubiKey {
     /// The PUK is part of the PIV standard that the YubiKey follows.
     ///
     /// The default PUK code is 12345678.
+    #[cfg(feature = "untested")]
     pub fn change_puk(&mut self, current_puk: &[u8], new_puk: &[u8]) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
         txn.change_pin(CHREF_ACT_CHANGE_PUK, current_puk, new_puk)
     }
 
     /// Block PUK: permanently prevent the PIN from becoming unblocked
+    #[cfg(feature = "untested")]
     pub fn block_puk(yubikey: &mut YubiKey) -> Result<(), Error> {
         let mut puk = [0x30, 0x42, 0x41, 0x44, 0x46, 0x30, 0x30, 0x44];
         let mut tries_remaining: i32 = -1;
@@ -519,18 +571,21 @@ impl YubiKey {
 
     /// Unblock a Personal Identification Number (PIN) using a previously
     /// configured PIN Unblocking Key (PUK).
+    #[cfg(feature = "untested")]
     pub fn unblock_pin(&mut self, puk: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
         txn.change_pin(CHREF_ACT_UNBLOCK_PIN, puk, new_pin)
     }
 
     /// Fetch an object from the YubiKey
+    #[cfg(feature = "untested")]
     pub fn fetch_object(&mut self, object_id: ObjectId) -> Result<Buffer, Error> {
         let txn = self.begin_transaction()?;
         txn.fetch_object(object_id)
     }
 
     /// Save an object
+    #[cfg(feature = "untested")]
     pub fn save_object(&mut self, object_id: ObjectId, indata: &mut [u8]) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
         txn.save_object(object_id, indata)
@@ -538,6 +593,7 @@ impl YubiKey {
 
     /// Import a private encryption or signing key into the YubiKey
     // TODO(tarcieri): refactor this into separate methods per key type
+    #[cfg(feature = "untested")]
     pub fn import_private_key(
         &mut self,
         key: SlotId,
@@ -733,6 +789,7 @@ impl YubiKey {
 
     /// Generate an attestation certificate for a stored key.
     /// <https://developers.yubico.com/PIV/Introduction/PIV_attestation.html>
+    #[cfg(feature = "untested")]
     pub fn attest(&mut self, key: SlotId) -> Result<Buffer, Error> {
         let templ = [0, YKPIV_INS_ATTEST, key, 0];
         let txn = self.begin_transaction()?;
@@ -754,6 +811,7 @@ impl YubiKey {
     }
 
     /// Get an auth challenge
+    #[cfg(feature = "untested")]
     pub fn get_auth_challenge(&mut self) -> Result<[u8; 8], Error> {
         let txn = self.begin_transaction()?;
 
@@ -770,6 +828,7 @@ impl YubiKey {
     }
 
     /// Verify an auth response
+    #[cfg(feature = "untested")]
     pub fn verify_auth_response(&mut self, response: [u8; 8]) -> Result<(), Error> {
         let mut data = [0u8; 12];
         data[0] = 0x7c;
@@ -794,43 +853,12 @@ impl YubiKey {
         Ok(())
     }
 
-    /// Deauthenticate
-    pub fn deauthenticate(&mut self) -> Result<(), Error> {
-        let txn = self.begin_transaction()?;
-
-        let status_words = APDU::new(YKPIV_INS_SELECT_APPLICATION)
-            .p1(0x04)
-            .data(MGMT_AID)
-            .transmit(&txn, 255)?
-            .status_words();
-
-        if !status_words.is_success() {
-            error!(
-                "Failed selecting mgmt application: {:04x}",
-                status_words.code()
-            );
-            return Err(Error::GenericError);
-        }
-
-        Ok(())
-    }
-
-    /// Get YubiKey device model
-    // TODO(tarcieri): use an emum for this
-    pub fn device_model(&self) -> u32 {
-        if self.is_neo {
-            DEVTYPE_NEOr3
-        } else {
-            // TODO(tarcieri): YK5?
-            DEVTYPE_YK4
-        }
-    }
-
     /// Reset YubiKey.
     ///
     /// WARNING: this is a destructive operation which will destroy all keys!
     ///
     /// The reset function is only available when both pins are blocked.
+    #[cfg(feature = "untested")]
     pub fn reset_device(&mut self) -> Result<(), Error> {
         let templ = [0, YKPIV_INS_RESET, 0, 0];
         let txn = self.begin_transaction()?;
@@ -844,6 +872,7 @@ impl YubiKey {
     }
 
     /// Get max object size supported by this device
+    #[cfg(feature = "untested")]
     pub(crate) fn obj_size_max(&self) -> usize {
         if self.is_neo {
             CB_OBJ_MAX_NEO
