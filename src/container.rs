@@ -1,4 +1,4 @@
-//! PIV container records.
+//! MS Container Map Records
 //!
 //! These appear(?) to be defined in Microsoft's Smart Card Minidriver Specification:
 //! <https://docs.microsoft.com/en-us/previous-versions/windows/hardware/design/dn631754(v=vs.85)>
@@ -40,7 +40,7 @@ use std::{
     fmt::{self, Debug},
 };
 
-/// MS Container Map(?) records
+/// MS Container Map(?) Records
 #[derive(Copy, Clone)]
 pub struct Container {
     /// Container name
