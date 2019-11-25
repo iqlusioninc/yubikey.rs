@@ -3,7 +3,7 @@ name    = "yubikey-piv"
 version = "0.0.1" # Also update html_root_url in lib.rs when bumping this
 description = """
 Pure Rust host-side driver for the YubiKey Personal Identity Verification (PIV)
-CCID application providing general-purpose public-key signing and encryption
+application providing general-purpose public-key signing and encryption
 with hardware-backed private keys for RSA (2048/1024) and ECC (P-256/P-384)
 algorithms (e.g, PKCS#1v1.5, ECDSA)
 """
@@ -26,3 +26,6 @@ pcsc = "2"
 sha-1 = "0.8"
 subtle = "2"
 zeroize = "1"
+
+[dev-dependencies]
+env_logger = "0.7"

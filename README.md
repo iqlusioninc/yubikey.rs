@@ -33,32 +33,68 @@ One small problem, it's not done yet... 😫
 
 But it might be close?
 
+## Minimum Supported Rust Version
+
+- Rust **1.39+**
+
+## Security Warning
+
+No security audits of this crate have ever been performed. Presently it is in
+an experimental stage and may still contain high-severity issues.
+
+USE AT YOUR OWN RISK!
+
 ## History
 
 This library is a Rust translation of the [yubico-piv-tool][3] utility by
 Yubico, which was originally written in C. It was mechanically translated
 from C into Rust using [Corrode][4], and then subsequently heavily
-refactored into safer, more idiomatic Rust§.
+refactored into safer, more idiomatic Rust.
 
 Note that while this project started as a fork of a [Yubico][5] project,
 this fork is **NOT** an official Yubico project and is in no way supported or
 endorsed by Yubico.
 
-§ *NOTE*: This section is actually full of lies and notes aspirations/goals,
-  not history. That said, there's been a decent amount of work cleaning up the
-  mechanically translated code, and at ~5klocs it's not that much.
+## Testing
 
-## Security Warning
+To run the full test suite, you'll need a connected YubiKey NEO/4/5 device in
+the default state (i.e. default PIN/PUK).
 
-No security audits of this crate have ever been performed, and it has not been
-thoroughly assessed to ensure its operation is constant-time on common CPU
-architectures.
+Tests which run live against a YubiKey device are marked as `#[ignore]` by
+default in order to pass when running in a CI environment. To run these
+tests locally, invoke the following command:
 
-USE AT YOUR OWN RISK!
+```
+cargo test -- --ignored
+```
 
-## Requirements
+This crate makes extensive use of the `log` facade to provide detailed
+information about what is happening. If you'd like to print this logging
+information while running the tests, set the `RUST_LOG` environment variable
+to a relevant loglevel (e.g. `error`, `warn`, `info`, `debug`, `trace`):
 
-- Rust 1.39+
+```
+RUST_LOG=info cargo test -- --ignored
+```
+
+To trace every message sent to/from the card i.e. the raw
+Application Protocol Data Unit (APDU) messages, use the `trace` log level:
+
+```
+running 1 test
+[INFO  yubikey_piv::yubikey] trying to connect to reader 'Yubico YubiKey OTP+FIDO+CCID'
+[INFO  yubikey_piv::yubikey] connected to 'Yubico YubiKey OTP+FIDO+CCID' successfully
+[TRACE yubikey_piv::transaction] >>> [0, 164, 4, 0, 5, 160, 0, 0, 3, 8]
+[TRACE yubikey_piv::transaction] <<< [97, 17, 79, 6, 0, 0, 16, 0, 1, 0, 121, 7, 79, 5, 160, 0, 0, 3, 8, 144, 0]
+[TRACE yubikey_piv::transaction] >>> [0, 253, 0, 0, 0]
+[TRACE yubikey_piv::transaction] <<< [5, 1, 2, 144, 0]
+[TRACE yubikey_piv::transaction] >>> [0, 248, 0, 0, 0]
+[TRACE yubikey_piv::transaction] <<< [0, 115, 0, 178, 144, 0]
+test connect ... ok
+```
+
+APDU messages labeled `>>>` are being sent to the YubiKey's internal SmartCard,
+and ones labeled `<<<` are the responses.
 
 ## Code of Conduct
 
