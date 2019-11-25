@@ -165,7 +165,8 @@ impl<'tx> Transaction<'tx> {
 
     /// Verify device PIN.
     pub fn verify_pin(&self, pin: &[u8]) -> Result<(), Error> {
-        if pin.len() > CB_PIN_MAX {
+        // TODO(tarcieri): allow unpadded (with `0xFF`) PIN shorter than CB_PIN_MAX?
+        if pin.len() != CB_PIN_MAX {
             return Err(Error::SizeError);
         }
 
