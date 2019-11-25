@@ -42,20 +42,35 @@ pub const ADMIN_FLAGS_1_PROTECTED_MGM: u8 = 0x02;
 pub const CB_ADMIN_TIMESTAMP: usize = 0x04;
 pub const CB_ADMIN_SALT: usize = 16;
 
-pub const CB_OBJ_MAX: usize = 3063;
+pub const CB_ATR_MAX: usize = 33;
+
+pub const CB_BUF_MAX_NEO: usize = 2048;
+pub const CB_BUF_MAX_YK4: usize = 3072;
+pub const CB_BUF_MAX: usize = CB_BUF_MAX_YK4;
+
+pub const CB_ECC_POINTP256: usize = 65;
+pub const CB_ECC_POINTP384: usize = 97;
+
+pub const CB_OBJ_MAX_YK4: usize = CB_BUF_MAX_YK4 - 9;
+pub const CB_OBJ_MAX: usize = CB_OBJ_MAX_YK4;
+pub const CB_OBJ_MAX_NEO: usize = CB_BUF_MAX_NEO - 9;
 
 pub const CB_OBJ_TAG_MIN: usize = 2; // 1 byte tag + 1 byte len
 pub const CB_OBJ_TAG_MAX: usize = (CB_OBJ_TAG_MIN + 2); // 1 byte tag + 3 bytes len
 
+pub const CB_PAGE: usize = 4096;
 pub const CB_PIN_MAX: usize = 8;
-pub const CB_ECC_POINTP256: usize = 65;
-pub const CB_ECC_POINTP384: usize = 97;
+
+pub const CCC_ID_OFFS: usize = 9;
 
 pub const CHUID_GUID_OFFS: usize = 29;
 
 pub const CHREF_ACT_CHANGE_PIN: i32 = 0;
 pub const CHREF_ACT_UNBLOCK_PIN: i32 = 1;
 pub const CHREF_ACT_CHANGE_PUK: i32 = 2;
+
+pub const CONTAINER_NAME_LEN: usize = 40;
+pub const CONTAINER_REC_LEN: usize = (2 * CONTAINER_NAME_LEN) + 27; // 80 + 1 + 1 + 2 + 1 + 1 + 1 + 20
 
 pub const DES_TYPE_3DES: u8 = 1;
 
@@ -132,6 +147,7 @@ pub const YKPIV_INS_SELECT_APPLICATION: u8 = 0xa4;
 pub const YKPIV_INS_GET_RESPONSE_APDU: u8 = 0xc0;
 
 // Yubico vendor specific instructions
+// <https://developers.yubico.com/PIV/Introduction/Yubico_extensions.html>
 pub const YKPIV_INS_SET_MGMKEY: u8 = 0xff;
 pub const YKPIV_INS_IMPORT_KEY: u8 = 0xfe;
 pub const YKPIV_INS_GET_VERSION: u8 = 0xfd;
@@ -212,8 +228,6 @@ pub const YKPIV_OBJ_MSROOTS2: u32 = 0x005f_ff12;
 pub const YKPIV_OBJ_MSROOTS3: u32 = 0x005f_ff13;
 pub const YKPIV_OBJ_MSROOTS4: u32 = 0x005f_ff14;
 pub const YKPIV_OBJ_MSROOTS5: u32 = 0x005f_ff15;
-
-pub const YKPIV_OBJ_MAX_SIZE: usize = 3072;
 
 pub const YKPIV_PINPOLICY_TAG: u8 = 0xaa;
 pub const YKPIV_PINPOLICY_DEFAULT: u8 = 0;

@@ -22,6 +22,9 @@ to store a number of RSA (2048/1024) and ECC (NIST P-256/P-384) private keys
 with configurable access control policies. Both the signing (RSASSA/ECDSA) and
 encryption (PKCS#1v1.5/ECIES) use cases are supported for either key type.
 
+See [Yubico's guide to PIV-enabled YubiKeys][2] for more information
+on which devices support PIV and the available functionality.
+
 If you've been wanting to use Rust to sign and/or encrypt stuff using a
 private key generated and stored on a Yubikey (with option PIN-based access),
 this is the crate you've been after!
@@ -32,12 +35,12 @@ But it might be close?
 
 ## History
 
-This library is a Rust translation of the [yubico-piv-tool][2] utility by
+This library is a Rust translation of the [yubico-piv-tool][3] utility by
 Yubico, which was originally written in C. It was mechanically translated
-from C into Rust using [Corrode][3], and then subsequently heavily
+from C into Rust using [Corrode][4], and then subsequently heavily
 refactored into safer, more idiomatic Rust§.
 
-Note that while this project started as a fork of a [Yubico][4] project,
+Note that while this project started as a fork of a [Yubico][5] project,
 this fork is **NOT** an official Yubico project and is in no way supported or
 endorsed by Yubico.
 
@@ -59,15 +62,15 @@ USE AT YOUR OWN RISK!
 
 ## Code of Conduct
 
-We abide by the [Contributor Covenant][5] and ask that you do as well.
+We abide by the [Contributor Covenant][6] and ask that you do as well.
 
-For more information, please see [CODE_OF_CONDUCT.md][6].
+For more information, please see [CODE_OF_CONDUCT.md][7].
 
 ## License
 
 **yubikey-piv.rs** is a fork of and originally a mechanical translation from
-Yubico's [`yubico-piv-tool`][2], a C library/CLI program. The original library
-was licensed under a [2-Clause BSD License][5], which this library inherits
+Yubico's [`yubico-piv-tool`][3], a C library/CLI program. The original library
+was licensed under a [2-Clause BSD License][8], which this library inherits
 as a derived work.
 
 Copyright (c) 2014-2019 Yubico AB, Tony Arcieri
@@ -101,7 +104,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Unless you explicitly state otherwise, any contribution intentionally
 submitted for inclusion in the work by you shall be licensed under the
-[2-Clause BSD License][5] as shown above, without any additional terms
+[2-Clause BSD License][8] as shown above, without any additional terms
 or conditions.
 
 [//]: # (badges)
@@ -121,9 +124,10 @@ or conditions.
 [//]: # (general links)
 
 [1]: https://piv.idmanagement.gov/
-[2]: https://github.com/Yubico/yubico-piv-tool/
-[3]: https://github.com/jameysharp/corrode
-[4]: https://www.yubico.com/
-[5]: https://contributor-covenant.org/
-[6]: https://github.com/tarcieri/yubikey-piv.rs/blob/develop/CODE_OF_CONDUCT.md
-[7]: https://opensource.org/licenses/BSD-2-Clause
+[2]: https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html
+[3]: https://github.com/Yubico/yubico-piv-tool/
+[4]: https://github.com/jameysharp/corrode
+[5]: https://www.yubico.com/
+[6]: https://contributor-covenant.org/
+[7]: https://github.com/tarcieri/yubikey-piv.rs/blob/develop/CODE_OF_CONDUCT.md
+[8]: https://opensource.org/licenses/BSD-2-Clause
