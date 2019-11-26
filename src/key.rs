@@ -38,7 +38,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    apdu::StatusWords,
+    apdu::{Ins, StatusWords},
     certificate::{self, Certificate},
     consts::*,
     error::Error,
@@ -199,7 +199,7 @@ pub fn generate(
     touch_policy: u8,
 ) -> Result<GeneratedKey, Error> {
     let mut in_data = [0u8; 11];
-    let mut templ = [0, YKPIV_INS_GENERATE_ASYMMETRIC, 0, 0];
+    let mut templ = [0, Ins::GenerateAsymmetric.code(), 0, 0];
     let setting_roca: settings::BoolValue;
 
     if yubikey.device_model() == DEVTYPE_YK4

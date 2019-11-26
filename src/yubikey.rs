@@ -35,7 +35,7 @@
 
 #[cfg(feature = "untested")]
 use crate::{
-    apdu::{StatusWords, APDU},
+    apdu::{Ins, StatusWords, APDU},
     key::SlotId,
     metadata,
     mgm::MgmKey,
@@ -97,6 +97,17 @@ pub struct Version {
 
     /// Patch version component
     pub patch: u8,
+}
+
+impl Version {
+    /// Parse a version from bytes
+    pub fn new(bytes: [u8; 3]) -> Version {
+        Version {
+            major: bytes[0],
+            minor: bytes[1],
+            patch: bytes[2],
+        }
+    }
 }
 
 /// YubiKey Device: this is the primary API for opening a session and
@@ -270,7 +281,7 @@ impl YubiKey {
         let txn = self.begin_transaction()?;
 
         // get a challenge from the card
-        let challenge = APDU::new(YKPIV_INS_AUTHENTICATE)
+        let challenge = APDU::new(Ins::Authenticate)
             .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
             .data(&[0x7c, 0x02, 0x80, 0x00])
             .transmit(&txn, 261)?;
@@ -299,7 +310,7 @@ impl YubiKey {
         let mut challenge = [0u8; 8];
         challenge.copy_from_slice(&data[14..22]);
 
-        let authentication = APDU::new(YKPIV_INS_AUTHENTICATE)
+        let authentication = APDU::new(Ins::Authenticate)
             .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
             .data(&data)
             .transmit(&txn, 261)?;
@@ -324,7 +335,7 @@ impl YubiKey {
     pub fn deauthenticate(&mut self) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
 
-        let status_words = APDU::new(YKPIV_INS_SELECT_APPLICATION)
+        let status_words = APDU::new(Ins::SelectApplication)
             .p1(0x04)
             .data(MGMT_AID)
             .transmit(&txn, 255)?
@@ -422,7 +433,7 @@ impl YubiKey {
 
         let templ = [
             0,
-            YKPIV_INS_SET_PIN_RETRIES,
+            Ins::SetPinRetries.code(),
             pin_tries as u8,
             puk_tries as u8,
         ];
@@ -644,7 +655,7 @@ impl YubiKey {
 
         let mut key_data = Zeroizing::new(vec![0u8; 1024]);
         let mut in_ptr: *mut u8 = key_data.as_mut_ptr();
-        let templ = [0, YKPIV_INS_IMPORT_KEY, algorithm, key];
+        let templ = [0, Ins::ImportKey.code(), algorithm, key];
         let mut elem_len: u32 = 0;
         let mut params: [*const u8; 5] = [ptr::null(); 5];
         let mut lens = [0usize; 5];
@@ -795,7 +806,7 @@ impl YubiKey {
     /// <https://developers.yubico.com/PIV/Introduction/PIV_attestation.html>
     #[cfg(feature = "untested")]
     pub fn attest(&mut self, key: SlotId) -> Result<Buffer, Error> {
-        let templ = [0, YKPIV_INS_ATTEST, key, 0];
+        let templ = [0, Ins::Attest.code(), key, 0];
         let txn = self.begin_transaction()?;
         let response = txn.transfer_data(&templ, &[], CB_OBJ_MAX)?;
 
@@ -819,7 +830,7 @@ impl YubiKey {
     pub fn get_auth_challenge(&mut self) -> Result<[u8; 8], Error> {
         let txn = self.begin_transaction()?;
 
-        let response = APDU::new(YKPIV_INS_AUTHENTICATE)
+        let response = APDU::new(Ins::Authenticate)
             .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
             .data(&[0x7c, 0x02, 0x81, 0x00])
             .transmit(&txn, 261)?;
@@ -844,7 +855,7 @@ impl YubiKey {
         let txn = self.begin_transaction()?;
 
         // send the response to the card and a challenge of our own.
-        let status_words = APDU::new(YKPIV_INS_AUTHENTICATE)
+        let status_words = APDU::new(Ins::Authenticate)
             .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
             .data(&data)
             .transmit(&txn, 261)?
@@ -864,7 +875,7 @@ impl YubiKey {
     /// The reset function is only available when both pins are blocked.
     #[cfg(feature = "untested")]
     pub fn reset_device(&mut self) -> Result<(), Error> {
-        let templ = [0, YKPIV_INS_RESET, 0, 0];
+        let templ = [0, Ins::Reset.code(), 0, 0];
         let txn = self.begin_transaction()?;
         let status_words = txn.transfer_data(&templ, &[], 255)?.status_words();
 

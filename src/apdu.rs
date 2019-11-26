@@ -32,7 +32,6 @@
 
 use crate::{error::Error, transaction::Transaction, Buffer};
 use log::trace;
-use std::fmt::{self, Debug};
 use zeroize::{Zeroize, Zeroizing};
 
 /// Maximum amount of command data that can be included in an APDU
@@ -41,13 +40,13 @@ const APDU_DATA_MAX: usize = 0xFF;
 /// Application Protocol Data Unit (APDU).
 ///
 /// These messages are packets used to communicate with the YubiKey.
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct APDU {
     /// Instruction class: indicates the type of command (e.g. inter-industry or proprietary)
     cla: u8,
 
     /// Instruction code: indicates the specific command (e.g. "write data")
-    ins: u8,
+    ins: Ins,
 
     /// Instruction parameter 1 for the command (e.g. offset into file at which to write the data)
     p1: u8,
@@ -61,10 +60,10 @@ pub(crate) struct APDU {
 
 impl APDU {
     /// Create a new APDU with the given instruction code
-    pub fn new(ins: u8) -> Self {
+    pub fn new(ins: impl Into<Ins>) -> Self {
         Self {
             cla: 0,
-            ins,
+            ins: ins.into(),
             p1: 0,
             p2: 0,
             data: vec![],
@@ -123,27 +122,12 @@ impl APDU {
     pub fn to_bytes(&self) -> Buffer {
         let mut bytes = Vec::with_capacity(5 + self.data.len());
         bytes.push(self.cla);
-        bytes.push(self.ins);
+        bytes.push(self.ins.code());
         bytes.push(self.p1);
         bytes.push(self.p2);
         bytes.push(self.data.len() as u8);
         bytes.extend_from_slice(self.data.as_ref());
         Zeroizing::new(bytes)
-    }
-}
-
-impl Debug for APDU {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "APDU {{ cla: {}, ins: {}, p1: {}, p2: {}, lc: {}, data: {:?} }}",
-            self.cla,
-            self.ins,
-            self.p1,
-            self.p2,
-            self.data.len(),
-            self.data.as_slice()
-        )
     }
 }
 
@@ -155,16 +139,125 @@ impl Drop for APDU {
 
 impl Zeroize for APDU {
     fn zeroize(&mut self) {
-        self.cla.zeroize();
-        self.ins.zeroize();
-        self.p1.zeroize();
-        self.p2.zeroize();
+        // Only `data` may contain secrets
         self.data.zeroize();
     }
 }
 
+/// APDU instruction codes
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Ins {
+    /// Verify
+    Verify,
+
+    /// Change reference
+    ChangeReference,
+
+    /// Reset retry
+    ResetRetry,
+
+    /// Generate asymmetric
+    GenerateAsymmetric,
+
+    /// Authenticate
+    Authenticate,
+
+    /// Get data
+    GetData,
+
+    /// Put data
+    PutData,
+
+    /// Select application
+    SelectApplication,
+
+    /// Get response APDU
+    GetResponseApdu,
+
+    // Yubico vendor specific instructions
+    // <https://developers.yubico.com/PIV/Introduction/Yubico_extensions.html>
+    /// Set MGM key
+    SetMgmKey,
+
+    /// Import key
+    ImportKey,
+
+    /// Get version
+    GetVersion,
+
+    /// Reset device
+    Reset,
+
+    /// Set PIN retries
+    SetPinRetries,
+
+    /// Generate attestation certificate for asymmetric key
+    Attest,
+
+    /// Get device serial
+    GetSerial,
+
+    /// Other/unrecognized instruction codes
+    Other(u8),
+}
+
+impl Ins {
+    /// Get the code that corresponds to this instruction
+    pub fn code(self) -> u8 {
+        match self {
+            Ins::Verify => 0x20,
+            Ins::ChangeReference => 0x24,
+            Ins::ResetRetry => 0x2c,
+            Ins::GenerateAsymmetric => 0x47,
+            Ins::Authenticate => 0x87,
+            Ins::GetData => 0xcb,
+            Ins::PutData => 0xdb,
+            Ins::SelectApplication => 0xa4,
+            Ins::GetResponseApdu => 0xc0,
+            Ins::SetMgmKey => 0xff,
+            Ins::ImportKey => 0xfe,
+            Ins::GetVersion => 0xfd,
+            Ins::Reset => 0xfb,
+            Ins::SetPinRetries => 0xfa,
+            Ins::Attest => 0xf9,
+            Ins::GetSerial => 0xf8,
+            Ins::Other(code) => code,
+        }
+    }
+}
+
+impl From<u8> for Ins {
+    fn from(code: u8) -> Self {
+        match code {
+            0x20 => Ins::Verify,
+            0x24 => Ins::ChangeReference,
+            0x2c => Ins::ResetRetry,
+            0x47 => Ins::GenerateAsymmetric,
+            0x87 => Ins::Authenticate,
+            0xcb => Ins::GetData,
+            0xdb => Ins::PutData,
+            0xa4 => Ins::SelectApplication,
+            0xc0 => Ins::GetResponseApdu,
+            0xff => Ins::SetMgmKey,
+            0xfe => Ins::ImportKey,
+            0xfd => Ins::GetVersion,
+            0xfb => Ins::Reset,
+            0xfa => Ins::SetPinRetries,
+            0xf9 => Ins::Attest,
+            0xf8 => Ins::GetSerial,
+            code => Ins::Other(code),
+        }
+    }
+}
+
+impl From<Ins> for u8 {
+    fn from(ins: Ins) -> u8 {
+        ins.code()
+    }
+}
+
 /// APDU responses
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Response {
     /// Status words
     status_words: StatusWords,
@@ -239,6 +332,7 @@ impl From<Vec<u8>> for Response {
 
 impl Zeroize for Response {
     fn zeroize(&mut self) {
+        // Only `data` may contain secrets
         self.data.zeroize();
     }
 }

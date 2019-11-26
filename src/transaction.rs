@@ -1,9 +1,14 @@
 //! YubiKey PC/SC transactions
 
-use crate::{apdu::APDU, consts::*, error::Error, yubikey::*};
+use crate::{
+    apdu::{Ins, APDU},
+    error::Error,
+    yubikey::*,
+};
 #[cfg(feature = "untested")]
 use crate::{
     apdu::{Response, StatusWords},
+    consts::*,
     mgm::MgmKey,
     serialization::*,
     Buffer, ObjectId,
@@ -60,7 +65,7 @@ impl<'tx> Transaction<'tx> {
 
     /// Select application.
     pub fn select_application(&self) -> Result<(), Error> {
-        let response = APDU::new(YKPIV_INS_SELECT_APPLICATION)
+        let response = APDU::new(Ins::SelectApplication)
             .p1(0x04)
             .data(&AID)
             .transmit(self, 0xFF)
@@ -83,7 +88,7 @@ impl<'tx> Transaction<'tx> {
     /// Get the version of the PIV application installed on the YubiKey
     pub fn get_version(&self) -> Result<Version, Error> {
         // get version from device
-        let response = APDU::new(YKPIV_INS_GET_VERSION).transmit(self, 261)?;
+        let response = APDU::new(Ins::GetVersion).transmit(self, 261)?;
 
         if !response.is_success() {
             return Err(Error::GenericError);
@@ -93,11 +98,7 @@ impl<'tx> Transaction<'tx> {
             return Err(Error::SizeError);
         }
 
-        Ok(Version {
-            major: response.data()[0],
-            minor: response.data()[1],
-            patch: response.data()[2],
-        })
+        Ok(Version::new(response.data()[..3].try_into().unwrap()))
     }
 
     /// Get YubiKey device serial number
@@ -106,7 +107,7 @@ impl<'tx> Transaction<'tx> {
 
         let response = if version.major < 5 {
             // get serial from neo/yk4 devices using the otp applet
-            let sw = APDU::new(YKPIV_INS_SELECT_APPLICATION)
+            let sw = APDU::new(Ins::SelectApplication)
                 .p1(0x04)
                 .data(&yk_applet)
                 .transmit(self, 0xFF)?
@@ -128,7 +129,7 @@ impl<'tx> Transaction<'tx> {
             }
 
             // reselect the PIV applet
-            let sw = APDU::new(YKPIV_INS_SELECT_APPLICATION)
+            let sw = APDU::new(Ins::SelectApplication)
                 .p1(0x04)
                 .data(&AID)
                 .transmit(self, 0xFF)?
@@ -142,7 +143,7 @@ impl<'tx> Transaction<'tx> {
             resp
         } else {
             // get serial from yk5 and later devices using the f8 command
-            let resp = APDU::new(YKPIV_INS_GET_SERIAL).transmit(self, 0xFF)?;
+            let resp = APDU::new(Ins::GetSerial).transmit(self, 0xFF)?;
 
             if !resp.is_success() {
                 error!(
@@ -169,7 +170,7 @@ impl<'tx> Transaction<'tx> {
             return Err(Error::SizeError);
         }
 
-        let response = APDU::new(YKPIV_INS_VERIFY)
+        let response = APDU::new(Ins::Verify)
             .params(0x00, 0x80)
             .data(pin)
             .transmit(self, 261)?;
@@ -185,7 +186,7 @@ impl<'tx> Transaction<'tx> {
     /// Change the PIN
     #[cfg(feature = "untested")]
     pub fn change_pin(&self, action: i32, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
-        let mut templ = [0, YKPIV_INS_CHANGE_REFERENCE, 0, 0x80];
+        let mut templ = [0, Ins::ChangeReference.code(), 0, 0x80];
         let mut indata = Zeroizing::new([0u8; 16]);
 
         if current_pin.len() > CB_PIN_MAX || new_pin.len() > CB_PIN_MAX {
@@ -193,7 +194,7 @@ impl<'tx> Transaction<'tx> {
         }
 
         if action == CHREF_ACT_UNBLOCK_PIN {
-            templ[1] = YKPIV_INS_RESET_RETRY;
+            templ[1] = Ins::ResetRetry.code();
         } else if action == CHREF_ACT_CHANGE_PUK {
             templ[3] = 0x81;
         }
@@ -259,7 +260,7 @@ impl<'tx> Transaction<'tx> {
         data[2] = DES_LEN_3DES as u8;
         data[3..3 + DES_LEN_3DES].copy_from_slice(new_key.as_ref());
 
-        let status_words = APDU::new(YKPIV_INS_SET_MGMKEY)
+        let status_words = APDU::new(Ins::SetMgmKey)
             .params(0xff, p2)
             .data(&data)
             .transmit(self, 261)?
@@ -290,7 +291,7 @@ impl<'tx> Transaction<'tx> {
     ) -> Result<(), Error> {
         let in_len = sign_in.len();
         let mut indata = [0u8; 1024];
-        let templ = [0, YKPIV_INS_AUTHENTICATE, algorithm, key];
+        let templ = [0, Ins::Authenticate.code(), algorithm, key];
         let mut len: usize = 0;
 
         match algorithm {
@@ -454,7 +455,7 @@ impl<'tx> Transaction<'tx> {
                 sw & 0xff
             );
 
-            let response = APDU::new(YKPIV_INS_GET_RESPONSE_APDU).transmit(self, 261)?;
+            let response = APDU::new(Ins::GetResponseApdu).transmit(self, 261)?;
             sw = response.status_words().code();
 
             if sw != StatusWords::Success.code() && (sw >> 8 != 0x61) {
@@ -481,7 +482,7 @@ impl<'tx> Transaction<'tx> {
     #[cfg(feature = "untested")]
     pub fn fetch_object(&self, object_id: ObjectId) -> Result<Buffer, Error> {
         let mut indata = [0u8; 5];
-        let templ = [0, YKPIV_INS_GET_DATA, 0x3f, 0xff];
+        let templ = [0, Ins::GetData.code(), 0x3f, 0xff];
 
         let mut inlen = indata.len();
         let indata_remaining = set_object(object_id, &mut indata);
@@ -524,7 +525,7 @@ impl<'tx> Transaction<'tx> {
     /// Save an object
     #[cfg(feature = "untested")]
     pub fn save_object(&self, object_id: ObjectId, indata: &[u8]) -> Result<(), Error> {
-        let templ = [0, YKPIV_INS_PUT_DATA, 0x3f, 0xff];
+        let templ = [0, Ins::PutData.code(), 0x3f, 0xff];
 
         // TODO(tarcieri): replace with vector
         let mut data = [0u8; CB_BUF_MAX];
