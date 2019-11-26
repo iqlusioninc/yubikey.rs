@@ -1,6 +1,6 @@
 [package]
 name    = "yubikey-piv"
-version = "0.0.1" # Also update html_root_url in lib.rs when bumping this
+version = "0.0.2" # Also update html_root_url in lib.rs when bumping this
 description = """
 Pure Rust host-side driver for the YubiKey Personal Identity Verification (PIV)
 application providing general-purpose public-key signing and encryption
@@ -21,19 +21,19 @@ maintenance = { status = "experimental" }
 [dependencies]
 des = "0.3"
 getrandom = "0.1"
-hmac = { version = "0.7", optional = true }
+hmac = "0.7"
 log = "0.4"
-pbkdf2 = { version = "0.3", optional = true }
+pbkdf2 = "0.3"
 pcsc = "2"
-sha-1 = { version = "0.8", optional = true }
-subtle = { version = "2", optional = true }
+sha-1 = "0.8"
+subtle = "2"
 zeroize = "1"
 
 [dev-dependencies]
 env_logger = "0.7"
 
 [features]
-untested = ["hmac", "pbkdf2", "sha-1", "subtle"]
+untested = []
 
 [package.metadata.docs.rs]
 all-features = true
