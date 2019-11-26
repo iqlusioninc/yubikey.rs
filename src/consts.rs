@@ -136,26 +136,6 @@ pub const YKPIV_CCCID_SIZE: usize = 14;
 pub const YKPIV_CERTINFO_UNCOMPRESSED: u8 = 0;
 pub const YKPIV_CERTINFO_GZIP: u8 = 1;
 
-pub const YKPIV_INS_VERIFY: u8 = 0x20;
-pub const YKPIV_INS_CHANGE_REFERENCE: u8 = 0x24;
-pub const YKPIV_INS_RESET_RETRY: u8 = 0x2c;
-pub const YKPIV_INS_GENERATE_ASYMMETRIC: u8 = 0x47;
-pub const YKPIV_INS_AUTHENTICATE: u8 = 0x87;
-pub const YKPIV_INS_GET_DATA: u8 = 0xcb;
-pub const YKPIV_INS_PUT_DATA: u8 = 0xdb;
-pub const YKPIV_INS_SELECT_APPLICATION: u8 = 0xa4;
-pub const YKPIV_INS_GET_RESPONSE_APDU: u8 = 0xc0;
-
-// Yubico vendor specific instructions
-// <https://developers.yubico.com/PIV/Introduction/Yubico_extensions.html>
-pub const YKPIV_INS_SET_MGMKEY: u8 = 0xff;
-pub const YKPIV_INS_IMPORT_KEY: u8 = 0xfe;
-pub const YKPIV_INS_GET_VERSION: u8 = 0xfd;
-pub const YKPIV_INS_RESET: u8 = 0xfb;
-pub const YKPIV_INS_SET_PIN_RETRIES: u8 = 0xfa;
-pub const YKPIV_INS_ATTEST: u8 = 0xf9;
-pub const YKPIV_INS_GET_SERIAL: u8 = 0xf8;
-
 pub const YKPIV_KEY_AUTHENTICATION: u8 = 0x9a;
 pub const YKPIV_KEY_CARDMGM: u8 = 0x9b;
 pub const YKPIV_KEY_SIGNATURE: u8 = 0x9c;
