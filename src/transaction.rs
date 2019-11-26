@@ -1,17 +1,18 @@
 //! YubiKey PC/SC transactions
 
-use crate::{apdu::APDU, consts::*, error::Error, yubikey::*, Buffer};
+use crate::{apdu::APDU, consts::*, error::Error, yubikey::*};
 #[cfg(feature = "untested")]
 use crate::{
+    apdu::{Response, StatusWords},
     mgm::MgmKey,
-    response::{Response, StatusWords},
     serialization::*,
-    ObjectId,
+    Buffer, ObjectId,
 };
 use log::{error, trace};
 use std::convert::TryInto;
 #[cfg(feature = "untested")]
 use std::ptr;
+#[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
 /// Exclusive transaction with the YubiKey's PC/SC card.
@@ -43,10 +44,10 @@ impl<'tx> Transaction<'tx> {
     /// single APDU messages at a time. For larger messages that need to be
     /// split into multiple APDUs, use the [`Transaction::transfer_data`]
     /// method instead.
-    pub fn transmit(&self, send_buffer: &[u8], recv_len: usize) -> Result<Buffer, Error> {
+    pub fn transmit(&self, send_buffer: &[u8], recv_len: usize) -> Result<Vec<u8>, Error> {
         trace!(">>> {:?}", send_buffer);
 
-        let mut recv_buffer = Zeroizing::new(vec![0u8; recv_len]);
+        let mut recv_buffer = vec![0u8; recv_len];
 
         let len = self
             .inner
@@ -54,9 +55,6 @@ impl<'tx> Transaction<'tx> {
             .len();
 
         recv_buffer.truncate(len);
-
-        trace!("<<< {:?}", recv_buffer.as_slice());
-
         Ok(recv_buffer)
     }
 
@@ -91,14 +89,14 @@ impl<'tx> Transaction<'tx> {
             return Err(Error::GenericError);
         }
 
-        if response.buffer().len() < 3 {
+        if response.data().len() < 3 {
             return Err(Error::SizeError);
         }
 
         Ok(Version {
-            major: response.buffer()[0],
-            minor: response.buffer()[1],
-            patch: response.buffer()[2],
+            major: response.data()[0],
+            minor: response.data()[1],
+            patch: response.data()[2],
         })
     }
 
@@ -157,7 +155,7 @@ impl<'tx> Transaction<'tx> {
             resp
         };
 
-        response.buffer()[..4]
+        response.data()[..4]
             .try_into()
             .map(|serial| Serial::from(u32::from_be_bytes(serial)))
             .map_err(|_| Error::SizeError)
@@ -363,7 +361,7 @@ impl<'tx> Transaction<'tx> {
             }
         }
 
-        let data = response.buffer();
+        let data = response.data();
 
         // skip the first 7c tag
         if data[0] != 0x7c {
@@ -404,7 +402,7 @@ impl<'tx> Transaction<'tx> {
         max_out: usize,
     ) -> Result<Response, Error> {
         let mut in_offset = 0;
-        let mut out_data = Zeroizing::new(vec![]);
+        let mut out_data = vec![];
         let mut sw = 0;
 
         loop {
@@ -432,17 +430,17 @@ impl<'tx> Transaction<'tx> {
 
             sw = response.status_words().code();
 
-            if out_data.len() - response.buffer().len() - 2 > max_out {
+            if out_data.len() - response.data().len() - 2 > max_out {
                 error!(
                     "output buffer too small: wanted to write {}, max was {}",
-                    out_data.len() - response.buffer().len() - 2,
+                    out_data.len() - response.data().len() - 2,
                     max_out
                 );
 
                 return Err(Error::SizeError);
             }
 
-            out_data.extend_from_slice(&response.buffer()[..response.buffer().len() - 2]);
+            out_data.extend_from_slice(&response.data()[..response.data().len() - 2]);
 
             in_offset += this_size;
             if in_offset >= in_data.len() {
@@ -460,20 +458,20 @@ impl<'tx> Transaction<'tx> {
             sw = response.status_words().code();
 
             if sw != StatusWords::Success.code() && (sw >> 8 != 0x61) {
-                return Ok(Response::new(sw.into(), Zeroizing::new(vec![])));
+                return Ok(Response::new(sw.into(), vec![]));
             }
 
-            if out_data.len() + response.buffer().len() - 2 > max_out {
+            if out_data.len() + response.data().len() - 2 > max_out {
                 error!(
                     "output buffer too small: wanted to write {}, max was {}",
-                    out_data.len() + response.buffer().len() - 2,
+                    out_data.len() + response.data().len() - 2,
                     max_out
                 );
 
                 return Err(Error::SizeError);
             }
 
-            out_data.extend_from_slice(&response.buffer()[..response.buffer().len() - 2]);
+            out_data.extend_from_slice(&response.data()[..response.data().len() - 2]);
         }
 
         Ok(Response::new(sw.into(), out_data))
@@ -495,7 +493,7 @@ impl<'tx> Transaction<'tx> {
             return Err(Error::GenericError);
         }
 
-        let data = response.into_buffer();
+        let data = Buffer::new(response.data().into());
         let mut outlen = 0;
 
         if data.len() < 2 || !has_valid_length(&data[1..], data.len() - 1) {

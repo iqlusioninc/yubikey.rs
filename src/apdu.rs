@@ -30,7 +30,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{error::Error, response::Response, transaction::Transaction, Buffer};
+use crate::{error::Error, transaction::Transaction, Buffer};
+use log::trace;
 use std::fmt::{self, Debug};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -112,11 +113,13 @@ impl APDU {
 
     /// Transmit this APDU using the given card transaction
     pub fn transmit(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response, Error> {
-        let response_bytes = txn.transmit(&self.to_bytes(), recv_len)?;
-        Ok(Response::from_bytes(response_bytes))
+        trace!(">>> {:?}", self);
+        let response = Response::from(txn.transmit(&self.to_bytes(), recv_len)?);
+        trace!("<<< {:?}", &response);
+        Ok(response)
     }
 
-    /// Consume this APDU and return a self-zeroizing buffer
+    /// Serialize this APDU as a self-zeroizing byte buffer
     pub fn to_bytes(&self) -> Buffer {
         let mut bytes = Vec::with_capacity(5 + self.data.len());
         bytes.push(self.cla);
@@ -157,5 +160,164 @@ impl Zeroize for APDU {
         self.p1.zeroize();
         self.p2.zeroize();
         self.data.zeroize();
+    }
+}
+
+/// APDU responses
+#[derive(Debug)]
+pub(crate) struct Response {
+    /// Status words
+    status_words: StatusWords,
+
+    /// Buffer
+    data: Vec<u8>,
+}
+
+impl Response {
+    /// Create a new response from the given status words and buffer
+    #[cfg(feature = "untested")]
+    pub fn new(status_words: StatusWords, data: Vec<u8>) -> Response {
+        Response { status_words, data }
+    }
+
+    /// Get the [`StatusWords`] for this response.
+    pub fn status_words(&self) -> StatusWords {
+        self.status_words
+    }
+
+    /// Get the raw [`StatusWords`] code for this response.
+    #[cfg(feature = "untested")]
+    pub fn code(&self) -> u32 {
+        self.status_words.code()
+    }
+
+    /// Do the status words for this response indicate success?
+    pub fn is_success(&self) -> bool {
+        self.status_words.is_success()
+    }
+
+    /// Borrow the response data
+    pub fn data(&self) -> &[u8] {
+        self.data.as_ref()
+    }
+}
+
+impl AsRef<[u8]> for Response {
+    fn as_ref(&self) -> &[u8] {
+        self.data()
+    }
+}
+
+impl Drop for Response {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+impl From<Vec<u8>> for Response {
+    fn from(mut bytes: Vec<u8>) -> Self {
+        if bytes.len() < 2 {
+            return Response {
+                status_words: StatusWords::None,
+                data: bytes,
+            };
+        }
+
+        let sw = StatusWords::from(
+            (bytes[bytes.len() - 2] as u32) << 8 | (bytes[bytes.len() - 1] as u32),
+        );
+
+        let len = bytes.len() - 2;
+        bytes.truncate(len);
+
+        Response {
+            status_words: sw,
+            data: bytes,
+        }
+    }
+}
+
+impl Zeroize for Response {
+    fn zeroize(&mut self) {
+        self.data.zeroize();
+    }
+}
+
+/// Status Words (SW) are 2-byte values returned by a card command.
+///
+/// The first byte of a status word is referred to as SW1 and the second byte
+/// of a status word is referred to as SW2.
+///
+/// See NIST special publication 800-73-4, section 5.6:
+/// <https://csrc.nist.gov/publications/detail/sp/800-73/4/final>
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum StatusWords {
+    /// No status words present in response
+    None,
+
+    /// Successful execution
+    Success,
+
+    /// Security status not satisfied
+    SecurityStatusError,
+
+    /// Authentication method blocked
+    AuthBlockedError,
+
+    /// Incorrect parameter in command data field
+    IncorrectParamError,
+
+    //
+    // Custom Yubico Status Word extensions
+    //
+    /// Incorrect card slot error
+    IncorrectSlotError,
+
+    /// Not supported error
+    NotSupportedError,
+
+    /// Other/unrecognized status words
+    Other(u32),
+}
+
+impl StatusWords {
+    /// Get the numerical response code for these status words
+    pub fn code(self) -> u32 {
+        match self {
+            StatusWords::None => 0,
+            StatusWords::SecurityStatusError => 0x6982,
+            StatusWords::AuthBlockedError => 0x6983,
+            StatusWords::IncorrectParamError => 0x6a80,
+            StatusWords::IncorrectSlotError => 0x6b00,
+            StatusWords::NotSupportedError => 0x6d00,
+            StatusWords::Success => 0x9000,
+            StatusWords::Other(n) => n,
+        }
+    }
+
+    /// Do these status words indicate success?
+    pub fn is_success(self) -> bool {
+        self == StatusWords::Success
+    }
+}
+
+impl From<u32> for StatusWords {
+    fn from(sw: u32) -> Self {
+        match sw {
+            0x0000 => StatusWords::None,
+            0x6982 => StatusWords::SecurityStatusError,
+            0x6983 => StatusWords::AuthBlockedError,
+            0x6a80 => StatusWords::IncorrectParamError,
+            0x6b00 => StatusWords::IncorrectSlotError,
+            0x6d00 => StatusWords::NotSupportedError,
+            0x9000 => StatusWords::Success,
+            _ => StatusWords::Other(sw),
+        }
+    }
+}
+
+impl From<StatusWords> for u32 {
+    fn from(sw: StatusWords) -> u32 {
+        sw.code()
     }
 }
