@@ -38,14 +38,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
+    apdu::StatusWords,
     certificate::{self, Certificate},
     consts::*,
     error::Error,
-    response::StatusWords,
     serialization::*,
     settings,
     yubikey::YubiKey,
-    AlgorithmId, ObjectId,
+    AlgorithmId, Buffer, ObjectId,
 };
 use log::{debug, error, warn};
 
@@ -309,7 +309,7 @@ pub fn generate(
         }
     }
 
-    let data = response.into_buffer();
+    let data = Buffer::new(response.data().into());
 
     match algorithm {
         YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 => {

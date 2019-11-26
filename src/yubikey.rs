@@ -35,7 +35,11 @@
 
 #[cfg(feature = "untested")]
 use crate::{
-    apdu::APDU, key::SlotId, metadata, mgm::MgmKey, response::StatusWords, serialization::*,
+    apdu::{StatusWords, APDU},
+    key::SlotId,
+    metadata,
+    mgm::MgmKey,
+    serialization::*,
     ObjectId,
 };
 use crate::{consts::*, error::Error, transaction::Transaction, Buffer};
@@ -271,12 +275,12 @@ impl YubiKey {
             .data(&[0x7c, 0x02, 0x80, 0x00])
             .transmit(&txn, 261)?;
 
-        if !challenge.is_success() || challenge.buffer().len() < 12 {
+        if !challenge.is_success() || challenge.data().len() < 12 {
             return Err(Error::AuthenticationError);
         }
 
         // send a response to the cards challenge and a challenge of our own.
-        let response = mgm_key.decrypt(challenge.buffer()[4..12].try_into().unwrap());
+        let response = mgm_key.decrypt(challenge.data()[4..12].try_into().unwrap());
 
         let mut data = [0u8; 22];
         data[0] = 0x7c;
@@ -308,7 +312,7 @@ impl YubiKey {
         let response = mgm_key.encrypt(&challenge);
 
         use subtle::ConstantTimeEq;
-        if response.ct_eq(&authentication.buffer()[4..12]).unwrap_u8() != 1 {
+        if response.ct_eq(&authentication.data()[4..12]).unwrap_u8() != 1 {
             return Err(Error::AuthenticationError);
         }
 
@@ -803,11 +807,11 @@ impl YubiKey {
             }
         }
 
-        if response.buffer()[0] != 0x30 {
+        if response.data()[0] != 0x30 {
             return Err(Error::GenericError);
         }
 
-        Ok(response.into_buffer())
+        Ok(Buffer::new(response.data().into()))
     }
 
     /// Get an auth challenge
@@ -824,7 +828,7 @@ impl YubiKey {
             return Err(Error::AuthenticationError);
         }
 
-        Ok(response.buffer()[4..12].try_into().unwrap())
+        Ok(response.data()[4..12].try_into().unwrap())
     }
 
     /// Verify an auth response
