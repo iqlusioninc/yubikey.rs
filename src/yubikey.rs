@@ -357,15 +357,13 @@ impl YubiKey {
     pub fn sign_data(
         &mut self,
         raw_in: &[u8],
-        sign_out: &mut [u8],
-        out_len: &mut usize,
         algorithm: u8,
         key: SlotId,
-    ) -> Result<(), Error> {
+    ) -> Result<Buffer, Error> {
         let txn = self.begin_transaction()?;
 
         // don't attempt to reselect in crypt operations to avoid problems with PIN_ALWAYS
-        txn.authenticated_command(raw_in, sign_out, out_len, algorithm, key, false)
+        txn.authenticated_command(raw_in, algorithm, key, false)
     }
 
     /// Decrypt data using a PIV key
@@ -373,15 +371,13 @@ impl YubiKey {
     pub fn decrypt_data(
         &mut self,
         input: &[u8],
-        out: &mut [u8],
-        out_len: &mut usize,
         algorithm: u8,
         key: SlotId,
-    ) -> Result<(), Error> {
+    ) -> Result<Buffer, Error> {
         let txn = self.begin_transaction()?;
 
         // don't attempt to reselect in crypt operations to avoid problems with PIN_ALWAYS
-        txn.authenticated_command(input, out, out_len, algorithm, key, true)
+        txn.authenticated_command(input, algorithm, key, true)
     }
 
     /// Verify device PIN.

@@ -283,12 +283,10 @@ impl<'tx> Transaction<'tx> {
     pub(crate) fn authenticated_command(
         &self,
         sign_in: &[u8],
-        out: &mut [u8],
-        out_len: &mut usize,
         algorithm: u8,
         key: u8,
         decipher: bool,
-    ) -> Result<(), Error> {
+    ) -> Result<Buffer, Error> {
         let in_len = sign_in.len();
         let mut indata = [0u8; 1024];
         let templ = [0, Ins::Authenticate.code(), algorithm, key];
@@ -380,15 +378,7 @@ impl<'tx> Transaction<'tx> {
 
         offset += 1;
         offset += get_length(&data[offset..], &mut len);
-
-        if len > *out_len {
-            error!("wrong size on output buffer");
-            return Err(Error::SizeError);
-        }
-
-        *out_len = len;
-        out[..len].copy_from_slice(&data[offset..(offset + len)]);
-        Ok(())
+        Ok(Buffer::new(data[offset..(offset + len)].into()))
     }
 
     /// Send/receive large amounts of data to/from the YubiKey, splitting long
