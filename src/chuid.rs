@@ -57,7 +57,7 @@ const CHUID_TMPL: &[u8] = &[
 
 /// Cardholder Unique Identifier (CHUID)
 #[derive(Copy, Clone, Debug)]
-pub struct CHUID([u8; YKPIV_CARDID_SIZE]);
+pub struct CHUID(pub [u8; YKPIV_CARDID_SIZE]);
 
 impl CHUID {
     /// Generate a random Cardholder Unique Identifier (CHUID)

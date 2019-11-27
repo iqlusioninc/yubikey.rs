@@ -421,17 +421,17 @@ impl<'tx> Transaction<'tx> {
 
             sw = response.status_words().code();
 
-            if out_data.len() - response.data().len() - 2 > max_out {
+            if 0 != out_data.len() && (out_data.len() - response.data().len() > max_out) {
                 error!(
                     "output buffer too small: wanted to write {}, max was {}",
-                    out_data.len() - response.data().len() - 2,
+                    out_data.len() - response.data().len(),
                     max_out
                 );
 
                 return Err(Error::SizeError);
             }
 
-            out_data.extend_from_slice(&response.data()[..response.data().len() - 2]);
+            out_data.extend_from_slice(&response.data()[..response.data().len()]);
 
             in_offset += this_size;
             if in_offset >= in_data.len() {
@@ -452,17 +452,17 @@ impl<'tx> Transaction<'tx> {
                 return Ok(Response::new(sw.into(), vec![]));
             }
 
-            if out_data.len() + response.data().len() - 2 > max_out {
+            if out_data.len() + response.data().len() > max_out {
                 error!(
                     "output buffer too small: wanted to write {}, max was {}",
-                    out_data.len() + response.data().len() - 2,
+                    out_data.len() + response.data().len(),
                     max_out
                 );
 
                 return Err(Error::SizeError);
             }
 
-            out_data.extend_from_slice(&response.data()[..response.data().len() - 2]);
+            out_data.extend_from_slice(&response.data()[..response.data().len()]);
         }
 
         Ok(Response::new(sw.into(), out_data))
