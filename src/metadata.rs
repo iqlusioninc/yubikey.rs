@@ -83,35 +83,25 @@ pub(crate) fn set_item(
     tag: u8,
     p_item: &[u8],
 ) -> Result<(), Error> {
-    let mut p_temp: *mut u8 = data.as_mut_ptr();
     let mut cb_temp: usize = 0;
     let mut tag_temp: u8 = 0;
     let mut cb_len: usize = 0;
     let cb_item = p_item.len();
-    // Must be signed to have negative offsets
-    let cb_moved: isize;
-    let p_next: *mut u8;
 
-    while p_temp < data[*pcb_data..].as_mut_ptr() {
-        unsafe {
-            tag_temp = *p_temp;
-            p_temp = p_temp.add(1);
+    let mut offset = 0;
 
-            cb_len = get_length(
-                slice::from_raw_parts(
-                    p_temp,
-                    data.as_mut_ptr() as usize + data.len() - p_temp as usize,
-                ),
-                &mut cb_temp,
-            );
-            p_temp = p_temp.add(cb_len);
+    while offset < *pcb_data {
+        tag_temp = data[offset];
+        offset += 1;
 
-            if tag_temp == tag {
-                break;
-            }
+        cb_len = get_length(&data[offset..], &mut cb_temp);
+        offset += cb_len;
 
-            p_temp = p_temp.add(cb_temp);
+        if tag_temp == tag {
+            break;
         }
+
+        offset += cb_temp;
     }
 
     if tag_temp != tag {
@@ -120,75 +110,63 @@ pub(crate) fn set_item(
             return Ok(());
         }
 
-        unsafe {
-            p_temp = data.as_mut_ptr().add(*pcb_data);
-            cb_len = get_length_size(cb_item);
+        // We did not find an existing tag, append
+        offset = *pcb_data;
+        cb_len = get_length_size(cb_item);
 
-            if (*pcb_data + cb_len + cb_item) > cb_data_max {
-                return Err(Error::GenericError);
-            }
-
-            *p_temp = tag;
-            p_temp = p_temp.add(1);
-            p_temp = p_temp.add(set_length(
-                slice::from_raw_parts_mut(
-                    p_temp,
-                    data.as_ptr() as usize + data.len() - p_temp as usize,
-                ),
-                cb_item,
-            ));
-
-            ptr::copy(p_item.as_ptr(), p_temp, cb_item);
+        // If length would cause buffer overflow, return error
+        if (*pcb_data + cb_len + cb_item) > cb_data_max {
+            return Err(Error::GenericError);
         }
+
+        data[offset] = tag;
+        offset += 1;
+        offset += set_length(&mut data[offset..], cb_item);
+        data[offset..offset + cb_item].copy_from_slice(p_item);
 
         *pcb_data += 1 + cb_len + cb_item;
 
         return Ok(());
     }
 
-    if cb_temp == cb_item {
-        unsafe {
-            ptr::copy(p_item.as_ptr(), p_temp, cb_item);
-        }
+    // Found tag
 
+    // Check length, if it matches, overwrite
+    if cb_temp == cb_item {
+        data[offset..offset + cb_item].copy_from_slice(p_item);
         return Ok(());
     }
 
-    p_next = unsafe { p_temp.add(cb_temp) };
-    cb_moved = (cb_item as isize - cb_temp as isize)
+    // Length doesn't match, expand/shrink to fit
+    let next_offset = offset + cb_temp;
+    // Must be signed to have negative offsets
+    let cb_moved: isize = (cb_item as isize - cb_temp as isize)
         + if cb_item != 0 {
             get_length_size(cb_item) as isize
         } else {
+            // For tag, if deleting
             -1
         }
+        // Accounts for different length encoding
         - cb_len as isize;
 
-    if (*pcb_data + cb_moved as usize) > cb_data_max {
+    // If length would cause buffer overflow, return error
+    if (*pcb_data as isize + cb_moved) as usize > cb_data_max {
         return Err(Error::GenericError);
     }
 
-    unsafe {
-        ptr::copy(
-            p_next,
-            p_next.offset(cb_moved),
-            *pcb_data - p_next as usize - data.as_ptr() as usize,
-        );
-    }
+    // Move remaining data
+    data.copy_within(
+        next_offset..*pcb_data,
+        (next_offset as isize + cb_moved) as usize,
+    );
+    *pcb_data = (*pcb_data as isize + cb_moved) as usize;
 
-    *pcb_data += cb_moved as usize;
-
+    // Re-encode item and insert
     if cb_item != 0 {
-        unsafe {
-            p_temp = p_temp.offset(-(cb_len as isize));
-            p_temp = p_temp.add(set_length(
-                slice::from_raw_parts_mut(
-                    p_temp,
-                    data.as_ptr() as usize + data.len() - p_temp as usize,
-                ),
-                cb_item,
-            ));
-            ptr::copy(p_item.as_ptr(), p_temp, cb_item);
-        }
+        offset -= cb_len;
+        offset += set_length(&mut data[offset..], cb_item);
+        data[offset..offset + cb_item].copy_from_slice(p_item);
     }
 
     Ok(())
