@@ -40,7 +40,6 @@ use crate::{
     Buffer,
 };
 use log::error;
-use std::ptr;
 use zeroize::Zeroizing;
 
 /// Certificates
@@ -124,10 +123,7 @@ pub(crate) fn read_certificate(txn: &Transaction<'_>, slot: SlotId) -> Result<Bu
             return Ok(Zeroizing::new(vec![]));
         }
 
-        unsafe {
-            ptr::copy(buf.as_ptr().add(offset), buf.as_mut_ptr(), len);
-        }
-
+        buf.copy_within(offset..offset + len, 0);
         buf.truncate(len);
     }
 
