@@ -16,8 +16,6 @@ use crate::{
 use log::{error, trace};
 use std::convert::TryInto;
 #[cfg(feature = "untested")]
-use std::ptr;
-#[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
 /// Exclusive transaction with the YubiKey's PC/SC card.
@@ -187,7 +185,6 @@ impl<'tx> Transaction<'tx> {
     #[cfg(feature = "untested")]
     pub fn change_pin(&self, action: i32, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         let mut templ = [0, Ins::ChangeReference.code(), 0, 0x80];
-        let mut indata = Zeroizing::new([0u8; 16]);
 
         if current_pin.len() > CB_PIN_MAX || new_pin.len() > CB_PIN_MAX {
             return Err(Error::SizeError);
@@ -199,31 +196,9 @@ impl<'tx> Transaction<'tx> {
             templ[3] = 0x81;
         }
 
-        unsafe {
-            ptr::copy(current_pin.as_ptr(), indata.as_mut_ptr(), current_pin.len());
-
-            if current_pin.len() < CB_PIN_MAX {
-                ptr::write_bytes(
-                    indata.as_mut_ptr().add(current_pin.len()),
-                    0xff,
-                    CB_PIN_MAX - current_pin.len(),
-                );
-            }
-
-            ptr::copy(
-                new_pin.as_ptr(),
-                indata.as_mut_ptr().offset(8),
-                new_pin.len(),
-            );
-
-            if new_pin.len() < CB_PIN_MAX {
-                ptr::write_bytes(
-                    indata.as_mut_ptr().offset(8).add(new_pin.len()),
-                    0xff,
-                    CB_PIN_MAX - new_pin.len(),
-                );
-            }
-        }
+        let mut indata = Zeroizing::new([0xff; CB_PIN_MAX * 2]);
+        indata[0..current_pin.len()].copy_from_slice(current_pin);
+        indata[CB_PIN_MAX..CB_PIN_MAX + new_pin.len()].copy_from_slice(new_pin);
 
         let status_words = self
             .transfer_data(&templ, indata.as_ref(), 0xFF)?
