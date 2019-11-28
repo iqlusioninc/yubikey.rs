@@ -39,7 +39,6 @@
 
 use crate::{consts::*, error::Error, serialization::*, yubikey::YubiKey};
 use log::error;
-use std::{ptr, slice};
 
 /// `msroots` file: PKCS#7-formatted certificate store for enterprise trust roots
 pub struct MsRoots(Vec<u8>);
@@ -51,33 +50,22 @@ impl MsRoots {
     }
 
     /// Read `msroots` file from YubiKey
-    pub fn read(yubikey: &mut YubiKey) -> Result<Vec<Self>, Error> {
-        let mut len: usize = 0;
-        let mut ptr: *mut u8;
-        let mut tag: u8;
-        let mut offset: usize = 0;
-
-        let mut results = vec![];
+    pub fn read(yubikey: &mut YubiKey) -> Result<Option<Self>, Error> {
         let cb_data = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
 
         // allocate first page
-        let mut p_data = vec![0u8; cb_data];
+        let mut data = Vec::with_capacity(cb_data);
 
         for object_id in YKPIV_OBJ_MSROOTS1..YKPIV_OBJ_MSROOTS5 {
-            let mut buf = txn.fetch_object(object_id)?;
+            let buf = txn.fetch_object(object_id)?;
             let cb_buf = buf.len();
 
-            ptr = buf.as_mut_ptr();
-
             if cb_buf < CB_OBJ_TAG_MIN {
-                return Ok(results);
+                return Ok(None);
             }
 
-            unsafe {
-                tag = *ptr;
-                ptr = ptr.add(1);
-            }
+            let tag = buf[0];
 
             if (TAG_MSROOTS_MID != tag || YKPIV_OBJ_MSROOTS5 == object_id)
                 && (TAG_MSROOTS_END != tag)
@@ -85,38 +73,28 @@ impl MsRoots {
                 // the current object doesn't contain a valid part of a msroots file
 
                 // treat condition as object isn't found
-                return Ok(results);
+                return Ok(None);
             }
 
-            unsafe {
-                ptr = ptr.add(get_length(
-                    slice::from_raw_parts(ptr, buf.as_ptr() as usize + buf.len() - ptr as usize),
-                    &mut len,
-                ));
-            }
+            let mut len: usize = 0;
+            let offset = 1 + get_length(&buf[1..], &mut len);
 
             // check that decoded length represents object contents
-            if len > cb_buf - (ptr as isize - buf.as_mut_ptr() as isize) as usize {
-                return Ok(results);
+            if len > cb_buf - offset {
+                return Ok(None);
             }
 
-            unsafe {
-                ptr::copy(ptr, p_data.as_mut_ptr().add(offset), len);
-            }
-
-            offset += len;
-
-            match MsRoots::new(&p_data[..offset]) {
-                Ok(msroots) => results.push(msroots),
-                Err(res) => error!("error parsing msroots: {:?}", res),
-            }
+            data.extend_from_slice(&buf[offset..offset + len]);
 
             if tag == TAG_MSROOTS_END {
                 break;
             }
         }
 
-        Ok(results)
+        MsRoots::new(&data).map(Some).map_err(|e| {
+            error!("error parsing msroots: {:?}", e);
+            e
+        })
     }
 
     /// Write `msroots` file to YubiKey
