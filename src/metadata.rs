@@ -31,7 +31,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{consts::*, error::Error, serialization::*, transaction::Transaction, Buffer};
-use std::ptr;
 use zeroize::Zeroizing;
 
 /// Get metadata item
@@ -186,10 +185,7 @@ pub(crate) fn read(txn: &Transaction<'_>, tag: u8) -> Result<Buffer, Error> {
         return Err(Error::GenericError);
     }
 
-    unsafe {
-        ptr::copy(data.as_ptr().add(offset), data.as_mut_ptr(), pcb_data);
-    }
-
+    data.copy_within(offset..offset + pcb_data, 0);
     data.truncate(pcb_data);
     Ok(data)
 }
