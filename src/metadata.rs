@@ -31,48 +31,37 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{consts::*, error::Error, serialization::*, transaction::Transaction, Buffer};
-use std::{ptr, slice};
+use std::ptr;
 use zeroize::Zeroizing;
 
 /// Get metadata item
 pub(crate) fn get_item(data: &[u8], tag: u8) -> Result<&[u8], Error> {
-    let mut p_temp: *const u8 = data.as_ptr();
     let mut cb_temp: usize = 0;
-    let mut tag_temp: u8;
+    let mut offset = 0;
 
-    unsafe {
-        while p_temp < data.as_ptr().add(data.len()) {
-            tag_temp = *p_temp;
-            p_temp = p_temp.add(1);
+    while offset < data.len() {
+        let tag_temp = data[offset];
+        offset += 1;
 
-            let p_slice = slice::from_raw_parts(
-                p_temp,
-                data.as_ptr() as usize + data.len() - p_temp as usize,
-            );
-
-            if !has_valid_length(
-                p_slice,
-                data.as_ptr().add(data.len()) as usize - p_temp as usize,
-            ) {
-                return Err(Error::SizeError);
-            }
-
-            p_temp = p_temp.add(get_length(p_slice, &mut cb_temp));
-
-            if tag_temp == tag {
-                // found tag
-                break;
-            }
-
-            p_temp = p_temp.add(cb_temp);
+        if !has_valid_length(&data[offset..], data.len() - 1) {
+            return Err(Error::SizeError);
         }
 
-        if p_temp < data.as_ptr().add(data.len()) {
-            return Ok(slice::from_raw_parts(p_temp, cb_temp));
+        offset += get_length(&data[offset..], &mut cb_temp);
+
+        if tag_temp == tag {
+            // found tag
+            break;
         }
+
+        offset += cb_temp;
     }
 
-    Err(Error::GenericError)
+    if offset < data.len() {
+        Ok(&data[offset..offset + cb_temp])
+    } else {
+        Err(Error::GenericError)
+    }
 }
 
 /// Set metadata item
