@@ -10,7 +10,7 @@ algorithms (e.g, PKCS#1v1.5, ECDSA)
 authors    = ["Tony Arcieri <bascule@gmail.com>", "Yubico AB"]
 edition    = "2018"
 license    = "BSD-2-Clause"
-repository = "https://github.com/tarcieri/yubikey-piv.rs"
+repository = "https://github.com/iqlusioninc/yubikey-piv.rs"
 readme     = "README.md"
 categories = ["api-bindings", "cryptography", "hardware-support"]
 keywords   = ["ccid", "ecdsa", "rsa", "piv", "yubikey"]
