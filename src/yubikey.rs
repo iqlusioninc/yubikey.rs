@@ -655,6 +655,7 @@ impl YubiKey {
                         match algorithm {
                             YKPIV_ALGO_RSA1024 => 64,
                             YKPIV_ALGO_RSA2048 => 128,
+                            _ => unreachable!(),
                         },
                         vec![p, q, dp, dq, qinv],
                         0x01,
@@ -673,6 +674,7 @@ impl YubiKey {
                         match algorithm {
                             YKPIV_ALGO_ECCP256 => 32,
                             YKPIV_ALGO_ECCP384 => 48,
+                            _ => unreachable!(),
                         },
                         vec![ec_data],
                         0x06,
