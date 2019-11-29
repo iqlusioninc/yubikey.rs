@@ -50,7 +50,7 @@ const CCC_TMPL: &[u8] = &[
 
 /// Cardholder Capability Container (CCC) Identifier
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct CCCID([u8; YKPIV_CCCID_SIZE]);
+pub struct CCCID(pub [u8; YKPIV_CCCID_SIZE]);
 
 impl CCCID {
     /// Generate a random CCCID
