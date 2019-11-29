@@ -7,6 +7,7 @@
 ![Apache2/MIT licensed][license-image]
 ![Rust Version][rustc-image]
 ![Maintenance Status: Experimental][maintenance-image]
+[![Safety Dance][safety-image]][safety-link]
 [![Build Status][build-image]][build-link]
 [![Gitter Chat][gitter-image]][gitter-link]
 
@@ -193,10 +194,12 @@ or conditions.
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
 [rustc-image]: https://img.shields.io/badge/rustc-1.39+-blue.svg
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
-[build-image]: https://github.com/tarcieri/yubikey-piv.rs/workflows/Rust/badge.svg
-[build-link]: https://github.com/tarcieri/yubikey-piv.rs/actions
-[gitter-image]: https://badges.gitter.im/yubihsm-piv-rs.svg
-[gitter-link]: https://gitter.im/yubikey-piv-rs/community
+[safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
+[safety-link]: https://github.com/rust-secure-code/safety-dance/
+[build-image]: https://github.com/iqlusioninc/yubikey-piv.rs/workflows/Rust/badge.svg?branch=develop&event=push
+[build-link]: https://github.com/iqlusioninc/yubikey-piv.rs/actions
+[gitter-image]: https://badges.gitter.im/badge.svg
+[gitter-link]: https://gitter.im/iqlusioninc/community
 
 [//]: # (general links)
 
@@ -209,18 +212,18 @@ or conditions.
 [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/
 [Corrode]: https://github.com/jameysharp/corrode
 [cc-web]: https://contributor-covenant.org/
-[cc-md]: https://github.com/tarcieri/yubikey-piv.rs/blob/develop/CODE_OF_CONDUCT.md
+[cc-md]: https://github.com/iqlusioninc/yubikey-piv.rs/blob/develop/CODE_OF_CONDUCT.md
 [BSDL]: https://opensource.org/licenses/BSD-2-Clause
 
 [//]: # (github issues)
 
-[#18]: https://github.com/tarcieri/yubikey-piv.rs/issues/18
-[#20]: https://github.com/tarcieri/yubikey-piv.rs/issues/20
-[#21]: https://github.com/tarcieri/yubikey-piv.rs/issues/21
-[#22]: https://github.com/tarcieri/yubikey-piv.rs/issues/22
-[#23]: https://github.com/tarcieri/yubikey-piv.rs/issues/23
-[#24]: https://github.com/tarcieri/yubikey-piv.rs/issues/24
-[#25]: https://github.com/tarcieri/yubikey-piv.rs/issues/25
-[#26]: https://github.com/tarcieri/yubikey-piv.rs/issues/26
-[#27]: https://github.com/tarcieri/yubikey-piv.rs/issues/27
-[#28]: https://github.com/tarcieri/yubikey-piv.rs/issues/28
+[#18]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/18
+[#20]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/20
+[#21]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/21
+[#22]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/22
+[#23]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/23
+[#24]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/24
+[#25]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/25
+[#26]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/26
+[#27]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/27
+[#28]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/28
