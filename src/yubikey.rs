@@ -611,12 +611,6 @@ impl YubiKey {
         let mut key_data = Zeroizing::new(vec![0u8; 1024]);
         let templ = [0, Ins::ImportKey.code(), algorithm.into(), key.into()];
 
-        // Only slot we want to exclude is CardManagement, which isn't in the enum.
-        // TODO: Decide whether to add it or not.
-        // match key {
-        //     SlotId::CardManagement => return Err(Error::KeyError),
-        // }
-
         if pin_policy != YKPIV_PINPOLICY_DEFAULT
             && pin_policy != YKPIV_PINPOLICY_NEVER
             && pin_policy != YKPIV_PINPOLICY_ONCE
