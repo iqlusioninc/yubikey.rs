@@ -352,6 +352,12 @@ pub(crate) enum StatusWords {
     /// Successful execution
     Success,
 
+    /// PIN verification failure
+    VerifyFailError {
+        /// Remaining verification attempts
+        tries: u8,
+    },
+
     /// Security status not satisfied
     SecurityStatusError,
 
@@ -379,6 +385,7 @@ impl StatusWords {
     pub fn code(self) -> u32 {
         match self {
             StatusWords::None => 0,
+            StatusWords::VerifyFailError { tries } => 0x63c0 & tries as u32,
             StatusWords::SecurityStatusError => 0x6982,
             StatusWords::AuthBlockedError => 0x6983,
             StatusWords::IncorrectParamError => 0x6a80,
@@ -399,6 +406,9 @@ impl From<u32> for StatusWords {
     fn from(sw: u32) -> Self {
         match sw {
             0x0000 => StatusWords::None,
+            sw if sw & 0xfff0 == 0x63c0 => StatusWords::VerifyFailError {
+                tries: (sw & 0x000f) as u8,
+            },
             0x6982 => StatusWords::SecurityStatusError,
             0x6983 => StatusWords::AuthBlockedError,
             0x6a80 => StatusWords::IncorrectParamError,

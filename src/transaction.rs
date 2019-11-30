@@ -184,7 +184,7 @@ impl<'tx> Transaction<'tx> {
         match response.status_words() {
             StatusWords::Success => Ok(()),
             StatusWords::AuthBlockedError => Err(Error::WrongPin { tries: 0 }),
-            StatusWords::Other(sw) if sw >> 8 == 0x63 => Err(Error::WrongPin { tries: sw & 0xf }),
+            StatusWords::VerifyFailError { tries } => Err(Error::WrongPin { tries }),
             _ => Err(Error::GenericError),
         }
     }
@@ -215,7 +215,7 @@ impl<'tx> Transaction<'tx> {
         match status_words {
             StatusWords::Success => Ok(()),
             StatusWords::AuthBlockedError => Err(Error::PinLocked),
-            StatusWords::Other(sw) if sw >> 8 == 0x63 => Err(Error::WrongPin { tries: sw & 0xf }),
+            StatusWords::VerifyFailError { tries } => Err(Error::WrongPin { tries }),
             _ => {
                 error!(
                     "failed changing pin, token response code: {:x}.",
