@@ -55,6 +55,7 @@ const CHUID_TMPL: &[u8] = &[
     0x30, 0x33, 0x30, 0x30, 0x31, 0x30, 0x31, 0x3e, 0x00, 0xfe, 0x00,
 ];
 
+/// Cardholder Unique Identifier (CHUID) Card UUID/GUID value
 #[derive(Copy,Clone, Debug)]
 pub struct ChuidUuid(pub [u8; YKPIV_CARDID_SIZE]);
 
@@ -64,19 +65,26 @@ pub struct CHUID(pub [u8; YKPIV_CHUID_SIZE]);
 
 impl CHUID {
 
+    /// Return FASC-N component of CHUID
     pub fn fascn(&self) -> Result<[u8; YKPIV_FASCN_SIZE], Error> {
         let mut fascn = [0u8; YKPIV_FASCN_SIZE];
         fascn.copy_from_slice(&self.0[CHUID_FASCN_OFFS..(CHUID_FASCN_OFFS + YKPIV_FASCN_SIZE)]);
         Ok(fascn)
     }
+
+    /// Return Card UUID/GUID component of CHUID
     pub fn uuid(&self) -> Result<[u8; YKPIV_CARDID_SIZE], Error> {
         let mut uuid = [0u8; YKPIV_CARDID_SIZE];
         uuid.copy_from_slice(&self.0[CHUID_GUID_OFFS..(CHUID_GUID_OFFS + YKPIV_CARDID_SIZE)]);
         Ok(uuid)
     }
+
+    /// Return expiration date component of CHUID
     pub fn expiration(&self) -> Result<[u8; YKPIV_EXPIRATION_SIZE], Error> {
         let mut expiration = [0u8; YKPIV_EXPIRATION_SIZE];
-        expiration.copy_from_slice(&self.0[CHUID_EXPIRATION_OFFS..(CHUID_EXPIRATION_OFFS + YKPIV_EXPIRATION_SIZE)]);
+        expiration.copy_from_slice(
+            &self.0[CHUID_EXPIRATION_OFFS..(CHUID_EXPIRATION_OFFS + YKPIV_EXPIRATION_SIZE)]
+        );
         Ok(expiration)
     }
 
@@ -98,7 +106,7 @@ impl CHUID {
 
         let mut chuid = [0u8; YKPIV_CHUID_SIZE];
         chuid.copy_from_slice(&response[0..YKPIV_CHUID_SIZE]);
-        let retval = CHUID{0: chuid};
+        let retval = CHUID { 0: chuid };
         Ok(retval)
     }
 
