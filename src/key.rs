@@ -45,7 +45,7 @@ use crate::{
     serialization::*,
     settings,
     yubikey::YubiKey,
-    AlgorithmId, Buffer, ObjectId,
+    Buffer, ObjectId,
 };
 use log::{debug, error, warn};
 use std::convert::TryFrom;
@@ -273,6 +273,44 @@ pub const SLOTS: [SlotId; 24] = [
     SlotId::CardAuthentication,
 ];
 
+/// Algorithm identifiers
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AlgorithmId {
+    /// 1024-bit RSA.
+    Rsa1024,
+    /// 2048-bit RSA.
+    Rsa2048,
+    /// ECDSA with the NIST P256 curve.
+    EccP256,
+    /// ECDSA with the NIST P384 curve.
+    EccP384,
+}
+
+impl TryFrom<u8> for AlgorithmId {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x06 => Ok(AlgorithmId::Rsa1024),
+            0x07 => Ok(AlgorithmId::Rsa2048),
+            0x11 => Ok(AlgorithmId::EccP256),
+            0x14 => Ok(AlgorithmId::EccP384),
+            _ => Err(Error::AlgorithmError),
+        }
+    }
+}
+
+impl From<AlgorithmId> for u8 {
+    fn from(id: AlgorithmId) -> u8 {
+        match id {
+            AlgorithmId::Rsa1024 => 0x06,
+            AlgorithmId::Rsa2048 => 0x07,
+            AlgorithmId::EccP256 => 0x11,
+            AlgorithmId::EccP384 => 0x14,
+        }
+    }
+}
+
 /// PIV cryptographic keys stored in a YubiKey
 #[derive(Clone, Debug)]
 pub struct Key {
@@ -377,50 +415,47 @@ pub fn generate(
     let mut templ = [0, Ins::GenerateAsymmetric.code(), 0, 0];
     let setting_roca: settings::BoolValue;
 
-    if yubikey.device_model() == DEVTYPE_YK4
-        && (algorithm == YKPIV_ALGO_RSA1024 || algorithm == YKPIV_ALGO_RSA2048)
-        && yubikey.version.major == 4
-        && (yubikey.version.minor < 3 || yubikey.version.minor == 3 && (yubikey.version.patch < 5))
-    {
-        setting_roca = settings::BoolValue::get(SZ_SETTING_ROCA, true);
-
-        let psz_msg = match setting_roca.source {
-            settings::Source::User => {
-                if setting_roca.value {
-                    SZ_ROCA_ALLOW_USER
-                } else {
-                    SZ_ROCA_BLOCK_USER
-                }
-            }
-            settings::Source::Admin => {
-                if setting_roca.value {
-                    SZ_ROCA_ALLOW_ADMIN
-                } else {
-                    SZ_ROCA_BLOCK_ADMIN
-                }
-            }
-            _ => SZ_ROCA_DEFAULT,
-        };
-
-        warn!(
-            "YubiKey serial number {} is affected by vulnerability CVE-2017-15361 \
-             (ROCA) and should be replaced. On-chip key generation {}  See \
-             YSA-2017-01 <https://www.yubico.com/support/security-advisories/ysa-2017-01/> \
-             for additional information on device replacement and mitigation assistance",
-            yubikey.serial, psz_msg
-        );
-
-        if !setting_roca.value {
-            return Err(Error::NotSupported);
-        }
-    }
-
     match algorithm {
-        YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 | YKPIV_ALGO_ECCP256 | YKPIV_ALGO_ECCP384 => (),
-        _ => {
-            error!("invalid algorithm specified");
-            return Err(Error::GenericError);
+        AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
+            if yubikey.device_model() == DEVTYPE_YK4
+                && yubikey.version.major == 4
+                && (yubikey.version.minor < 3
+                    || yubikey.version.minor == 3 && (yubikey.version.patch < 5))
+            {
+                setting_roca = settings::BoolValue::get(SZ_SETTING_ROCA, true);
+
+                let psz_msg = match setting_roca.source {
+                    settings::Source::User => {
+                        if setting_roca.value {
+                            SZ_ROCA_ALLOW_USER
+                        } else {
+                            SZ_ROCA_BLOCK_USER
+                        }
+                    }
+                    settings::Source::Admin => {
+                        if setting_roca.value {
+                            SZ_ROCA_ALLOW_ADMIN
+                        } else {
+                            SZ_ROCA_BLOCK_ADMIN
+                        }
+                    }
+                    _ => SZ_ROCA_DEFAULT,
+                };
+
+                warn!(
+                    "YubiKey serial number {} is affected by vulnerability CVE-2017-15361 \
+                     (ROCA) and should be replaced. On-chip key generation {}  See \
+                     YSA-2017-01 <https://www.yubico.com/support/security-advisories/ysa-2017-01/> \
+                     for additional information on device replacement and mitigation assistance",
+                    yubikey.serial, psz_msg
+                );
+
+                if !setting_roca.value {
+                    return Err(Error::NotSupported);
+                }
+            }
         }
+        _ => (),
     }
 
     let txn = yubikey.begin_transaction()?;
@@ -433,7 +468,7 @@ pub fn generate(
         3, // length sans this 2-byte header
         YKPIV_ALGO_TAG,
         1,
-        algorithm,
+        algorithm.into(),
     ]);
 
     if in_data[4] == 0 {
@@ -487,7 +522,7 @@ pub fn generate(
     let data = Buffer::new(response.data().into());
 
     match algorithm {
-        YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 => {
+        AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
             let mut offset = 5;
             let mut len = 0;
 
@@ -515,10 +550,10 @@ pub fn generate(
                 exp,
             })
         }
-        YKPIV_ALGO_ECCP256 | YKPIV_ALGO_ECCP384 => {
+        AlgorithmId::EccP256 | AlgorithmId::EccP384 => {
             let mut offset = 3;
 
-            let len = if algorithm == YKPIV_ALGO_ECCP256 {
+            let len = if let AlgorithmId::EccP256 = algorithm {
                 CB_ECC_POINTP256
             } else {
                 CB_ECC_POINTP384
@@ -541,10 +576,6 @@ pub fn generate(
 
             let point = data[offset..(offset + len)].to_vec();
             Ok(GeneratedKey::Ecc { algorithm, point })
-        }
-        _ => {
-            error!("wrong algorithm");
-            Err(Error::AlgorithmError)
         }
     }
 }

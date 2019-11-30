@@ -124,10 +124,6 @@ pub const TAG_ECC_POINT: u8 = 0x86;
 
 pub const YKPIV_ALGO_TAG: u8 = 0x80;
 pub const YKPIV_ALGO_3DES: u8 = 0x03;
-pub const YKPIV_ALGO_RSA1024: u8 = 0x06;
-pub const YKPIV_ALGO_RSA2048: u8 = 0x07;
-pub const YKPIV_ALGO_ECCP256: u8 = 0x11;
-pub const YKPIV_ALGO_ECCP384: u8 = 0x14;
 
 pub const YKPIV_ATR_NEO_R3: &[u8] = b";\xFC\x13\0\0\x811\xFE\x15YubikeyNEOr3\xE1\0";
 

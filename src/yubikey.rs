@@ -36,7 +36,7 @@
 #[cfg(feature = "untested")]
 use crate::{
     apdu::{Ins, StatusWords, APDU},
-    key::SlotId,
+    key::{AlgorithmId, SlotId},
     metadata,
     mgm::MgmKey,
     serialization::*,
@@ -356,7 +356,7 @@ impl YubiKey {
     pub fn sign_data(
         &mut self,
         raw_in: &[u8],
-        algorithm: u8,
+        algorithm: AlgorithmId,
         key: SlotId,
     ) -> Result<Buffer, Error> {
         let txn = self.begin_transaction()?;
@@ -370,7 +370,7 @@ impl YubiKey {
     pub fn decrypt_data(
         &mut self,
         input: &[u8],
-        algorithm: u8,
+        algorithm: AlgorithmId,
         key: SlotId,
     ) -> Result<Buffer, Error> {
         let txn = self.begin_transaction()?;
@@ -598,7 +598,7 @@ impl YubiKey {
     pub fn import_private_key(
         &mut self,
         key: SlotId,
-        algorithm: u8,
+        algorithm: AlgorithmId,
         p: Option<&[u8]>,
         q: Option<&[u8]>,
         dp: Option<&[u8]>,
@@ -609,7 +609,7 @@ impl YubiKey {
         touch_policy: u8,
     ) -> Result<(), Error> {
         let mut key_data = Zeroizing::new(vec![0u8; 1024]);
-        let templ = [0, Ins::ImportKey.code(), algorithm, key.into()];
+        let templ = [0, Ins::ImportKey.code(), algorithm.into(), key.into()];
 
         // Only slot we want to exclude is CardManagement, which isn't in the enum.
         // TODO: Decide whether to add it or not.
@@ -634,7 +634,7 @@ impl YubiKey {
         }
 
         let (elem_len, params, param_tag) = match algorithm {
-            YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 => match (p, q, dp, dq, qinv) {
+            AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => match (p, q, dp, dq, qinv) {
                 (Some(p), Some(q), Some(dp), Some(dq), Some(qinv)) => {
                     if p.len() + q.len() + dp.len() + dq.len() + qinv.len() >= key_data.len() {
                         return Err(Error::SizeError);
@@ -642,8 +642,8 @@ impl YubiKey {
 
                     (
                         match algorithm {
-                            YKPIV_ALGO_RSA1024 => 64,
-                            YKPIV_ALGO_RSA2048 => 128,
+                            AlgorithmId::Rsa1024 => 64,
+                            AlgorithmId::Rsa2048 => 128,
                             _ => unreachable!(),
                         },
                         vec![p, q, dp, dq, qinv],
@@ -652,7 +652,7 @@ impl YubiKey {
                 }
                 _ => return Err(Error::GenericError),
             },
-            YKPIV_ALGO_ECCP256 | YKPIV_ALGO_ECCP384 => match ec_data {
+            AlgorithmId::EccP256 | AlgorithmId::EccP384 => match ec_data {
                 Some(ec_data) => {
                     if ec_data.len() >= key_data.len() {
                         // This can never be true, but check to be explicit.
@@ -661,8 +661,8 @@ impl YubiKey {
 
                     (
                         match algorithm {
-                            YKPIV_ALGO_ECCP256 => 32,
-                            YKPIV_ALGO_ECCP384 => 48,
+                            AlgorithmId::EccP256 => 32,
+                            AlgorithmId::EccP384 => 48,
                             _ => unreachable!(),
                         },
                         vec![ec_data],
@@ -671,7 +671,6 @@ impl YubiKey {
                 }
                 _ => return Err(Error::GenericError),
             },
-            _ => return Err(Error::AlgorithmError),
         };
 
         let mut offset = 0;
