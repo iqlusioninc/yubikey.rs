@@ -396,7 +396,7 @@ impl YubiKey {
 
     /// Get the number of PIN retries
     #[cfg(feature = "untested")]
-    pub fn get_pin_retries(&mut self) -> Result<u32, Error> {
+    pub fn get_pin_retries(&mut self) -> Result<u8, Error> {
         let txn = self.begin_transaction()?;
 
         // Force a re-select to unverify, because once verified the spec dictates that
@@ -414,24 +414,15 @@ impl YubiKey {
 
     /// Set the number of PIN retries
     #[cfg(feature = "untested")]
-    pub fn set_pin_retries(&mut self, pin_tries: usize, puk_tries: usize) -> Result<(), Error> {
+    pub fn set_pin_retries(&mut self, pin_tries: u8, puk_tries: u8) -> Result<(), Error> {
         // Special case: if either retry count is 0, it's a successful no-op
         if pin_tries == 0 || puk_tries == 0 {
             return Ok(());
         }
 
-        if pin_tries > 0xff || puk_tries > 0xff || pin_tries < 1 || puk_tries < 1 {
-            return Err(Error::RangeError);
-        }
-
         let txn = self.begin_transaction()?;
 
-        let templ = [
-            0,
-            Ins::SetPinRetries.code(),
-            pin_tries as u8,
-            puk_tries as u8,
-        ];
+        let templ = [0, Ins::SetPinRetries.code(), pin_tries, puk_tries];
 
         let status_words = txn.transfer_data(&templ, &[], 255)?.status_words();
 

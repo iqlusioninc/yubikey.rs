@@ -68,7 +68,7 @@ pub enum Error {
     /// Wrong PIN
     WrongPin {
         /// Number of tries remaining
-        tries: u32,
+        tries: u8,
     },
 
     /// Invalid object
