@@ -163,15 +163,23 @@ impl<'tx> Transaction<'tx> {
     /// Verify device PIN.
     #[cfg(feature = "untested")]
     pub fn verify_pin(&self, pin: &[u8]) -> Result<(), Error> {
-        // TODO(tarcieri): allow unpadded (with `0xFF`) PIN shorter than CB_PIN_MAX?
-        if pin.len() != CB_PIN_MAX {
+        if pin.len() > CB_PIN_MAX {
             return Err(Error::SizeError);
         }
 
-        let response = APDU::new(Ins::Verify)
-            .params(0x00, 0x80)
-            .data(pin)
-            .transmit(self, 261)?;
+        let mut query = APDU::new(Ins::Verify);
+        query.params(0x00, 0x80);
+
+        // Empty pin means we are querying the number of retries. We set no data in this
+        // case; if we instead sent [0xff; CB_PIN_MAX] it would count as an attempt and
+        // decrease the retry counter.
+        if !pin.is_empty() {
+            let mut data = Zeroizing::new([0xff; CB_PIN_MAX]);
+            data[0..pin.len()].copy_from_slice(pin);
+            query.data(data.as_ref());
+        }
+
+        let response = query.transmit(self, 261)?;
 
         match response.status_words() {
             StatusWords::Success => Ok(()),
