@@ -280,7 +280,7 @@ impl Response {
 
     /// Get the raw [`StatusWords`] code for this response.
     #[cfg(feature = "untested")]
-    pub fn code(&self) -> u32 {
+    pub fn code(&self) -> u16 {
         self.status_words.code()
     }
 
@@ -317,7 +317,7 @@ impl From<Vec<u8>> for Response {
         }
 
         let sw = StatusWords::from(
-            (bytes[bytes.len() - 2] as u32) << 8 | (bytes[bytes.len() - 1] as u32),
+            (bytes[bytes.len() - 2] as u16) << 8 | (bytes[bytes.len() - 1] as u16),
         );
 
         let len = bytes.len() - 2;
@@ -377,15 +377,15 @@ pub(crate) enum StatusWords {
     NotSupportedError,
 
     /// Other/unrecognized status words
-    Other(u32),
+    Other(u16),
 }
 
 impl StatusWords {
     /// Get the numerical response code for these status words
-    pub fn code(self) -> u32 {
+    pub fn code(self) -> u16 {
         match self {
             StatusWords::None => 0,
-            StatusWords::VerifyFailError { tries } => 0x63c0 & tries as u32,
+            StatusWords::VerifyFailError { tries } => 0x63c0 & tries as u16,
             StatusWords::SecurityStatusError => 0x6982,
             StatusWords::AuthBlockedError => 0x6983,
             StatusWords::IncorrectParamError => 0x6a80,
@@ -402,8 +402,8 @@ impl StatusWords {
     }
 }
 
-impl From<u32> for StatusWords {
-    fn from(sw: u32) -> Self {
+impl From<u16> for StatusWords {
+    fn from(sw: u16) -> Self {
         match sw {
             0x0000 => StatusWords::None,
             sw if sw & 0xfff0 == 0x63c0 => StatusWords::VerifyFailError {
@@ -420,8 +420,8 @@ impl From<u32> for StatusWords {
     }
 }
 
-impl From<StatusWords> for u32 {
-    fn from(sw: StatusWords) -> u32 {
+impl From<StatusWords> for u16 {
+    fn from(sw: StatusWords) -> u16 {
         sw.code()
     }
 }
