@@ -167,10 +167,6 @@ pub mod yubikey;
 pub use self::{key::Key, mgm::MgmKey};
 pub use yubikey::YubiKey;
 
-/// Algorithm identifiers
-// TODO(tarcieri): make this an enum
-pub type AlgorithmId = u8;
-
 /// Object identifiers
 pub type ObjectId = u32;
 

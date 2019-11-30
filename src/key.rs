@@ -45,60 +45,271 @@ use crate::{
     serialization::*,
     settings,
     yubikey::YubiKey,
-    AlgorithmId, Buffer, ObjectId,
+    Buffer, ObjectId,
 };
 use log::{debug, error, warn};
+use std::convert::TryFrom;
 
 /// Slot identifiers.
 /// <https://developers.yubico.com/PIV/Introduction/Certificate_slots.html>
-// TODO(tarcieri): replace these with enums
-pub type SlotId = u8;
+#[derive(Clone, Copy, Debug)]
+pub enum SlotId {
+    /// This certificate and its associated private key is used to authenticate the card
+    /// and the cardholder. This slot is used for things like system login. The end user
+    /// PIN is required to perform any private key operations. Once the PIN has been
+    /// provided successfully, multiple private key operations may be performed without
+    /// additional cardholder consent.
+    Authentication,
 
-/// Get the [`ObjectId`] that corresponds to a given [`SlotId`]
-// TODO(tarcieri): factor this into a slot ID enum
-pub(crate) fn slot_object(slot: SlotId) -> Result<ObjectId, Error> {
-    let id = match slot {
-        YKPIV_KEY_AUTHENTICATION => YKPIV_OBJ_AUTHENTICATION,
-        YKPIV_KEY_SIGNATURE => YKPIV_OBJ_SIGNATURE,
-        YKPIV_KEY_KEYMGM => YKPIV_OBJ_KEY_MANAGEMENT,
-        YKPIV_KEY_CARDAUTH => YKPIV_OBJ_CARD_AUTH,
-        YKPIV_KEY_ATTESTATION => YKPIV_OBJ_ATTESTATION,
-        slot if slot >= YKPIV_KEY_RETIRED1 && (slot <= YKPIV_KEY_RETIRED20) => {
-            YKPIV_OBJ_RETIRED1 + (slot - YKPIV_KEY_RETIRED1) as u32
+    /// This certificate and its associated private key is used for digital signatures for
+    /// the purpose of document signing, or signing files and executables. The end user
+    /// PIN is required to perform any private key operations. The PIN must be submitted
+    /// every time immediately before a sign operation, to ensure cardholder participation
+    /// for every digital signature generated.
+    Signature,
+
+    /// This certificate and its associated private key is used for encryption for the
+    /// purpose of confidentiality. This slot is used for things like encrypting e-mails
+    /// or files. The end user PIN is required to perform any private key operations. Once
+    /// the PIN has been provided successfully, multiple private key operations may be
+    /// performed without additional cardholder consent.
+    KeyManagement,
+
+    /// This certificate and its associated private key is used to support additional
+    /// physical access applications, such as providing physical access to buildings via
+    /// PIV-enabled door locks. The end user PIN is NOT required to perform private key
+    /// operations for this slot.
+    CardAuthentication,
+
+    /// These slots are only available on the YubiKey 4 & 5. They are meant for previously
+    /// used Key Management keys to be able to decrypt earlier encrypted documents or
+    /// emails. In the YubiKey 4 & 5 all 20 of them are fully available for use.
+    Retired(RetiredSlotId),
+
+    /// This slot is only available on YubiKey version 4.3 and newer. It is only used for
+    /// attestation of other keys generated on device with instruction `f9`. This slot is
+    /// not cleared on reset, but can be overwritten.
+    Attestation,
+}
+
+impl TryFrom<u8> for SlotId {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x9a => Ok(SlotId::Authentication),
+            0x9c => Ok(SlotId::Signature),
+            0x9d => Ok(SlotId::KeyManagement),
+            0x9e => Ok(SlotId::CardAuthentication),
+            0xf9 => Ok(SlotId::Attestation),
+            _ => RetiredSlotId::try_from(value).map(SlotId::Retired),
         }
-        _ => return Err(Error::InvalidObject),
-    };
+    }
+}
 
-    Ok(id)
+impl From<SlotId> for u8 {
+    fn from(slot: SlotId) -> u8 {
+        match slot {
+            SlotId::Authentication => 0x9a,
+            SlotId::Signature => 0x9c,
+            SlotId::KeyManagement => 0x9d,
+            SlotId::CardAuthentication => 0x9e,
+            SlotId::Retired(retired) => retired.into(),
+            SlotId::Attestation => 0xf9,
+        }
+    }
+}
+
+impl SlotId {
+    /// Returns the [`ObjectId`] that corresponds to a given [`SlotId`].
+    pub(crate) fn object_id(self) -> ObjectId {
+        match self {
+            SlotId::Authentication => 0x005f_c105,
+            SlotId::Signature => 0x005f_c10a,
+            SlotId::KeyManagement => 0x005f_c10b,
+            SlotId::CardAuthentication => 0x005f_c101,
+            SlotId::Retired(retired) => retired.object_id(),
+            SlotId::Attestation => 0x005f_ff01,
+        }
+    }
+}
+
+/// Retired slot IDs.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug)]
+pub enum RetiredSlotId {
+    R1,
+    R2,
+    R3,
+    R4,
+    R5,
+    R6,
+    R7,
+    R8,
+    R9,
+    R10,
+    R11,
+    R12,
+    R13,
+    R14,
+    R15,
+    R16,
+    R17,
+    R18,
+    R19,
+    R20,
+}
+
+impl TryFrom<u8> for RetiredSlotId {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x82 => Ok(RetiredSlotId::R1),
+            0x83 => Ok(RetiredSlotId::R2),
+            0x84 => Ok(RetiredSlotId::R3),
+            0x85 => Ok(RetiredSlotId::R4),
+            0x86 => Ok(RetiredSlotId::R5),
+            0x87 => Ok(RetiredSlotId::R6),
+            0x88 => Ok(RetiredSlotId::R7),
+            0x89 => Ok(RetiredSlotId::R8),
+            0x8a => Ok(RetiredSlotId::R9),
+            0x8b => Ok(RetiredSlotId::R10),
+            0x8c => Ok(RetiredSlotId::R11),
+            0x8d => Ok(RetiredSlotId::R12),
+            0x8e => Ok(RetiredSlotId::R13),
+            0x8f => Ok(RetiredSlotId::R14),
+            0x90 => Ok(RetiredSlotId::R15),
+            0x91 => Ok(RetiredSlotId::R16),
+            0x92 => Ok(RetiredSlotId::R17),
+            0x93 => Ok(RetiredSlotId::R18),
+            0x94 => Ok(RetiredSlotId::R19),
+            0x95 => Ok(RetiredSlotId::R20),
+            _ => Err(Error::InvalidObject),
+        }
+    }
+}
+
+impl From<RetiredSlotId> for u8 {
+    fn from(slot: RetiredSlotId) -> u8 {
+        match slot {
+            RetiredSlotId::R1 => 0x82,
+            RetiredSlotId::R2 => 0x83,
+            RetiredSlotId::R3 => 0x84,
+            RetiredSlotId::R4 => 0x85,
+            RetiredSlotId::R5 => 0x86,
+            RetiredSlotId::R6 => 0x87,
+            RetiredSlotId::R7 => 0x88,
+            RetiredSlotId::R8 => 0x89,
+            RetiredSlotId::R9 => 0x8a,
+            RetiredSlotId::R10 => 0x8b,
+            RetiredSlotId::R11 => 0x8c,
+            RetiredSlotId::R12 => 0x8d,
+            RetiredSlotId::R13 => 0x8e,
+            RetiredSlotId::R14 => 0x8f,
+            RetiredSlotId::R15 => 0x90,
+            RetiredSlotId::R16 => 0x91,
+            RetiredSlotId::R17 => 0x92,
+            RetiredSlotId::R18 => 0x93,
+            RetiredSlotId::R19 => 0x94,
+            RetiredSlotId::R20 => 0x95,
+        }
+    }
+}
+
+impl RetiredSlotId {
+    /// Returns the [`ObjectId`] that corresponds to a given [`RetiredSlotId`].
+    pub(crate) fn object_id(self) -> ObjectId {
+        match self {
+            RetiredSlotId::R1 => 0x005f_c10d,
+            RetiredSlotId::R2 => 0x005f_c10e,
+            RetiredSlotId::R3 => 0x005f_c10f,
+            RetiredSlotId::R4 => 0x005f_c110,
+            RetiredSlotId::R5 => 0x005f_c111,
+            RetiredSlotId::R6 => 0x005f_c112,
+            RetiredSlotId::R7 => 0x005f_c113,
+            RetiredSlotId::R8 => 0x005f_c114,
+            RetiredSlotId::R9 => 0x005f_c115,
+            RetiredSlotId::R10 => 0x005f_c116,
+            RetiredSlotId::R11 => 0x005f_c117,
+            RetiredSlotId::R12 => 0x005f_c118,
+            RetiredSlotId::R13 => 0x005f_c119,
+            RetiredSlotId::R14 => 0x005f_c11a,
+            RetiredSlotId::R15 => 0x005f_c11b,
+            RetiredSlotId::R16 => 0x005f_c11c,
+            RetiredSlotId::R17 => 0x005f_c11d,
+            RetiredSlotId::R18 => 0x005f_c11e,
+            RetiredSlotId::R19 => 0x005f_c11f,
+            RetiredSlotId::R20 => 0x005f_c120,
+        }
+    }
 }
 
 /// Personal Identity Verification (PIV) key slots
-pub const SLOTS: [u8; 24] = [
-    YKPIV_KEY_AUTHENTICATION,
-    YKPIV_KEY_SIGNATURE,
-    YKPIV_KEY_KEYMGM,
-    YKPIV_KEY_RETIRED1,
-    YKPIV_KEY_RETIRED2,
-    YKPIV_KEY_RETIRED3,
-    YKPIV_KEY_RETIRED4,
-    YKPIV_KEY_RETIRED5,
-    YKPIV_KEY_RETIRED6,
-    YKPIV_KEY_RETIRED7,
-    YKPIV_KEY_RETIRED8,
-    YKPIV_KEY_RETIRED9,
-    YKPIV_KEY_RETIRED10,
-    YKPIV_KEY_RETIRED11,
-    YKPIV_KEY_RETIRED12,
-    YKPIV_KEY_RETIRED13,
-    YKPIV_KEY_RETIRED14,
-    YKPIV_KEY_RETIRED15,
-    YKPIV_KEY_RETIRED16,
-    YKPIV_KEY_RETIRED17,
-    YKPIV_KEY_RETIRED18,
-    YKPIV_KEY_RETIRED19,
-    YKPIV_KEY_RETIRED20,
-    YKPIV_KEY_CARDAUTH,
+pub const SLOTS: [SlotId; 24] = [
+    SlotId::Authentication,
+    SlotId::Signature,
+    SlotId::KeyManagement,
+    SlotId::Retired(RetiredSlotId::R1),
+    SlotId::Retired(RetiredSlotId::R2),
+    SlotId::Retired(RetiredSlotId::R3),
+    SlotId::Retired(RetiredSlotId::R4),
+    SlotId::Retired(RetiredSlotId::R5),
+    SlotId::Retired(RetiredSlotId::R6),
+    SlotId::Retired(RetiredSlotId::R7),
+    SlotId::Retired(RetiredSlotId::R8),
+    SlotId::Retired(RetiredSlotId::R9),
+    SlotId::Retired(RetiredSlotId::R10),
+    SlotId::Retired(RetiredSlotId::R11),
+    SlotId::Retired(RetiredSlotId::R12),
+    SlotId::Retired(RetiredSlotId::R13),
+    SlotId::Retired(RetiredSlotId::R14),
+    SlotId::Retired(RetiredSlotId::R15),
+    SlotId::Retired(RetiredSlotId::R16),
+    SlotId::Retired(RetiredSlotId::R17),
+    SlotId::Retired(RetiredSlotId::R18),
+    SlotId::Retired(RetiredSlotId::R19),
+    SlotId::Retired(RetiredSlotId::R20),
+    SlotId::CardAuthentication,
 ];
+
+/// Algorithm identifiers
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AlgorithmId {
+    /// 1024-bit RSA.
+    Rsa1024,
+    /// 2048-bit RSA.
+    Rsa2048,
+    /// ECDSA with the NIST P256 curve.
+    EccP256,
+    /// ECDSA with the NIST P384 curve.
+    EccP384,
+}
+
+impl TryFrom<u8> for AlgorithmId {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x06 => Ok(AlgorithmId::Rsa1024),
+            0x07 => Ok(AlgorithmId::Rsa2048),
+            0x11 => Ok(AlgorithmId::EccP256),
+            0x14 => Ok(AlgorithmId::EccP384),
+            _ => Err(Error::AlgorithmError),
+        }
+    }
+}
+
+impl From<AlgorithmId> for u8 {
+    fn from(id: AlgorithmId) -> u8 {
+        match id {
+            AlgorithmId::Rsa1024 => 0x06,
+            AlgorithmId::Rsa2048 => 0x07,
+            AlgorithmId::EccP256 => 0x11,
+            AlgorithmId::EccP384 => 0x14,
+        }
+    }
+}
 
 /// PIV cryptographic keys stored in a YubiKey
 #[derive(Clone, Debug)]
@@ -120,13 +331,15 @@ impl Key {
             let buf = match certificate::read_certificate(&txn, slot) {
                 Ok(b) => b,
                 Err(e) => {
-                    debug!("error reading certificate in slot {}: {}", slot, e);
+                    debug!("error reading certificate in slot {:?}: {}", slot, e);
                     continue;
                 }
             };
 
-            let cert = Certificate::new(buf)?;
-            keys.push(Key { slot, cert });
+            if !buf.is_empty() {
+                let cert = Certificate::new(buf)?;
+                keys.push(Key { slot, cert });
+            }
         }
 
         Ok(keys)
@@ -202,55 +415,52 @@ pub fn generate(
     let mut templ = [0, Ins::GenerateAsymmetric.code(), 0, 0];
     let setting_roca: settings::BoolValue;
 
-    if yubikey.device_model() == DEVTYPE_YK4
-        && (algorithm == YKPIV_ALGO_RSA1024 || algorithm == YKPIV_ALGO_RSA2048)
-        && yubikey.version.major == 4
-        && (yubikey.version.minor < 3 || yubikey.version.minor == 3 && (yubikey.version.patch < 5))
-    {
-        setting_roca = settings::BoolValue::get(SZ_SETTING_ROCA, true);
-
-        let psz_msg = match setting_roca.source {
-            settings::Source::User => {
-                if setting_roca.value {
-                    SZ_ROCA_ALLOW_USER
-                } else {
-                    SZ_ROCA_BLOCK_USER
-                }
-            }
-            settings::Source::Admin => {
-                if setting_roca.value {
-                    SZ_ROCA_ALLOW_ADMIN
-                } else {
-                    SZ_ROCA_BLOCK_ADMIN
-                }
-            }
-            _ => SZ_ROCA_DEFAULT,
-        };
-
-        warn!(
-            "YubiKey serial number {} is affected by vulnerability CVE-2017-15361 \
-             (ROCA) and should be replaced. On-chip key generation {}  See \
-             YSA-2017-01 <https://www.yubico.com/support/security-advisories/ysa-2017-01/> \
-             for additional information on device replacement and mitigation assistance",
-            yubikey.serial, psz_msg
-        );
-
-        if !setting_roca.value {
-            return Err(Error::NotSupported);
-        }
-    }
-
     match algorithm {
-        YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 | YKPIV_ALGO_ECCP256 | YKPIV_ALGO_ECCP384 => (),
-        _ => {
-            error!("invalid algorithm specified");
-            return Err(Error::GenericError);
+        AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
+            if yubikey.device_model() == DEVTYPE_YK4
+                && yubikey.version.major == 4
+                && (yubikey.version.minor < 3
+                    || yubikey.version.minor == 3 && (yubikey.version.patch < 5))
+            {
+                setting_roca = settings::BoolValue::get(SZ_SETTING_ROCA, true);
+
+                let psz_msg = match setting_roca.source {
+                    settings::Source::User => {
+                        if setting_roca.value {
+                            SZ_ROCA_ALLOW_USER
+                        } else {
+                            SZ_ROCA_BLOCK_USER
+                        }
+                    }
+                    settings::Source::Admin => {
+                        if setting_roca.value {
+                            SZ_ROCA_ALLOW_ADMIN
+                        } else {
+                            SZ_ROCA_BLOCK_ADMIN
+                        }
+                    }
+                    _ => SZ_ROCA_DEFAULT,
+                };
+
+                warn!(
+                    "YubiKey serial number {} is affected by vulnerability CVE-2017-15361 \
+                     (ROCA) and should be replaced. On-chip key generation {}  See \
+                     YSA-2017-01 <https://www.yubico.com/support/security-advisories/ysa-2017-01/> \
+                     for additional information on device replacement and mitigation assistance",
+                    yubikey.serial, psz_msg
+                );
+
+                if !setting_roca.value {
+                    return Err(Error::NotSupported);
+                }
+            }
         }
+        _ => (),
     }
 
     let txn = yubikey.begin_transaction()?;
 
-    templ[3] = slot;
+    templ[3] = slot.into();
 
     let mut offset = 5;
     in_data[..offset].copy_from_slice(&[
@@ -258,7 +468,7 @@ pub fn generate(
         3, // length sans this 2-byte header
         YKPIV_ALGO_TAG,
         1,
-        algorithm,
+        algorithm.into(),
     ]);
 
     if in_data[4] == 0 {
@@ -312,7 +522,7 @@ pub fn generate(
     let data = Buffer::new(response.data().into());
 
     match algorithm {
-        YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 => {
+        AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
             let mut offset = 5;
             let mut len = 0;
 
@@ -340,10 +550,10 @@ pub fn generate(
                 exp,
             })
         }
-        YKPIV_ALGO_ECCP256 | YKPIV_ALGO_ECCP384 => {
+        AlgorithmId::EccP256 | AlgorithmId::EccP384 => {
             let mut offset = 3;
 
-            let len = if algorithm == YKPIV_ALGO_ECCP256 {
+            let len = if let AlgorithmId::EccP256 = algorithm {
                 CB_ECC_POINTP256
             } else {
                 CB_ECC_POINTP384
@@ -366,10 +576,6 @@ pub fn generate(
 
             let point = data[offset..(offset + len)].to_vec();
             Ok(GeneratedKey::Ecc { algorithm, point })
-        }
-        _ => {
-            error!("wrong algorithm");
-            Err(Error::AlgorithmError)
         }
     }
 }

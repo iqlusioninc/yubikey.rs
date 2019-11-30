@@ -9,6 +9,7 @@ use crate::{
 use crate::{
     apdu::{Response, StatusWords},
     consts::*,
+    key::{AlgorithmId, SlotId},
     mgm::MgmKey,
     serialization::*,
     Buffer, ObjectId,
@@ -266,18 +267,18 @@ impl<'tx> Transaction<'tx> {
     pub(crate) fn authenticated_command(
         &self,
         sign_in: &[u8],
-        algorithm: u8,
-        key: u8,
+        algorithm: AlgorithmId,
+        key: SlotId,
         decipher: bool,
     ) -> Result<Buffer, Error> {
         let in_len = sign_in.len();
         let mut indata = [0u8; 1024];
-        let templ = [0, Ins::Authenticate.code(), algorithm, key];
+        let templ = [0, Ins::Authenticate.code(), algorithm.into(), key.into()];
         let mut len: usize = 0;
 
         match algorithm {
-            YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 => {
-                let key_len = if algorithm == YKPIV_ALGO_RSA1024 {
+            AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
+                let key_len = if let AlgorithmId::Rsa1024 = algorithm {
                     128
                 } else {
                     256
@@ -287,8 +288,8 @@ impl<'tx> Transaction<'tx> {
                     return Err(Error::SizeError);
                 }
             }
-            YKPIV_ALGO_ECCP256 | YKPIV_ALGO_ECCP384 => {
-                let key_len = if algorithm == YKPIV_ALGO_ECCP256 {
+            AlgorithmId::EccP256 | AlgorithmId::EccP384 => {
+                let key_len = if let AlgorithmId::EccP256 = algorithm {
                     32
                 } else {
                     48
@@ -299,7 +300,6 @@ impl<'tx> Transaction<'tx> {
                     return Err(Error::SizeError);
                 }
             }
-            _ => return Err(Error::AlgorithmError),
         }
 
         let bytes = if in_len < 0x80 {
@@ -314,12 +314,10 @@ impl<'tx> Transaction<'tx> {
         let mut offset = 1 + set_length(&mut indata[1..], in_len + bytes + 3);
         indata[offset] = 0x82;
         indata[offset + 1] = 0x00;
-        indata[offset + 2] =
-            if (algorithm == YKPIV_ALGO_ECCP256 || algorithm == YKPIV_ALGO_ECCP384) && decipher {
-                0x85
-            } else {
-                0x81
-            };
+        indata[offset + 2] = match (algorithm, decipher) {
+            (AlgorithmId::EccP256, true) | (AlgorithmId::EccP384, true) => 0x85,
+            _ => 0x81,
+        };
 
         offset += 3;
         offset += set_length(&mut indata[offset..], in_len);
