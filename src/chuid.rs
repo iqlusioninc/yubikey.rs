@@ -56,7 +56,7 @@ const CHUID_TMPL: &[u8] = &[
 ];
 
 /// Cardholder Unique Identifier (CHUID) Card UUID/GUID value
-#[derive(Copy,Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct ChuidUuid(pub [u8; YKPIV_CARDID_SIZE]);
 
 /// Cardholder Unique Identifier (CHUID)
@@ -64,7 +64,6 @@ pub struct ChuidUuid(pub [u8; YKPIV_CARDID_SIZE]);
 pub struct CHUID(pub [u8; YKPIV_CHUID_SIZE]);
 
 impl CHUID {
-
     /// Return FASC-N component of CHUID
     pub fn fascn(&self) -> Result<[u8; YKPIV_FASCN_SIZE], Error> {
         let mut fascn = [0u8; YKPIV_FASCN_SIZE];
@@ -83,7 +82,7 @@ impl CHUID {
     pub fn expiration(&self) -> Result<[u8; YKPIV_EXPIRATION_SIZE], Error> {
         let mut expiration = [0u8; YKPIV_EXPIRATION_SIZE];
         expiration.copy_from_slice(
-            &self.0[CHUID_EXPIRATION_OFFS..(CHUID_EXPIRATION_OFFS + YKPIV_EXPIRATION_SIZE)]
+            &self.0[CHUID_EXPIRATION_OFFS..(CHUID_EXPIRATION_OFFS + YKPIV_EXPIRATION_SIZE)],
         );
         Ok(expiration)
     }
