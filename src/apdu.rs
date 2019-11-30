@@ -352,11 +352,17 @@ pub(crate) enum StatusWords {
     /// Successful execution
     Success,
 
+    /// https://github.com/Yubico/yubikey-manager/blob/1f22620b623c6b345dd9f9193ec765a542dddc80/ykman/driver_ccid.py#L53
+    NoInputDataError,
+
     /// PIN verification failure
     VerifyFailError {
         /// Remaining verification attempts
         tries: u8,
     },
+
+    /// https://github.com/Yubico/yubikey-manager/blob/1f22620b623c6b345dd9f9193ec765a542dddc80/ykman/driver_ccid.py#L55
+    WrongLengthError,
 
     /// Security status not satisfied
     SecurityStatusError,
@@ -364,8 +370,23 @@ pub(crate) enum StatusWords {
     /// Authentication method blocked
     AuthBlockedError,
 
+    /// https://github.com/Yubico/yubikey-manager/blob/1f22620b623c6b345dd9f9193ec765a542dddc80/ykman/driver_ccid.py#L58
+    DataInvalidError,
+
+    /// https://github.com/Yubico/yubikey-manager/blob/1f22620b623c6b345dd9f9193ec765a542dddc80/ykman/driver_ccid.py#L59
+    ConditionsNotSatisfiedError,
+
+    /// https://github.com/Yubico/yubikey-manager/blob/1f22620b623c6b345dd9f9193ec765a542dddc80/ykman/driver_ccid.py#L60
+    CommandNotAllowedError,
+
     /// Incorrect parameter in command data field
     IncorrectParamError,
+
+    /// Data object or application not found
+    NotFoundError,
+
+    /// Not enough memory
+    NoSpaceError,
 
     //
     // Custom Yubico Status Word extensions
@@ -376,6 +397,9 @@ pub(crate) enum StatusWords {
     /// Not supported error
     NotSupportedError,
 
+    /// https://github.com/Yubico/yubikey-manager/blob/1f22620b623c6b345dd9f9193ec765a542dddc80/ykman/driver_ccid.py#L65
+    CommandAbortedError,
+
     /// Other/unrecognized status words
     Other(u16),
 }
@@ -385,12 +409,20 @@ impl StatusWords {
     pub fn code(self) -> u16 {
         match self {
             StatusWords::None => 0,
+            StatusWords::NoInputDataError => 0x6285,
             StatusWords::VerifyFailError { tries } => 0x63c0 & tries as u16,
+            StatusWords::WrongLengthError => 0x6700,
             StatusWords::SecurityStatusError => 0x6982,
             StatusWords::AuthBlockedError => 0x6983,
+            StatusWords::DataInvalidError => 0x6984,
+            StatusWords::ConditionsNotSatisfiedError => 0x6985,
+            StatusWords::CommandNotAllowedError => 0x6986,
             StatusWords::IncorrectParamError => 0x6a80,
+            StatusWords::NotFoundError => 0x6a82,
+            StatusWords::NoSpaceError => 0x6a84,
             StatusWords::IncorrectSlotError => 0x6b00,
             StatusWords::NotSupportedError => 0x6d00,
+            StatusWords::CommandAbortedError => 0x6f00,
             StatusWords::Success => 0x9000,
             StatusWords::Other(n) => n,
         }
@@ -406,14 +438,22 @@ impl From<u16> for StatusWords {
     fn from(sw: u16) -> Self {
         match sw {
             0x0000 => StatusWords::None,
+            0x6285 => StatusWords::NoInputDataError,
             sw if sw & 0xfff0 == 0x63c0 => StatusWords::VerifyFailError {
                 tries: (sw & 0x000f) as u8,
             },
+            0x6700 => StatusWords::WrongLengthError,
             0x6982 => StatusWords::SecurityStatusError,
             0x6983 => StatusWords::AuthBlockedError,
+            0x6984 => StatusWords::DataInvalidError,
+            0x6985 => StatusWords::ConditionsNotSatisfiedError,
+            0x6986 => StatusWords::CommandNotAllowedError,
             0x6a80 => StatusWords::IncorrectParamError,
+            0x6a82 => StatusWords::NotFoundError,
+            0x6a84 => StatusWords::NoSpaceError,
             0x6b00 => StatusWords::IncorrectSlotError,
             0x6d00 => StatusWords::NotSupportedError,
+            0x6f00 => StatusWords::CommandAbortedError,
             0x9000 => StatusWords::Success,
             _ => StatusWords::Other(sw),
         }
