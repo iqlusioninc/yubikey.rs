@@ -97,11 +97,11 @@ impl TryFrom<u8> for SlotId {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            YKPIV_KEY_AUTHENTICATION => Ok(SlotId::Authentication),
-            YKPIV_KEY_SIGNATURE => Ok(SlotId::Signature),
-            YKPIV_KEY_KEYMGM => Ok(SlotId::KeyManagement),
-            YKPIV_KEY_CARDAUTH => Ok(SlotId::CardAuthentication),
-            YKPIV_KEY_ATTESTATION => Ok(SlotId::Attestation),
+            0x9a => Ok(SlotId::Authentication),
+            0x9c => Ok(SlotId::Signature),
+            0x9d => Ok(SlotId::KeyManagement),
+            0x9e => Ok(SlotId::CardAuthentication),
+            0xf9 => Ok(SlotId::Attestation),
             _ => RetiredSlotId::try_from(value).map(SlotId::Retired),
         }
     }
@@ -110,12 +110,12 @@ impl TryFrom<u8> for SlotId {
 impl From<SlotId> for u8 {
     fn from(slot: SlotId) -> u8 {
         match slot {
-            SlotId::Authentication => YKPIV_KEY_AUTHENTICATION,
-            SlotId::Signature => YKPIV_KEY_SIGNATURE,
-            SlotId::KeyManagement => YKPIV_KEY_KEYMGM,
-            SlotId::CardAuthentication => YKPIV_KEY_CARDAUTH,
+            SlotId::Authentication => 0x9a,
+            SlotId::Signature => 0x9c,
+            SlotId::KeyManagement => 0x9d,
+            SlotId::CardAuthentication => 0x9e,
             SlotId::Retired(retired) => retired.into(),
-            SlotId::Attestation => YKPIV_KEY_ATTESTATION,
+            SlotId::Attestation => 0xf9,
         }
     }
 }
@@ -124,12 +124,12 @@ impl SlotId {
     /// Returns the [`ObjectId`] that corresponds to a given [`SlotId`].
     pub(crate) fn object_id(self) -> ObjectId {
         match self {
-            SlotId::Authentication => YKPIV_OBJ_AUTHENTICATION,
-            SlotId::Signature => YKPIV_OBJ_SIGNATURE,
-            SlotId::KeyManagement => YKPIV_OBJ_KEY_MANAGEMENT,
-            SlotId::CardAuthentication => YKPIV_OBJ_CARD_AUTH,
+            SlotId::Authentication => 0x005f_c105,
+            SlotId::Signature => 0x005f_c10a,
+            SlotId::KeyManagement => 0x005f_c10b,
+            SlotId::CardAuthentication => 0x005f_c101,
             SlotId::Retired(retired) => retired.object_id(),
-            SlotId::Attestation => YKPIV_OBJ_ATTESTATION,
+            SlotId::Attestation => 0x005f_ff01,
         }
     }
 }
@@ -165,26 +165,26 @@ impl TryFrom<u8> for RetiredSlotId {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            YKPIV_KEY_RETIRED1 => Ok(RetiredSlotId::R1),
-            YKPIV_KEY_RETIRED2 => Ok(RetiredSlotId::R2),
-            YKPIV_KEY_RETIRED3 => Ok(RetiredSlotId::R3),
-            YKPIV_KEY_RETIRED4 => Ok(RetiredSlotId::R4),
-            YKPIV_KEY_RETIRED5 => Ok(RetiredSlotId::R5),
-            YKPIV_KEY_RETIRED6 => Ok(RetiredSlotId::R6),
-            YKPIV_KEY_RETIRED7 => Ok(RetiredSlotId::R7),
-            YKPIV_KEY_RETIRED8 => Ok(RetiredSlotId::R8),
-            YKPIV_KEY_RETIRED9 => Ok(RetiredSlotId::R9),
-            YKPIV_KEY_RETIRED10 => Ok(RetiredSlotId::R10),
-            YKPIV_KEY_RETIRED11 => Ok(RetiredSlotId::R11),
-            YKPIV_KEY_RETIRED12 => Ok(RetiredSlotId::R12),
-            YKPIV_KEY_RETIRED13 => Ok(RetiredSlotId::R13),
-            YKPIV_KEY_RETIRED14 => Ok(RetiredSlotId::R14),
-            YKPIV_KEY_RETIRED15 => Ok(RetiredSlotId::R15),
-            YKPIV_KEY_RETIRED16 => Ok(RetiredSlotId::R16),
-            YKPIV_KEY_RETIRED17 => Ok(RetiredSlotId::R17),
-            YKPIV_KEY_RETIRED18 => Ok(RetiredSlotId::R18),
-            YKPIV_KEY_RETIRED19 => Ok(RetiredSlotId::R19),
-            YKPIV_KEY_RETIRED20 => Ok(RetiredSlotId::R20),
+            0x82 => Ok(RetiredSlotId::R1),
+            0x83 => Ok(RetiredSlotId::R2),
+            0x84 => Ok(RetiredSlotId::R3),
+            0x85 => Ok(RetiredSlotId::R4),
+            0x86 => Ok(RetiredSlotId::R5),
+            0x87 => Ok(RetiredSlotId::R6),
+            0x88 => Ok(RetiredSlotId::R7),
+            0x89 => Ok(RetiredSlotId::R8),
+            0x8a => Ok(RetiredSlotId::R9),
+            0x8b => Ok(RetiredSlotId::R10),
+            0x8c => Ok(RetiredSlotId::R11),
+            0x8d => Ok(RetiredSlotId::R12),
+            0x8e => Ok(RetiredSlotId::R13),
+            0x8f => Ok(RetiredSlotId::R14),
+            0x90 => Ok(RetiredSlotId::R15),
+            0x91 => Ok(RetiredSlotId::R16),
+            0x92 => Ok(RetiredSlotId::R17),
+            0x93 => Ok(RetiredSlotId::R18),
+            0x94 => Ok(RetiredSlotId::R19),
+            0x95 => Ok(RetiredSlotId::R20),
             _ => Err(Error::InvalidObject),
         }
     }
@@ -193,26 +193,26 @@ impl TryFrom<u8> for RetiredSlotId {
 impl From<RetiredSlotId> for u8 {
     fn from(slot: RetiredSlotId) -> u8 {
         match slot {
-            RetiredSlotId::R1 => YKPIV_KEY_RETIRED1,
-            RetiredSlotId::R2 => YKPIV_KEY_RETIRED2,
-            RetiredSlotId::R3 => YKPIV_KEY_RETIRED3,
-            RetiredSlotId::R4 => YKPIV_KEY_RETIRED4,
-            RetiredSlotId::R5 => YKPIV_KEY_RETIRED5,
-            RetiredSlotId::R6 => YKPIV_KEY_RETIRED6,
-            RetiredSlotId::R7 => YKPIV_KEY_RETIRED7,
-            RetiredSlotId::R8 => YKPIV_KEY_RETIRED8,
-            RetiredSlotId::R9 => YKPIV_KEY_RETIRED9,
-            RetiredSlotId::R10 => YKPIV_KEY_RETIRED10,
-            RetiredSlotId::R11 => YKPIV_KEY_RETIRED11,
-            RetiredSlotId::R12 => YKPIV_KEY_RETIRED12,
-            RetiredSlotId::R13 => YKPIV_KEY_RETIRED13,
-            RetiredSlotId::R14 => YKPIV_KEY_RETIRED14,
-            RetiredSlotId::R15 => YKPIV_KEY_RETIRED15,
-            RetiredSlotId::R16 => YKPIV_KEY_RETIRED16,
-            RetiredSlotId::R17 => YKPIV_KEY_RETIRED17,
-            RetiredSlotId::R18 => YKPIV_KEY_RETIRED18,
-            RetiredSlotId::R19 => YKPIV_KEY_RETIRED19,
-            RetiredSlotId::R20 => YKPIV_KEY_RETIRED20,
+            RetiredSlotId::R1 => 0x82,
+            RetiredSlotId::R2 => 0x83,
+            RetiredSlotId::R3 => 0x84,
+            RetiredSlotId::R4 => 0x85,
+            RetiredSlotId::R5 => 0x86,
+            RetiredSlotId::R6 => 0x87,
+            RetiredSlotId::R7 => 0x88,
+            RetiredSlotId::R8 => 0x89,
+            RetiredSlotId::R9 => 0x8a,
+            RetiredSlotId::R10 => 0x8b,
+            RetiredSlotId::R11 => 0x8c,
+            RetiredSlotId::R12 => 0x8d,
+            RetiredSlotId::R13 => 0x8e,
+            RetiredSlotId::R14 => 0x8f,
+            RetiredSlotId::R15 => 0x90,
+            RetiredSlotId::R16 => 0x91,
+            RetiredSlotId::R17 => 0x92,
+            RetiredSlotId::R18 => 0x93,
+            RetiredSlotId::R19 => 0x94,
+            RetiredSlotId::R20 => 0x95,
         }
     }
 }
@@ -221,26 +221,26 @@ impl RetiredSlotId {
     /// Returns the [`ObjectId`] that corresponds to a given [`RetiredSlotId`].
     pub(crate) fn object_id(self) -> ObjectId {
         match self {
-            RetiredSlotId::R1 => YKPIV_OBJ_RETIRED1,
-            RetiredSlotId::R2 => YKPIV_OBJ_RETIRED2,
-            RetiredSlotId::R3 => YKPIV_OBJ_RETIRED3,
-            RetiredSlotId::R4 => YKPIV_OBJ_RETIRED4,
-            RetiredSlotId::R5 => YKPIV_OBJ_RETIRED5,
-            RetiredSlotId::R6 => YKPIV_OBJ_RETIRED6,
-            RetiredSlotId::R7 => YKPIV_OBJ_RETIRED7,
-            RetiredSlotId::R8 => YKPIV_OBJ_RETIRED8,
-            RetiredSlotId::R9 => YKPIV_OBJ_RETIRED9,
-            RetiredSlotId::R10 => YKPIV_OBJ_RETIRED10,
-            RetiredSlotId::R11 => YKPIV_OBJ_RETIRED11,
-            RetiredSlotId::R12 => YKPIV_OBJ_RETIRED12,
-            RetiredSlotId::R13 => YKPIV_OBJ_RETIRED13,
-            RetiredSlotId::R14 => YKPIV_OBJ_RETIRED14,
-            RetiredSlotId::R15 => YKPIV_OBJ_RETIRED15,
-            RetiredSlotId::R16 => YKPIV_OBJ_RETIRED16,
-            RetiredSlotId::R17 => YKPIV_OBJ_RETIRED17,
-            RetiredSlotId::R18 => YKPIV_OBJ_RETIRED18,
-            RetiredSlotId::R19 => YKPIV_OBJ_RETIRED19,
-            RetiredSlotId::R20 => YKPIV_OBJ_RETIRED20,
+            RetiredSlotId::R1 => 0x005f_c10d,
+            RetiredSlotId::R2 => 0x005f_c10e,
+            RetiredSlotId::R3 => 0x005f_c10f,
+            RetiredSlotId::R4 => 0x005f_c110,
+            RetiredSlotId::R5 => 0x005f_c111,
+            RetiredSlotId::R6 => 0x005f_c112,
+            RetiredSlotId::R7 => 0x005f_c113,
+            RetiredSlotId::R8 => 0x005f_c114,
+            RetiredSlotId::R9 => 0x005f_c115,
+            RetiredSlotId::R10 => 0x005f_c116,
+            RetiredSlotId::R11 => 0x005f_c117,
+            RetiredSlotId::R12 => 0x005f_c118,
+            RetiredSlotId::R13 => 0x005f_c119,
+            RetiredSlotId::R14 => 0x005f_c11a,
+            RetiredSlotId::R15 => 0x005f_c11b,
+            RetiredSlotId::R16 => 0x005f_c11c,
+            RetiredSlotId::R17 => 0x005f_c11d,
+            RetiredSlotId::R18 => 0x005f_c11e,
+            RetiredSlotId::R19 => 0x005f_c11f,
+            RetiredSlotId::R20 => 0x005f_c120,
         }
     }
 }
