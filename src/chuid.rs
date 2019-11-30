@@ -55,20 +55,47 @@ const CHUID_TMPL: &[u8] = &[
     0x30, 0x33, 0x30, 0x30, 0x31, 0x30, 0x31, 0x3e, 0x00, 0xfe, 0x00,
 ];
 
-/// Cardholder Unique Identifier (CHUID)
+/// Cardholder Unique Identifier (CHUID) Card UUID/GUID value
 #[derive(Copy, Clone, Debug)]
-pub struct CHUID(pub [u8; YKPIV_CARDID_SIZE]);
+pub struct ChuidUuid(pub [u8; YKPIV_CARDID_SIZE]);
+
+/// Cardholder Unique Identifier (CHUID)
+#[derive(Copy, Clone)]
+pub struct CHUID(pub [u8; YKPIV_CHUID_SIZE]);
 
 impl CHUID {
+    /// Return FASC-N component of CHUID
+    pub fn fascn(&self) -> Result<[u8; YKPIV_FASCN_SIZE], Error> {
+        let mut fascn = [0u8; YKPIV_FASCN_SIZE];
+        fascn.copy_from_slice(&self.0[CHUID_FASCN_OFFS..(CHUID_FASCN_OFFS + YKPIV_FASCN_SIZE)]);
+        Ok(fascn)
+    }
+
+    /// Return Card UUID/GUID component of CHUID
+    pub fn uuid(&self) -> Result<[u8; YKPIV_CARDID_SIZE], Error> {
+        let mut uuid = [0u8; YKPIV_CARDID_SIZE];
+        uuid.copy_from_slice(&self.0[CHUID_GUID_OFFS..(CHUID_GUID_OFFS + YKPIV_CARDID_SIZE)]);
+        Ok(uuid)
+    }
+
+    /// Return expiration date component of CHUID
+    pub fn expiration(&self) -> Result<[u8; YKPIV_EXPIRATION_SIZE], Error> {
+        let mut expiration = [0u8; YKPIV_EXPIRATION_SIZE];
+        expiration.copy_from_slice(
+            &self.0[CHUID_EXPIRATION_OFFS..(CHUID_EXPIRATION_OFFS + YKPIV_EXPIRATION_SIZE)],
+        );
+        Ok(expiration)
+    }
+
     /// Generate a random Cardholder Unique Identifier (CHUID)
-    pub fn generate() -> Result<Self, Error> {
+    pub fn generate() -> Result<ChuidUuid, Error> {
         let mut id = [0u8; YKPIV_CARDID_SIZE];
         getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
-        Ok(CHUID(id))
+        Ok(ChuidUuid(id))
     }
 
     /// Get Cardholder Unique Identifier (CHUID)
-    pub fn get(yubikey: &mut YubiKey) -> Result<Self, Error> {
+    pub fn get(yubikey: &mut YubiKey) -> Result<CHUID, Error> {
         let txn = yubikey.begin_transaction()?;
         let response = txn.fetch_object(YKPIV_OBJ_CHUID)?;
 
@@ -76,15 +103,16 @@ impl CHUID {
             return Err(Error::GenericError);
         }
 
-        let mut cardid = [0u8; YKPIV_CARDID_SIZE];
-        cardid.copy_from_slice(&response[CHUID_GUID_OFFS..(CHUID_GUID_OFFS + YKPIV_CARDID_SIZE)]);
-        Ok(CHUID(cardid))
+        let mut chuid = [0u8; YKPIV_CHUID_SIZE];
+        chuid.copy_from_slice(&response[0..YKPIV_CHUID_SIZE]);
+        let retval = CHUID { 0: chuid };
+        Ok(retval)
     }
 
     /// Set Cardholder Unique Identifier (CHUID)
     pub fn set(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
         let mut buf = CHUID_TMPL.to_vec();
-        buf[CHUID_GUID_OFFS..(CHUID_GUID_OFFS + self.0.len())].copy_from_slice(&self.0);
+        buf[0..self.0.len()].copy_from_slice(&self.0);
 
         let txn = yubikey.begin_transaction()?;
         txn.save_object(YKPIV_OBJ_CHUID, &buf)

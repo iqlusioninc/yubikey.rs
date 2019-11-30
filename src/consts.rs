@@ -63,7 +63,9 @@ pub const CB_PIN_MAX: usize = 8;
 
 pub const CCC_ID_OFFS: usize = 9;
 
+pub const CHUID_FASCN_OFFS: usize = 2;
 pub const CHUID_GUID_OFFS: usize = 29;
+pub const CHUID_EXPIRATION_OFFS: usize = 47;
 
 pub const CHREF_ACT_CHANGE_PIN: i32 = 0;
 pub const CHREF_ACT_UNBLOCK_PIN: i32 = 1;
@@ -129,7 +131,10 @@ pub const YKPIV_ALGO_ECCP384: u8 = 0x14;
 
 pub const YKPIV_ATR_NEO_R3: &[u8] = b";\xFC\x13\0\0\x811\xFE\x15YubikeyNEOr3\xE1\0";
 
+pub const YKPIV_CHUID_SIZE: usize = 59;
 pub const YKPIV_CARDID_SIZE: usize = 16;
+pub const YKPIV_FASCN_SIZE: usize = 25;
+pub const YKPIV_EXPIRATION_SIZE: usize = 8;
 
 pub const YKPIV_CCCID_SIZE: usize = 14;
 
