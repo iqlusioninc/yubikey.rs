@@ -125,8 +125,10 @@ impl Key {
                 }
             };
 
-            let cert = Certificate::new(buf)?;
-            keys.push(Key { slot, cert });
+            if !buf.is_empty() {
+                let cert = Certificate::new(buf)?;
+                keys.push(Key { slot, cert });
+            }
         }
 
         Ok(keys)
