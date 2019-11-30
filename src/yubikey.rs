@@ -40,13 +40,15 @@ use crate::{
     metadata,
     mgm::MgmKey,
     serialization::*,
-    ObjectId,
+    Buffer, ObjectId,
 };
-use crate::{consts::*, error::Error, transaction::Transaction, Buffer};
+use crate::{consts::*, error::Error, transaction::Transaction};
 #[cfg(feature = "untested")]
 use getrandom::getrandom;
 use log::{error, info, warn};
 use pcsc::{Card, Context};
+#[cfg(feature = "untested")]
+use secrecy::ExposeSecret;
 use std::fmt::{self, Display};
 #[cfg(feature = "untested")]
 use std::{
@@ -62,6 +64,9 @@ pub const AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
 /// MGMT Application ID.
 /// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
 pub const MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
+
+/// Cached YubiKey PIN
+pub type CachedPin = secrecy::SecretVec<u8>;
 
 /// YubiKey Serial Number
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -118,7 +123,7 @@ impl Version {
 #[cfg_attr(not(feature = "untested"), allow(dead_code))]
 pub struct YubiKey {
     pub(crate) card: Card,
-    pub(crate) pin: Option<Buffer>,
+    pub(crate) pin: Option<CachedPin>,
     pub(crate) is_neo: bool,
     pub(crate) version: Version,
     pub(crate) serial: Serial,
@@ -228,8 +233,10 @@ impl YubiKey {
             pcsc::Disposition::ResetCard,
         )?;
 
-        // TODO(tarcieri): zeroize pin!
-        let pin = self.pin.clone();
+        let pin = self
+            .pin
+            .as_ref()
+            .map(|p| Buffer::new(p.expose_secret().clone()));
 
         let txn = Transaction::new(&mut self.card)?;
         txn.select_application()?;
@@ -388,7 +395,7 @@ impl YubiKey {
         }
 
         if !pin.is_empty() {
-            self.pin = Some(Buffer::new(pin.into()))
+            self.pin = Some(CachedPin::new(pin.into()))
         }
 
         Ok(())
@@ -445,7 +452,7 @@ impl YubiKey {
         }
 
         if !new_pin.is_empty() {
-            self.pin = Some(Buffer::new(new_pin.into()));
+            self.pin = Some(CachedPin::new(new_pin.into()));
         }
 
         Ok(())
