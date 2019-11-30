@@ -48,56 +48,229 @@ use crate::{
     AlgorithmId, Buffer, ObjectId,
 };
 use log::{debug, error, warn};
+use std::convert::TryFrom;
 
 /// Slot identifiers.
 /// <https://developers.yubico.com/PIV/Introduction/Certificate_slots.html>
-// TODO(tarcieri): replace these with enums
-pub type SlotId = u8;
+#[derive(Clone, Copy, Debug)]
+pub enum SlotId {
+    /// This certificate and its associated private key is used to authenticate the card
+    /// and the cardholder. This slot is used for things like system login. The end user
+    /// PIN is required to perform any private key operations. Once the PIN has been
+    /// provided successfully, multiple private key operations may be performed without
+    /// additional cardholder consent.
+    Authentication,
 
-/// Get the [`ObjectId`] that corresponds to a given [`SlotId`]
-// TODO(tarcieri): factor this into a slot ID enum
-pub(crate) fn slot_object(slot: SlotId) -> Result<ObjectId, Error> {
-    let id = match slot {
-        YKPIV_KEY_AUTHENTICATION => YKPIV_OBJ_AUTHENTICATION,
-        YKPIV_KEY_SIGNATURE => YKPIV_OBJ_SIGNATURE,
-        YKPIV_KEY_KEYMGM => YKPIV_OBJ_KEY_MANAGEMENT,
-        YKPIV_KEY_CARDAUTH => YKPIV_OBJ_CARD_AUTH,
-        YKPIV_KEY_ATTESTATION => YKPIV_OBJ_ATTESTATION,
-        slot if slot >= YKPIV_KEY_RETIRED1 && (slot <= YKPIV_KEY_RETIRED20) => {
-            YKPIV_OBJ_RETIRED1 + (slot - YKPIV_KEY_RETIRED1) as u32
+    /// This certificate and its associated private key is used for digital signatures for
+    /// the purpose of document signing, or signing files and executables. The end user
+    /// PIN is required to perform any private key operations. The PIN must be submitted
+    /// every time immediately before a sign operation, to ensure cardholder participation
+    /// for every digital signature generated.
+    Signature,
+
+    /// This certificate and its associated private key is used for encryption for the
+    /// purpose of confidentiality. This slot is used for things like encrypting e-mails
+    /// or files. The end user PIN is required to perform any private key operations. Once
+    /// the PIN has been provided successfully, multiple private key operations may be
+    /// performed without additional cardholder consent.
+    KeyManagement,
+
+    /// This certificate and its associated private key is used to support additional
+    /// physical access applications, such as providing physical access to buildings via
+    /// PIV-enabled door locks. The end user PIN is NOT required to perform private key
+    /// operations for this slot.
+    CardAuthentication,
+
+    /// These slots are only available on the YubiKey 4 & 5. They are meant for previously
+    /// used Key Management keys to be able to decrypt earlier encrypted documents or
+    /// emails. In the YubiKey 4 & 5 all 20 of them are fully available for use.
+    Retired(RetiredSlotId),
+
+    /// This slot is only available on YubiKey version 4.3 and newer. It is only used for
+    /// attestation of other keys generated on device with instruction `f9`. This slot is
+    /// not cleared on reset, but can be overwritten.
+    Attestation,
+}
+
+impl TryFrom<u8> for SlotId {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            YKPIV_KEY_AUTHENTICATION => Ok(SlotId::Authentication),
+            YKPIV_KEY_SIGNATURE => Ok(SlotId::Signature),
+            YKPIV_KEY_KEYMGM => Ok(SlotId::KeyManagement),
+            YKPIV_KEY_CARDAUTH => Ok(SlotId::CardAuthentication),
+            YKPIV_KEY_ATTESTATION => Ok(SlotId::Attestation),
+            _ => RetiredSlotId::try_from(value).map(SlotId::Retired),
         }
-        _ => return Err(Error::InvalidObject),
-    };
+    }
+}
 
-    Ok(id)
+impl From<SlotId> for u8 {
+    fn from(slot: SlotId) -> u8 {
+        match slot {
+            SlotId::Authentication => YKPIV_KEY_AUTHENTICATION,
+            SlotId::Signature => YKPIV_KEY_SIGNATURE,
+            SlotId::KeyManagement => YKPIV_KEY_KEYMGM,
+            SlotId::CardAuthentication => YKPIV_KEY_CARDAUTH,
+            SlotId::Retired(retired) => retired.into(),
+            SlotId::Attestation => YKPIV_KEY_ATTESTATION,
+        }
+    }
+}
+
+impl SlotId {
+    /// Returns the [`ObjectId`] that corresponds to a given [`SlotId`].
+    pub(crate) fn object_id(self) -> ObjectId {
+        match self {
+            SlotId::Authentication => YKPIV_OBJ_AUTHENTICATION,
+            SlotId::Signature => YKPIV_OBJ_SIGNATURE,
+            SlotId::KeyManagement => YKPIV_OBJ_KEY_MANAGEMENT,
+            SlotId::CardAuthentication => YKPIV_OBJ_CARD_AUTH,
+            SlotId::Retired(retired) => retired.object_id(),
+            SlotId::Attestation => YKPIV_OBJ_ATTESTATION,
+        }
+    }
+}
+
+/// Retired slot IDs.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug)]
+pub enum RetiredSlotId {
+    R1,
+    R2,
+    R3,
+    R4,
+    R5,
+    R6,
+    R7,
+    R8,
+    R9,
+    R10,
+    R11,
+    R12,
+    R13,
+    R14,
+    R15,
+    R16,
+    R17,
+    R18,
+    R19,
+    R20,
+}
+
+impl TryFrom<u8> for RetiredSlotId {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            YKPIV_KEY_RETIRED1 => Ok(RetiredSlotId::R1),
+            YKPIV_KEY_RETIRED2 => Ok(RetiredSlotId::R2),
+            YKPIV_KEY_RETIRED3 => Ok(RetiredSlotId::R3),
+            YKPIV_KEY_RETIRED4 => Ok(RetiredSlotId::R4),
+            YKPIV_KEY_RETIRED5 => Ok(RetiredSlotId::R5),
+            YKPIV_KEY_RETIRED6 => Ok(RetiredSlotId::R6),
+            YKPIV_KEY_RETIRED7 => Ok(RetiredSlotId::R7),
+            YKPIV_KEY_RETIRED8 => Ok(RetiredSlotId::R8),
+            YKPIV_KEY_RETIRED9 => Ok(RetiredSlotId::R9),
+            YKPIV_KEY_RETIRED10 => Ok(RetiredSlotId::R10),
+            YKPIV_KEY_RETIRED11 => Ok(RetiredSlotId::R11),
+            YKPIV_KEY_RETIRED12 => Ok(RetiredSlotId::R12),
+            YKPIV_KEY_RETIRED13 => Ok(RetiredSlotId::R13),
+            YKPIV_KEY_RETIRED14 => Ok(RetiredSlotId::R14),
+            YKPIV_KEY_RETIRED15 => Ok(RetiredSlotId::R15),
+            YKPIV_KEY_RETIRED16 => Ok(RetiredSlotId::R16),
+            YKPIV_KEY_RETIRED17 => Ok(RetiredSlotId::R17),
+            YKPIV_KEY_RETIRED18 => Ok(RetiredSlotId::R18),
+            YKPIV_KEY_RETIRED19 => Ok(RetiredSlotId::R19),
+            YKPIV_KEY_RETIRED20 => Ok(RetiredSlotId::R20),
+            _ => Err(Error::InvalidObject),
+        }
+    }
+}
+
+impl From<RetiredSlotId> for u8 {
+    fn from(slot: RetiredSlotId) -> u8 {
+        match slot {
+            RetiredSlotId::R1 => YKPIV_KEY_RETIRED1,
+            RetiredSlotId::R2 => YKPIV_KEY_RETIRED2,
+            RetiredSlotId::R3 => YKPIV_KEY_RETIRED3,
+            RetiredSlotId::R4 => YKPIV_KEY_RETIRED4,
+            RetiredSlotId::R5 => YKPIV_KEY_RETIRED5,
+            RetiredSlotId::R6 => YKPIV_KEY_RETIRED6,
+            RetiredSlotId::R7 => YKPIV_KEY_RETIRED7,
+            RetiredSlotId::R8 => YKPIV_KEY_RETIRED8,
+            RetiredSlotId::R9 => YKPIV_KEY_RETIRED9,
+            RetiredSlotId::R10 => YKPIV_KEY_RETIRED10,
+            RetiredSlotId::R11 => YKPIV_KEY_RETIRED11,
+            RetiredSlotId::R12 => YKPIV_KEY_RETIRED12,
+            RetiredSlotId::R13 => YKPIV_KEY_RETIRED13,
+            RetiredSlotId::R14 => YKPIV_KEY_RETIRED14,
+            RetiredSlotId::R15 => YKPIV_KEY_RETIRED15,
+            RetiredSlotId::R16 => YKPIV_KEY_RETIRED16,
+            RetiredSlotId::R17 => YKPIV_KEY_RETIRED17,
+            RetiredSlotId::R18 => YKPIV_KEY_RETIRED18,
+            RetiredSlotId::R19 => YKPIV_KEY_RETIRED19,
+            RetiredSlotId::R20 => YKPIV_KEY_RETIRED20,
+        }
+    }
+}
+
+impl RetiredSlotId {
+    /// Returns the [`ObjectId`] that corresponds to a given [`RetiredSlotId`].
+    pub(crate) fn object_id(self) -> ObjectId {
+        match self {
+            RetiredSlotId::R1 => YKPIV_OBJ_RETIRED1,
+            RetiredSlotId::R2 => YKPIV_OBJ_RETIRED2,
+            RetiredSlotId::R3 => YKPIV_OBJ_RETIRED3,
+            RetiredSlotId::R4 => YKPIV_OBJ_RETIRED4,
+            RetiredSlotId::R5 => YKPIV_OBJ_RETIRED5,
+            RetiredSlotId::R6 => YKPIV_OBJ_RETIRED6,
+            RetiredSlotId::R7 => YKPIV_OBJ_RETIRED7,
+            RetiredSlotId::R8 => YKPIV_OBJ_RETIRED8,
+            RetiredSlotId::R9 => YKPIV_OBJ_RETIRED9,
+            RetiredSlotId::R10 => YKPIV_OBJ_RETIRED10,
+            RetiredSlotId::R11 => YKPIV_OBJ_RETIRED11,
+            RetiredSlotId::R12 => YKPIV_OBJ_RETIRED12,
+            RetiredSlotId::R13 => YKPIV_OBJ_RETIRED13,
+            RetiredSlotId::R14 => YKPIV_OBJ_RETIRED14,
+            RetiredSlotId::R15 => YKPIV_OBJ_RETIRED15,
+            RetiredSlotId::R16 => YKPIV_OBJ_RETIRED16,
+            RetiredSlotId::R17 => YKPIV_OBJ_RETIRED17,
+            RetiredSlotId::R18 => YKPIV_OBJ_RETIRED18,
+            RetiredSlotId::R19 => YKPIV_OBJ_RETIRED19,
+            RetiredSlotId::R20 => YKPIV_OBJ_RETIRED20,
+        }
+    }
 }
 
 /// Personal Identity Verification (PIV) key slots
-pub const SLOTS: [u8; 24] = [
-    YKPIV_KEY_AUTHENTICATION,
-    YKPIV_KEY_SIGNATURE,
-    YKPIV_KEY_KEYMGM,
-    YKPIV_KEY_RETIRED1,
-    YKPIV_KEY_RETIRED2,
-    YKPIV_KEY_RETIRED3,
-    YKPIV_KEY_RETIRED4,
-    YKPIV_KEY_RETIRED5,
-    YKPIV_KEY_RETIRED6,
-    YKPIV_KEY_RETIRED7,
-    YKPIV_KEY_RETIRED8,
-    YKPIV_KEY_RETIRED9,
-    YKPIV_KEY_RETIRED10,
-    YKPIV_KEY_RETIRED11,
-    YKPIV_KEY_RETIRED12,
-    YKPIV_KEY_RETIRED13,
-    YKPIV_KEY_RETIRED14,
-    YKPIV_KEY_RETIRED15,
-    YKPIV_KEY_RETIRED16,
-    YKPIV_KEY_RETIRED17,
-    YKPIV_KEY_RETIRED18,
-    YKPIV_KEY_RETIRED19,
-    YKPIV_KEY_RETIRED20,
-    YKPIV_KEY_CARDAUTH,
+pub const SLOTS: [SlotId; 24] = [
+    SlotId::Authentication,
+    SlotId::Signature,
+    SlotId::KeyManagement,
+    SlotId::Retired(RetiredSlotId::R1),
+    SlotId::Retired(RetiredSlotId::R2),
+    SlotId::Retired(RetiredSlotId::R3),
+    SlotId::Retired(RetiredSlotId::R4),
+    SlotId::Retired(RetiredSlotId::R5),
+    SlotId::Retired(RetiredSlotId::R6),
+    SlotId::Retired(RetiredSlotId::R7),
+    SlotId::Retired(RetiredSlotId::R8),
+    SlotId::Retired(RetiredSlotId::R9),
+    SlotId::Retired(RetiredSlotId::R10),
+    SlotId::Retired(RetiredSlotId::R11),
+    SlotId::Retired(RetiredSlotId::R12),
+    SlotId::Retired(RetiredSlotId::R13),
+    SlotId::Retired(RetiredSlotId::R14),
+    SlotId::Retired(RetiredSlotId::R15),
+    SlotId::Retired(RetiredSlotId::R16),
+    SlotId::Retired(RetiredSlotId::R17),
+    SlotId::Retired(RetiredSlotId::R18),
+    SlotId::Retired(RetiredSlotId::R19),
+    SlotId::Retired(RetiredSlotId::R20),
+    SlotId::CardAuthentication,
 ];
 
 /// PIV cryptographic keys stored in a YubiKey
@@ -120,7 +293,7 @@ impl Key {
             let buf = match certificate::read_certificate(&txn, slot) {
                 Ok(b) => b,
                 Err(e) => {
-                    debug!("error reading certificate in slot {}: {}", slot, e);
+                    debug!("error reading certificate in slot {:?}: {}", slot, e);
                     continue;
                 }
             };
@@ -252,7 +425,7 @@ pub fn generate(
 
     let txn = yubikey.begin_transaction()?;
 
-    templ[3] = slot;
+    templ[3] = slot.into();
 
     let mut offset = 5;
     in_data[..offset].copy_from_slice(&[

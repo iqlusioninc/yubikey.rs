@@ -31,13 +31,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    consts::*,
-    error::Error,
-    key::{self, SlotId},
-    serialization::*,
-    transaction::Transaction,
-    yubikey::YubiKey,
-    Buffer,
+    consts::*, error::Error, key::SlotId, serialization::*, transaction::Transaction,
+    yubikey::YubiKey, Buffer,
 };
 use log::error;
 use zeroize::Zeroizing;
@@ -100,7 +95,7 @@ impl AsRef<[u8]> for Certificate {
 /// Read certificate
 pub(crate) fn read_certificate(txn: &Transaction<'_>, slot: SlotId) -> Result<Buffer, Error> {
     let mut len: usize = 0;
-    let object_id = key::slot_object(slot)?;
+    let object_id = slot.object_id();
 
     let mut buf = match txn.fetch_object(object_id) {
         Ok(b) => b,
@@ -141,7 +136,7 @@ pub(crate) fn write_certificate(
     let mut buf = [0u8; CB_OBJ_MAX];
     let mut offset = 0;
 
-    let object_id = key::slot_object(slot)?;
+    let object_id = slot.object_id();
 
     if data.is_none() {
         return txn.save_object(object_id, &[]);

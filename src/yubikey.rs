@@ -609,15 +609,13 @@ impl YubiKey {
         touch_policy: u8,
     ) -> Result<(), Error> {
         let mut key_data = Zeroizing::new(vec![0u8; 1024]);
-        let templ = [0, Ins::ImportKey.code(), algorithm, key];
+        let templ = [0, Ins::ImportKey.code(), algorithm, key.into()];
 
-        if key == YKPIV_KEY_CARDMGM
-            || key < YKPIV_KEY_RETIRED1
-            || (key > YKPIV_KEY_RETIRED20 && key < YKPIV_KEY_AUTHENTICATION)
-            || (key > YKPIV_KEY_CARDAUTH && key != YKPIV_KEY_ATTESTATION)
-        {
-            return Err(Error::KeyError);
-        }
+        // Only slot we want to exclude is CardManagement, which isn't in the enum.
+        // TODO: Decide whether to add it or not.
+        // match key {
+        //     SlotId::CardManagement => return Err(Error::KeyError),
+        // }
 
         if pin_policy != YKPIV_PINPOLICY_DEFAULT
             && pin_policy != YKPIV_PINPOLICY_NEVER
@@ -730,7 +728,7 @@ impl YubiKey {
     /// <https://developers.yubico.com/PIV/Introduction/PIV_attestation.html>
     #[cfg(feature = "untested")]
     pub fn attest(&mut self, key: SlotId) -> Result<Buffer, Error> {
-        let templ = [0, Ins::Attest.code(), key, 0];
+        let templ = [0, Ins::Attest.code(), key.into(), 0];
         let txn = self.begin_transaction()?;
         let response = txn.transfer_data(&templ, &[], CB_OBJ_MAX)?;
 

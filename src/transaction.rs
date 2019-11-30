@@ -9,6 +9,7 @@ use crate::{
 use crate::{
     apdu::{Response, StatusWords},
     consts::*,
+    key::SlotId,
     mgm::MgmKey,
     serialization::*,
     Buffer, ObjectId,
@@ -267,12 +268,12 @@ impl<'tx> Transaction<'tx> {
         &self,
         sign_in: &[u8],
         algorithm: u8,
-        key: u8,
+        key: SlotId,
         decipher: bool,
     ) -> Result<Buffer, Error> {
         let in_len = sign_in.len();
         let mut indata = [0u8; 1024];
-        let templ = [0, Ins::Authenticate.code(), algorithm, key];
+        let templ = [0, Ins::Authenticate.code(), algorithm, key.into()];
         let mut len: usize = 0;
 
         match algorithm {

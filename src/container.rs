@@ -158,7 +158,7 @@ impl Container {
 
         Ok(Container {
             name,
-            slot: bytes[name_bytes_len],
+            slot: bytes[name_bytes_len].try_into()?,
             key_spec: bytes[name_bytes_len + 1],
             key_size_bits: u16::from_le_bytes(
                 bytes[(name_bytes_len + 2)..(name_bytes_len + 4)]
@@ -185,7 +185,7 @@ impl Container {
             bytes.extend_from_slice(&self.name[i].to_le_bytes());
         }
 
-        bytes.push(self.slot);
+        bytes.push(self.slot.into());
         bytes.push(self.key_spec);
         bytes.extend_from_slice(&self.key_size_bits.to_le_bytes());
         bytes.push(self.flags);
@@ -204,7 +204,7 @@ impl Debug for Container {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "PivContainer {{ name: {:?}, slot: {}, key_spec: {}, key_size_bits: {}, \
+            "PivContainer {{ name: {:?}, slot: {:?}, key_spec: {}, key_size_bits: {}, \
              flags: {}, pin_id: {}, associated_echd_container: {}, cert_fingerprint: {:?} }}",
             &self.name[..],
             self.slot,
