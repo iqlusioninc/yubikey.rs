@@ -312,6 +312,16 @@ impl From<AlgorithmId> for u8 {
     }
 }
 
+impl AlgorithmId {
+    /// Writes the `AlgorithmId` in the format the YubiKey expects during key generation.
+    pub(crate) fn write(self, buf: &mut [u8]) -> usize {
+        buf[0] = 0x80;
+        buf[1] = 0x01;
+        buf[2] = self.into();
+        3
+    }
+}
+
 /// PIV cryptographic keys stored in a YubiKey
 #[derive(Clone, Debug)]
 pub struct Key {
@@ -412,7 +422,6 @@ pub fn generate(
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
 ) -> Result<GeneratedKey, Error> {
-    let mut in_data = [0u8; 11];
     let mut templ = [0, Ins::GenerateAsymmetric.code(), 0, 0];
     let setting_roca: settings::BoolValue;
 
@@ -463,19 +472,11 @@ pub fn generate(
 
     templ[3] = slot.into();
 
+    let mut in_data = [0u8; 11];
+    in_data[0] = 0xac;
+    in_data[1] = 3; // length sans this 2-byte header
+    assert_eq!(algorithm.write(&mut in_data[2..]), 3);
     let mut offset = 5;
-    in_data[..offset].copy_from_slice(&[
-        0xac,
-        3, // length sans this 2-byte header
-        YKPIV_ALGO_TAG,
-        1,
-        algorithm.into(),
-    ]);
-
-    if in_data[4] == 0 {
-        error!("unexpected algorithm");
-        return Err(Error::AlgorithmError);
-    }
 
     let pin_len = pin_policy.write(&mut in_data[offset..]);
     in_data[1] += pin_len as u8;
