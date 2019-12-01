@@ -34,7 +34,6 @@ sha-1 = "0.8"
 subtle = "2"
 x509-parser = "0.6"
 zeroize = "1"
-sha2 = "0.8"
 
 [dev-dependencies]
 env_logger = "0.7"
@@ -44,4 +43,3 @@ untested = []
 
 [package.metadata.docs.rs]
 all-features = true
-
