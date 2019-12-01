@@ -31,15 +31,143 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    consts::*, error::Error, key::SlotId, serialization::*, transaction::Transaction,
-    yubikey::YubiKey, Buffer,
+    consts::*,
+    error::Error,
+    key::{AlgorithmId, SlotId},
+    serialization::*,
+    transaction::Transaction,
+    yubikey::YubiKey,
+    Buffer,
+};
+use ecdsa::{
+    curve::{CompressedCurvePoint, NistP256, NistP384, UncompressedCurvePoint},
+    generic_array::GenericArray,
 };
 use log::error;
+use rsa::{PublicKey, RSAPublicKey};
+use std::fmt;
+use x509_parser::{parse_x509_der, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
+
+// TODO: Make these der_parser::oid::Oid constants when it has const fn support.
+const OID_RSA_ENCRYPTION: &str = "1.2.840.113549.1.1.1";
+const OID_EC_PUBLIC_KEY: &str = "1.2.840.10045.2.1";
+const OID_NIST_P256: &str = "1.2.840.10045.3.1.7";
+const OID_NIST_P384: &str = "1.3.132.0.34";
+
+/// An encoded point on the Nist P-256 curve.
+#[derive(Clone, Eq, PartialEq)]
+pub enum EcP256Point {
+    /// Compressed encoding of a point on the curve.
+    Compressed(CompressedCurvePoint<NistP256>),
+
+    /// Uncompressed encoding of a point on the curve.
+    Uncompressed(UncompressedCurvePoint<NistP256>),
+}
+
+/// An encoded point on the Nist P-384 curve.
+#[derive(Clone, Eq, PartialEq)]
+pub enum EcP384Point {
+    /// Compressed encoding of a point on the curve.
+    Compressed(CompressedCurvePoint<NistP384>),
+
+    /// Uncompressed encoding of a point on the curve.
+    Uncompressed(UncompressedCurvePoint<NistP384>),
+}
+
+/// Information about a public key within a [`Certificate`].
+#[derive(Clone, Eq, PartialEq)]
+pub enum PublicKeyInfo {
+    /// RSA keys
+    Rsa {
+        /// RSA algorithm
+        algorithm: AlgorithmId,
+
+        /// Public key
+        pubkey: RSAPublicKey,
+    },
+
+    /// EC P-256 keys
+    EcP256(EcP256Point),
+
+    /// EC P-384 keys
+    EcP384(EcP384Point),
+}
+
+impl fmt::Debug for PublicKeyInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PublicKeyInfo({:?})", self.algorithm())
+    }
+}
+
+impl PublicKeyInfo {
+    fn parse(subject_pki: &SubjectPublicKeyInfo<'_>) -> Result<Self, Error> {
+        match subject_pki.algorithm.algorithm.to_string().as_str() {
+            OID_RSA_ENCRYPTION => {
+                let pubkey = read_pki::rsa_pubkey(subject_pki.subject_public_key.data)?;
+
+                Ok(PublicKeyInfo::Rsa {
+                    algorithm: match pubkey.n().bits() {
+                        1024 => AlgorithmId::Rsa1024,
+                        2048 => AlgorithmId::Rsa2048,
+                        _ => return Err(Error::AlgorithmError),
+                    },
+                    pubkey,
+                })
+            }
+            OID_EC_PUBLIC_KEY => {
+                let key_bytes = &subject_pki.subject_public_key.data;
+                match read_pki::ec_parameters(&subject_pki.algorithm.parameters)? {
+                    AlgorithmId::EccP256 => match key_bytes.len() {
+                        33 => CompressedCurvePoint::<NistP256>::from_bytes(
+                            GenericArray::clone_from_slice(key_bytes),
+                        )
+                        .map(EcP256Point::Compressed),
+                        65 => UncompressedCurvePoint::<NistP256>::from_bytes(
+                            GenericArray::clone_from_slice(key_bytes),
+                        )
+                        .map(EcP256Point::Uncompressed),
+                        _ => None,
+                    }
+                    .map(PublicKeyInfo::EcP256)
+                    .ok_or(Error::InvalidObject),
+                    AlgorithmId::EccP384 => match key_bytes.len() {
+                        49 => CompressedCurvePoint::<NistP384>::from_bytes(
+                            GenericArray::clone_from_slice(key_bytes),
+                        )
+                        .map(EcP384Point::Compressed),
+                        97 => UncompressedCurvePoint::<NistP384>::from_bytes(
+                            GenericArray::clone_from_slice(key_bytes),
+                        )
+                        .map(EcP384Point::Uncompressed),
+                        _ => None,
+                    }
+                    .map(PublicKeyInfo::EcP384)
+                    .ok_or(Error::InvalidObject),
+                    _ => Err(Error::AlgorithmError),
+                }
+            }
+            _ => Err(Error::InvalidObject),
+        }
+    }
+
+    /// Returns the algorithm that this public key can be used with.
+    pub fn algorithm(&self) -> AlgorithmId {
+        match self {
+            PublicKeyInfo::Rsa { algorithm, .. } => *algorithm,
+            PublicKeyInfo::EcP256(_) => AlgorithmId::EccP256,
+            PublicKeyInfo::EcP384(_) => AlgorithmId::EccP384,
+        }
+    }
+}
 
 /// Certificates
 #[derive(Clone, Debug)]
-pub struct Certificate(Buffer);
+pub struct Certificate {
+    subject: String,
+    subject_pki: PublicKeyInfo,
+    data: Buffer,
+}
 
 impl Certificate {
     /// Read a certificate from the given slot in the YubiKey
@@ -51,14 +179,14 @@ impl Certificate {
             return Err(Error::InvalidObject);
         }
 
-        Ok(Certificate(buf))
+        Certificate::new(buf)
     }
 
     /// Write this certificate into the YubiKey in the given slot
     pub fn write(&self, yubikey: &mut YubiKey, slot: SlotId, certinfo: u8) -> Result<(), Error> {
         let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
-        write_certificate(&txn, slot, Some(&self.0), certinfo, max_size)
+        write_certificate(&txn, slot, Some(&self.data), certinfo, max_size)
     }
 
     /// Delete a certificate located at the given slot of the given YubiKey
@@ -77,18 +205,40 @@ impl Certificate {
             return Err(Error::SizeError);
         }
 
-        Ok(Certificate(cert))
+        let parsed_cert = match parse_x509_der(&cert) {
+            Ok((_, cert)) => cert,
+            _ => return Err(Error::InvalidObject),
+        };
+
+        let subject = format!("{}", parsed_cert.tbs_certificate.subject);
+        let subject_pki = PublicKeyInfo::parse(&parsed_cert.tbs_certificate.subject_pki)?;
+
+        Ok(Certificate {
+            subject,
+            subject_pki,
+            data: cert,
+        })
+    }
+
+    /// Returns the SubjectName field of the certificate.
+    pub fn subject(&self) -> &str {
+        &self.subject
+    }
+
+    /// Returns the SubjectPublicKeyInfo field of the certificate.
+    pub fn subject_pki(&self) -> &PublicKeyInfo {
+        &self.subject_pki
     }
 
     /// Extract the inner buffer
     pub fn into_buffer(self) -> Buffer {
-        self.0
+        self.data
     }
 }
 
 impl AsRef<[u8]> for Certificate {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
+        self.data.as_ref()
     }
 }
 
@@ -174,4 +324,79 @@ pub(crate) fn write_certificate(
     offset += 5;
 
     txn.save_object(object_id, &buf[..offset])
+}
+
+mod read_pki {
+    use der_parser::{
+        ber::BerObjectContent,
+        der::{parse_der_integer, DerObject},
+        error::BerError,
+        *,
+    };
+    use nom::{combinator, IResult};
+    use rsa::{BigUint, RSAPublicKey};
+
+    use super::{OID_NIST_P256, OID_NIST_P384};
+    use crate::{error::Error, key::AlgorithmId};
+
+    /// From [RFC 8017](https://tools.ietf.org/html/rfc8017#appendix-A.1.1):
+    /// ```text
+    /// RSAPublicKey ::= SEQUENCE {
+    ///     modulus           INTEGER,  -- n
+    ///     publicExponent    INTEGER   -- e
+    /// }
+    /// ```
+    pub(super) fn rsa_pubkey(encoded: &[u8]) -> Result<RSAPublicKey, Error> {
+        fn parse_rsa_pubkey(i: &[u8]) -> IResult<&[u8], DerObject<'_>, BerError> {
+            parse_der_sequence_defined!(i, parse_der_integer >> parse_der_integer)
+        }
+
+        fn rsa_pubkey_parts(i: &[u8]) -> IResult<&[u8], (BigUint, BigUint), BerError> {
+            combinator::map(parse_rsa_pubkey, |object| {
+                let seq = object.as_sequence().expect("is DER sequence");
+                assert_eq!(seq.len(), 2);
+
+                let n = match seq[0].content {
+                    BerObjectContent::Integer(s) => BigUint::from_bytes_be(s),
+                    _ => panic!("expected DER integer"),
+                };
+                let e = match seq[1].content {
+                    BerObjectContent::Integer(s) => BigUint::from_bytes_be(s),
+                    _ => panic!("expected DER integer"),
+                };
+
+                (n, e)
+            })(i)
+        }
+
+        let (n, e) = match rsa_pubkey_parts(encoded) {
+            Ok((_, res)) => res,
+            _ => return Err(Error::InvalidObject),
+        };
+
+        RSAPublicKey::new(n, e).map_err(|_| Error::InvalidObject)
+    }
+
+    /// From [RFC 5480](https://tools.ietf.org/html/rfc5480#section-2.1.1):
+    /// ```text
+    /// ECParameters ::= CHOICE {
+    ///   namedCurve         OBJECT IDENTIFIER
+    ///   -- implicitCurve   NULL
+    ///   -- specifiedCurve  SpecifiedECDomain
+    /// }
+    /// ```
+    pub(super) fn ec_parameters(parameters: &DerObject<'_>) -> Result<AlgorithmId, Error> {
+        let curve_oid = match parameters.as_context_specific() {
+            Ok((_, Some(named_curve))) => {
+                named_curve.as_oid_val().map_err(|_| Error::InvalidObject)
+            }
+            _ => Err(Error::InvalidObject),
+        }?;
+
+        match curve_oid.to_string().as_str() {
+            OID_NIST_P256 => Ok(AlgorithmId::EccP256),
+            OID_NIST_P384 => Ok(AlgorithmId::EccP384),
+            _ => Err(Error::AlgorithmError),
+        }
+    }
 }
