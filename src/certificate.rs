@@ -49,6 +49,12 @@ use std::fmt;
 use x509_parser::{parse_x509_der, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
 
+// TODO: Make these der_parser::oid::Oid constants when it has const fn support.
+const OID_RSA_ENCRYPTION: &str = "1.2.840.113549.1.1.1";
+const OID_EC_PUBLIC_KEY: &str = "1.2.840.10045.2.1";
+const OID_NIST_P256: &str = "1.2.840.10045.3.1.7";
+const OID_NIST_P384: &str = "1.3.132.0.34";
+
 /// An encoded point on the Nist P-256 curve.
 #[derive(Clone, Eq, PartialEq)]
 pub enum EcP256Point {
@@ -97,8 +103,7 @@ impl fmt::Debug for PublicKeyInfo {
 impl PublicKeyInfo {
     fn parse(subject_pki: &SubjectPublicKeyInfo<'_>) -> Result<Self, Error> {
         match subject_pki.algorithm.algorithm.to_string().as_str() {
-            // RSA encryption
-            "1.2.840.113549.1.1.1" => {
+            OID_RSA_ENCRYPTION => {
                 let pubkey = read_pki::rsa_pubkey(subject_pki.subject_public_key.data)?;
 
                 Ok(PublicKeyInfo::Rsa {
@@ -110,8 +115,7 @@ impl PublicKeyInfo {
                     pubkey,
                 })
             }
-            // EC Public Key
-            "1.2.840.10045.2.1" => {
+            OID_EC_PUBLIC_KEY => {
                 let key_bytes = &subject_pki.subject_public_key.data;
                 match read_pki::ec_parameters(&subject_pki.algorithm.parameters)? {
                     AlgorithmId::EccP256 => match key_bytes.len() {
@@ -332,6 +336,7 @@ mod read_pki {
     use nom::{combinator, IResult};
     use rsa::{BigUint, RSAPublicKey};
 
+    use super::{OID_NIST_P256, OID_NIST_P384};
     use crate::{error::Error, key::AlgorithmId};
 
     /// From [RFC 8017](https://tools.ietf.org/html/rfc8017#appendix-A.1.1):
@@ -389,8 +394,8 @@ mod read_pki {
         }?;
 
         match curve_oid.to_string().as_str() {
-            "1.2.840.10045.3.1.7" => Ok(AlgorithmId::EccP256),
-            "1.3.132.0.34" => Ok(AlgorithmId::EccP384),
+            OID_NIST_P256 => Ok(AlgorithmId::EccP256),
+            OID_NIST_P384 => Ok(AlgorithmId::EccP384),
             _ => Err(Error::AlgorithmError),
         }
     }
