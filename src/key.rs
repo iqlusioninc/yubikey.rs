@@ -42,6 +42,7 @@ use crate::{
     certificate::{self, Certificate},
     consts::*,
     error::Error,
+    policy::{PinPolicy, TouchPolicy},
     serialization::*,
     settings,
     yubikey::YubiKey,
@@ -408,8 +409,8 @@ pub fn generate(
     yubikey: &mut YubiKey,
     slot: SlotId,
     algorithm: AlgorithmId,
-    pin_policy: u8,
-    touch_policy: u8,
+    pin_policy: PinPolicy,
+    touch_policy: TouchPolicy,
 ) -> Result<GeneratedKey, Error> {
     let mut in_data = [0u8; 11];
     let mut templ = [0, Ins::GenerateAsymmetric.code(), 0, 0];
@@ -476,16 +477,13 @@ pub fn generate(
         return Err(Error::AlgorithmError);
     }
 
-    if pin_policy != YKPIV_PINPOLICY_DEFAULT {
-        in_data[1] += 3;
-        in_data[offset..(offset + 3)].copy_from_slice(&[YKPIV_PINPOLICY_TAG, 1, pin_policy]);
-        offset += 3;
-    }
+    let pin_len = pin_policy.write(&mut in_data[offset..]);
+    in_data[1] += pin_len as u8;
+    offset += pin_len;
 
-    if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT {
-        in_data[1] += 3;
-        in_data[offset..(offset + 3)].copy_from_slice(&[YKPIV_TOUCHPOLICY_TAG, 1, touch_policy]);
-    }
+    let touch_len = touch_policy.write(&mut in_data[offset..]);
+    in_data[1] += touch_len as u8;
+    offset += touch_len;
 
     let response = txn.transfer_data(&templ, &in_data[..offset], 1024)?;
 
@@ -498,12 +496,12 @@ pub fn generate(
                 return Err(Error::KeyError);
             }
             StatusWords::IncorrectParamError => {
-                if pin_policy != YKPIV_PINPOLICY_DEFAULT {
-                    error!("{} (pin policy not supported?)", err_msg);
-                } else if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT {
-                    error!("{} (touch policy not supported?)", err_msg);
-                } else {
-                    error!("{} (algorithm not supported?)", err_msg);
+                match pin_policy {
+                    PinPolicy::Default => match touch_policy {
+                        TouchPolicy::Default => error!("{} (algorithm not supported?)", err_msg),
+                        _ => error!("{} (touch policy not supported?)", err_msg),
+                    },
+                    _ => error!("{} (pin policy not supported?)", err_msg),
                 }
 
                 return Err(Error::AlgorithmError);

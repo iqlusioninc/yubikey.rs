@@ -156,6 +156,8 @@ mod metadata;
 pub mod mgm;
 #[cfg(feature = "untested")]
 pub mod msroots;
+#[cfg(feature = "untested")]
+pub mod policy;
 pub mod readers;
 #[cfg(feature = "untested")]
 mod serialization;

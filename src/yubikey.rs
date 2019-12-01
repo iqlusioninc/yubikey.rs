@@ -39,6 +39,7 @@ use crate::{
     key::{AlgorithmId, SlotId},
     metadata,
     mgm::MgmKey,
+    policy::{PinPolicy, TouchPolicy},
     serialization::*,
     Buffer, ObjectId,
 };
@@ -552,27 +553,11 @@ impl YubiKey {
         dq: Option<&[u8]>,
         qinv: Option<&[u8]>,
         ec_data: Option<&[u8]>,
-        pin_policy: u8,
-        touch_policy: u8,
+        pin_policy: PinPolicy,
+        touch_policy: TouchPolicy,
     ) -> Result<(), Error> {
         let mut key_data = Zeroizing::new(vec![0u8; 1024]);
         let templ = [0, Ins::ImportKey.code(), algorithm.into(), key.into()];
-
-        if pin_policy != YKPIV_PINPOLICY_DEFAULT
-            && pin_policy != YKPIV_PINPOLICY_NEVER
-            && pin_policy != YKPIV_PINPOLICY_ONCE
-            && pin_policy != YKPIV_PINPOLICY_ALWAYS
-        {
-            return Err(Error::GenericError);
-        }
-
-        if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT
-            && touch_policy != YKPIV_TOUCHPOLICY_NEVER
-            && touch_policy != YKPIV_TOUCHPOLICY_ALWAYS
-            && touch_policy != YKPIV_TOUCHPOLICY_CACHED
-        {
-            return Err(Error::GenericError);
-        }
 
         let (elem_len, params, param_tag) = match algorithm {
             AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => match (p, q, dp, dq, qinv) {
@@ -637,19 +622,8 @@ impl YubiKey {
             offset += param.len();
         }
 
-        if pin_policy != YKPIV_PINPOLICY_DEFAULT {
-            key_data[offset] = YKPIV_PINPOLICY_TAG;
-            key_data[offset + 1] = 0x01;
-            key_data[offset + 2] = pin_policy;
-            offset += 3;
-        }
-
-        if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT {
-            key_data[offset] = YKPIV_TOUCHPOLICY_TAG;
-            key_data[offset + 1] = 0x01;
-            key_data[offset + 2] = touch_policy;
-            offset += 3;
-        }
+        offset += pin_policy.write(&mut key_data[offset..]);
+        offset += touch_policy.write(&mut key_data[offset..]);
 
         let txn = self.begin_transaction()?;
 

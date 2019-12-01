@@ -158,15 +158,3 @@ pub const YKPIV_OBJ_MSROOTS2: u32 = 0x005f_ff12;
 pub const YKPIV_OBJ_MSROOTS3: u32 = 0x005f_ff13;
 pub const YKPIV_OBJ_MSROOTS4: u32 = 0x005f_ff14;
 pub const YKPIV_OBJ_MSROOTS5: u32 = 0x005f_ff15;
-
-pub const YKPIV_PINPOLICY_TAG: u8 = 0xaa;
-pub const YKPIV_PINPOLICY_DEFAULT: u8 = 0;
-pub const YKPIV_PINPOLICY_NEVER: u8 = 1;
-pub const YKPIV_PINPOLICY_ONCE: u8 = 2;
-pub const YKPIV_PINPOLICY_ALWAYS: u8 = 3;
-
-pub const YKPIV_TOUCHPOLICY_TAG: u8 = 0xab;
-pub const YKPIV_TOUCHPOLICY_DEFAULT: u8 = 0;
-pub const YKPIV_TOUCHPOLICY_NEVER: u8 = 1;
-pub const YKPIV_TOUCHPOLICY_ALWAYS: u8 = 2;
-pub const YKPIV_TOUCHPOLICY_CACHED: u8 = 3;
