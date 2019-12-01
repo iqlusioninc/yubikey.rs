@@ -45,10 +45,10 @@ use ecdsa::{
 };
 use log::error;
 use rsa::{PublicKey, RSAPublicKey};
+use sha2::{Digest, Sha256};
 use std::fmt;
 use x509_parser::{parse_x509_der, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
-use sha2::{Sha256, Digest};
 
 // TODO: Make these der_parser::oid::Oid constants when it has const fn support.
 const OID_RSA_ENCRYPTION: &str = "1.2.840.113549.1.1.1";
@@ -422,12 +422,21 @@ pub fn print_cert_info(yubikey: &mut YubiKey, slot: SlotId) -> Result<(), Error>
         println!("Slot {:x}: ", slot_id);
         match parse_x509_der(&buf) {
             Ok((_rem, cert)) => {
-                println!("\tAlgorithm: {}", cert.tbs_certificate.subject_pki.algorithm.algorithm);
+                println!(
+                    "\tAlgorithm: {}",
+                    cert.tbs_certificate.subject_pki.algorithm.algorithm
+                );
                 println!("\tSubject: {}", cert.tbs_certificate.subject);
                 println!("\tIssuer: {}", cert.tbs_certificate.issuer);
                 println!("\tFingerprint: {:X}", fingerprint);
-                println!("\tNot Before: {}", cert.tbs_certificate.validity.not_before.asctime());
-                println!("\tNot After: {}", cert.tbs_certificate.validity.not_after.asctime());
+                println!(
+                    "\tNot Before: {}",
+                    cert.tbs_certificate.validity.not_before.asctime()
+                );
+                println!(
+                    "\tNot After: {}",
+                    cert.tbs_certificate.validity.not_after.asctime()
+                );
             }
             _ => {
                 println!("Failed to parse certificate");
