@@ -124,10 +124,6 @@ pub const TAG_ECC_POINT: u8 = 0x86;
 
 pub const YKPIV_ALGO_TAG: u8 = 0x80;
 pub const YKPIV_ALGO_3DES: u8 = 0x03;
-pub const YKPIV_ALGO_RSA1024: u8 = 0x06;
-pub const YKPIV_ALGO_RSA2048: u8 = 0x07;
-pub const YKPIV_ALGO_ECCP256: u8 = 0x11;
-pub const YKPIV_ALGO_ECCP384: u8 = 0x14;
 
 pub const YKPIV_ATR_NEO_R3: &[u8] = b";\xFC\x13\0\0\x811\xFE\x15YubikeyNEOr3\xE1\0";
 
@@ -142,72 +138,21 @@ pub const YKPIV_CCC_SIZE: usize = 51;
 pub const YKPIV_CERTINFO_UNCOMPRESSED: u8 = 0;
 pub const YKPIV_CERTINFO_GZIP: u8 = 1;
 
-pub const YKPIV_KEY_AUTHENTICATION: u8 = 0x9a;
 pub const YKPIV_KEY_CARDMGM: u8 = 0x9b;
-pub const YKPIV_KEY_SIGNATURE: u8 = 0x9c;
-pub const YKPIV_KEY_KEYMGM: u8 = 0x9d;
-pub const YKPIV_KEY_CARDAUTH: u8 = 0x9e;
-pub const YKPIV_KEY_RETIRED1: u8 = 0x82;
-pub const YKPIV_KEY_RETIRED2: u8 = 0x83;
-pub const YKPIV_KEY_RETIRED3: u8 = 0x84;
-pub const YKPIV_KEY_RETIRED4: u8 = 0x85;
-pub const YKPIV_KEY_RETIRED5: u8 = 0x86;
-pub const YKPIV_KEY_RETIRED6: u8 = 0x87;
-pub const YKPIV_KEY_RETIRED7: u8 = 0x88;
-pub const YKPIV_KEY_RETIRED8: u8 = 0x89;
-pub const YKPIV_KEY_RETIRED9: u8 = 0x8a;
-pub const YKPIV_KEY_RETIRED10: u8 = 0x8b;
-pub const YKPIV_KEY_RETIRED11: u8 = 0x8c;
-pub const YKPIV_KEY_RETIRED12: u8 = 0x8d;
-pub const YKPIV_KEY_RETIRED13: u8 = 0x8e;
-pub const YKPIV_KEY_RETIRED14: u8 = 0x8f;
-pub const YKPIV_KEY_RETIRED15: u8 = 0x90;
-pub const YKPIV_KEY_RETIRED16: u8 = 0x91;
-pub const YKPIV_KEY_RETIRED17: u8 = 0x92;
-pub const YKPIV_KEY_RETIRED18: u8 = 0x93;
-pub const YKPIV_KEY_RETIRED19: u8 = 0x94;
-pub const YKPIV_KEY_RETIRED20: u8 = 0x95;
-pub const YKPIV_KEY_ATTESTATION: u8 = 0xf9;
 
 pub const YKPIV_OBJ_CAPABILITY: u32 = 0x005f_c107;
 pub const YKPIV_OBJ_CHUID: u32 = 0x005f_c102;
-pub const YKPIV_OBJ_AUTHENTICATION: u32 = 0x005f_c105; // cert for 9a key
 pub const YKPIV_OBJ_FINGERPRINTS: u32 = 0x005f_c103;
 pub const YKPIV_OBJ_SECURITY: u32 = 0x005f_c106;
 pub const YKPIV_OBJ_FACIAL: u32 = 0x005f_c108;
 pub const YKPIV_OBJ_PRINTED: u32 = 0x005f_c109;
-pub const YKPIV_OBJ_SIGNATURE: u32 = 0x005f_c10a; // cert for 9c key
-pub const YKPIV_OBJ_KEY_MANAGEMENT: u32 = 0x005f_c10b; // cert for 9d key
-pub const YKPIV_OBJ_CARD_AUTH: u32 = 0x005f_c101; // cert for 9e key
 pub const YKPIV_OBJ_DISCOVERY: u32 = 0x7e;
 pub const YKPIV_OBJ_KEY_HISTORY: u32 = 0x005f_c10c;
 pub const YKPIV_OBJ_IRIS: u32 = 0x005f_c121;
 
-pub const YKPIV_OBJ_RETIRED1: u32 = 0x005f_c10d;
-pub const YKPIV_OBJ_RETIRED2: u32 = 0x005f_c10e;
-pub const YKPIV_OBJ_RETIRED3: u32 = 0x005f_c10f;
-pub const YKPIV_OBJ_RETIRED4: u32 = 0x005f_c110;
-pub const YKPIV_OBJ_RETIRED5: u32 = 0x005f_c111;
-pub const YKPIV_OBJ_RETIRED6: u32 = 0x005f_c112;
-pub const YKPIV_OBJ_RETIRED7: u32 = 0x005f_c113;
-pub const YKPIV_OBJ_RETIRED8: u32 = 0x005f_c114;
-pub const YKPIV_OBJ_RETIRED9: u32 = 0x005f_c115;
-pub const YKPIV_OBJ_RETIRED10: u32 = 0x005f_c116;
-pub const YKPIV_OBJ_RETIRED11: u32 = 0x005f_c117;
-pub const YKPIV_OBJ_RETIRED12: u32 = 0x005f_c118;
-pub const YKPIV_OBJ_RETIRED13: u32 = 0x005f_c119;
-pub const YKPIV_OBJ_RETIRED14: u32 = 0x005f_c11a;
-pub const YKPIV_OBJ_RETIRED15: u32 = 0x005f_c11b;
-pub const YKPIV_OBJ_RETIRED16: u32 = 0x005f_c11c;
-pub const YKPIV_OBJ_RETIRED17: u32 = 0x005f_c11d;
-pub const YKPIV_OBJ_RETIRED18: u32 = 0x005f_c11e;
-pub const YKPIV_OBJ_RETIRED19: u32 = 0x005f_c11f;
-pub const YKPIV_OBJ_RETIRED20: u32 = 0x005f_c120;
-
 // Internal object IDs
 
 pub const YKPIV_OBJ_ADMIN_DATA: u32 = 0x005f_ff00;
-pub const YKPIV_OBJ_ATTESTATION: u32 = 0x005f_ff01;
 pub const YKPIV_OBJ_MSCMAP: u32 = 0x005f_ff10;
 pub const YKPIV_OBJ_MSROOTS1: u32 = 0x005f_ff11;
 pub const YKPIV_OBJ_MSROOTS2: u32 = 0x005f_ff12;

@@ -125,6 +125,7 @@
     html_logo_url = "https://raw.githubusercontent.com/tarcieri/yubikey-piv.rs/develop/img/logo.png",
     html_root_url = "https://docs.rs/yubikey-piv/0.0.2"
 )]
+#![forbid(unsafe_code)]
 #![warn(
     missing_docs,
     rust_2018_idioms,
@@ -165,10 +166,6 @@ pub mod yubikey;
 #[cfg(feature = "untested")]
 pub use self::{key::Key, mgm::MgmKey};
 pub use yubikey::YubiKey;
-
-/// Algorithm identifiers
-// TODO(tarcieri): make this an enum
-pub type AlgorithmId = u8;
 
 /// Object identifiers
 pub type ObjectId = u32;

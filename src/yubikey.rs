@@ -36,22 +36,23 @@
 #[cfg(feature = "untested")]
 use crate::{
     apdu::{Ins, StatusWords, APDU},
-    key::SlotId,
+    key::{AlgorithmId, SlotId},
     metadata,
     mgm::MgmKey,
     serialization::*,
-    ObjectId,
+    Buffer, ObjectId,
 };
-use crate::{consts::*, error::Error, transaction::Transaction, Buffer};
+use crate::{consts::*, error::Error, transaction::Transaction};
 #[cfg(feature = "untested")]
 use getrandom::getrandom;
 use log::{error, info, warn};
 use pcsc::{Card, Context};
+#[cfg(feature = "untested")]
+use secrecy::ExposeSecret;
 use std::fmt::{self, Display};
 #[cfg(feature = "untested")]
 use std::{
     convert::TryInto,
-    ptr, slice,
     time::{SystemTime, UNIX_EPOCH},
 };
 #[cfg(feature = "untested")]
@@ -63,6 +64,9 @@ pub const AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
 /// MGMT Application ID.
 /// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
 pub const MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
+
+/// Cached YubiKey PIN
+pub type CachedPin = secrecy::SecretVec<u8>;
 
 /// YubiKey Serial Number
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -119,7 +123,7 @@ impl Version {
 #[cfg_attr(not(feature = "untested"), allow(dead_code))]
 pub struct YubiKey {
     pub(crate) card: Card,
-    pub(crate) pin: Option<Buffer>,
+    pub(crate) pin: Option<CachedPin>,
     pub(crate) is_neo: bool,
     pub(crate) version: Version,
     pub(crate) serial: Serial,
@@ -229,8 +233,10 @@ impl YubiKey {
             pcsc::Disposition::ResetCard,
         )?;
 
-        // TODO(tarcieri): zeroize pin!
-        let pin = self.pin.clone();
+        let pin = self
+            .pin
+            .as_ref()
+            .map(|p| Buffer::new(p.expose_secret().clone()));
 
         let txn = Transaction::new(&mut self.card)?;
         txn.select_application()?;
@@ -357,7 +363,7 @@ impl YubiKey {
     pub fn sign_data(
         &mut self,
         raw_in: &[u8],
-        algorithm: u8,
+        algorithm: AlgorithmId,
         key: SlotId,
     ) -> Result<Buffer, Error> {
         let txn = self.begin_transaction()?;
@@ -371,7 +377,7 @@ impl YubiKey {
     pub fn decrypt_data(
         &mut self,
         input: &[u8],
-        algorithm: u8,
+        algorithm: AlgorithmId,
         key: SlotId,
     ) -> Result<Buffer, Error> {
         let txn = self.begin_transaction()?;
@@ -389,7 +395,7 @@ impl YubiKey {
         }
 
         if !pin.is_empty() {
-            self.pin = Some(Buffer::new(pin.into()))
+            self.pin = Some(CachedPin::new(pin.into()))
         }
 
         Ok(())
@@ -397,7 +403,7 @@ impl YubiKey {
 
     /// Get the number of PIN retries
     #[cfg(feature = "untested")]
-    pub fn get_pin_retries(&mut self) -> Result<u32, Error> {
+    pub fn get_pin_retries(&mut self) -> Result<u8, Error> {
         let txn = self.begin_transaction()?;
 
         // Force a re-select to unverify, because once verified the spec dictates that
@@ -415,24 +421,15 @@ impl YubiKey {
 
     /// Set the number of PIN retries
     #[cfg(feature = "untested")]
-    pub fn set_pin_retries(&mut self, pin_tries: usize, puk_tries: usize) -> Result<(), Error> {
+    pub fn set_pin_retries(&mut self, pin_tries: u8, puk_tries: u8) -> Result<(), Error> {
         // Special case: if either retry count is 0, it's a successful no-op
         if pin_tries == 0 || puk_tries == 0 {
             return Ok(());
         }
 
-        if pin_tries > 0xff || puk_tries > 0xff || pin_tries < 1 || puk_tries < 1 {
-            return Err(Error::RangeError);
-        }
-
         let txn = self.begin_transaction()?;
 
-        let templ = [
-            0,
-            Ins::SetPinRetries.code(),
-            pin_tries as u8,
-            puk_tries as u8,
-        ];
+        let templ = [0, Ins::SetPinRetries.code(), pin_tries, puk_tries];
 
         let status_words = txn.transfer_data(&templ, &[], 255)?.status_words();
 
@@ -455,7 +452,7 @@ impl YubiKey {
         }
 
         if !new_pin.is_empty() {
-            self.pin = Some(Buffer::new(new_pin.into()));
+            self.pin = Some(CachedPin::new(new_pin.into()));
         }
 
         Ok(())
@@ -608,7 +605,7 @@ impl YubiKey {
     pub fn import_private_key(
         &mut self,
         key: SlotId,
-        algorithm: u8,
+        algorithm: AlgorithmId,
         p: Option<&[u8]>,
         q: Option<&[u8]>,
         dp: Option<&[u8]>,
@@ -618,177 +615,106 @@ impl YubiKey {
         pin_policy: u8,
         touch_policy: u8,
     ) -> Result<(), Error> {
-        // TODO(tarcieri): get rid of legacy pointers
-        let (p, p_len) = match p {
-            Some(slice) => (slice.as_ptr(), slice.len()),
-            None => (ptr::null(), 0),
-        };
-
-        let (q, q_len) = match q {
-            Some(slice) => (slice.as_ptr(), slice.len()),
-            None => (ptr::null(), 0),
-        };
-
-        let (dp, dp_len) = match dp {
-            Some(slice) => (slice.as_ptr(), slice.len()),
-            None => (ptr::null(), 0),
-        };
-
-        let (dq, dq_len) = match dq {
-            Some(slice) => (slice.as_ptr(), slice.len()),
-            None => (ptr::null(), 0),
-        };
-
-        let (qinv, qinv_len) = match qinv {
-            Some(slice) => (slice.as_ptr(), slice.len()),
-            None => (ptr::null(), 0),
-        };
-
-        let (ec_data, ec_data_len) = match ec_data {
-            Some(slice) => (slice.as_ptr(), slice.len()),
-            None => (ptr::null(), 0),
-        };
-
         let mut key_data = Zeroizing::new(vec![0u8; 1024]);
-        let mut in_ptr: *mut u8 = key_data.as_mut_ptr();
-        let templ = [0, Ins::ImportKey.code(), algorithm, key];
-        let mut elem_len: u32 = 0;
-        let mut params: [*const u8; 5] = [ptr::null(); 5];
-        let mut lens = [0usize; 5];
-        let n_params: u8;
-        let param_tag: i32;
-
-        if key == YKPIV_KEY_CARDMGM
-            || key < YKPIV_KEY_RETIRED1
-            || key > YKPIV_KEY_RETIRED20 && (key < YKPIV_KEY_AUTHENTICATION)
-            || key > YKPIV_KEY_CARDAUTH && (key != YKPIV_KEY_ATTESTATION)
-        {
-            return Err(Error::KeyError);
-        }
+        let templ = [0, Ins::ImportKey.code(), algorithm.into(), key.into()];
 
         if pin_policy != YKPIV_PINPOLICY_DEFAULT
-            && (pin_policy != YKPIV_PINPOLICY_NEVER)
-            && (pin_policy != YKPIV_PINPOLICY_ONCE)
-            && (pin_policy != YKPIV_PINPOLICY_ALWAYS)
+            && pin_policy != YKPIV_PINPOLICY_NEVER
+            && pin_policy != YKPIV_PINPOLICY_ONCE
+            && pin_policy != YKPIV_PINPOLICY_ALWAYS
         {
             return Err(Error::GenericError);
         }
 
         if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT
-            && (touch_policy != YKPIV_TOUCHPOLICY_NEVER)
-            && (touch_policy != YKPIV_TOUCHPOLICY_ALWAYS)
-            && (touch_policy != YKPIV_TOUCHPOLICY_CACHED)
+            && touch_policy != YKPIV_TOUCHPOLICY_NEVER
+            && touch_policy != YKPIV_TOUCHPOLICY_ALWAYS
+            && touch_policy != YKPIV_TOUCHPOLICY_CACHED
         {
             return Err(Error::GenericError);
         }
 
-        match algorithm {
-            YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 => {
-                if p_len + q_len + dp_len + dq_len + qinv_len >= 1024 {
-                    return Err(Error::SizeError);
-                } else {
-                    if algorithm == YKPIV_ALGO_RSA1024 {
-                        elem_len = 64;
+        let (elem_len, params, param_tag) = match algorithm {
+            AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => match (p, q, dp, dq, qinv) {
+                (Some(p), Some(q), Some(dp), Some(dq), Some(qinv)) => {
+                    if p.len() + q.len() + dp.len() + dq.len() + qinv.len() >= key_data.len() {
+                        return Err(Error::SizeError);
                     }
 
-                    if algorithm == YKPIV_ALGO_RSA2048 {
-                        elem_len = 128;
+                    (
+                        match algorithm {
+                            AlgorithmId::Rsa1024 => 64,
+                            AlgorithmId::Rsa2048 => 128,
+                            _ => unreachable!(),
+                        },
+                        vec![p, q, dp, dq, qinv],
+                        0x01,
+                    )
+                }
+                _ => return Err(Error::GenericError),
+            },
+            AlgorithmId::EccP256 | AlgorithmId::EccP384 => match ec_data {
+                Some(ec_data) => {
+                    if ec_data.len() >= key_data.len() {
+                        // This can never be true, but check to be explicit.
+                        return Err(Error::SizeError);
                     }
 
-                    if p.is_null() || q.is_null() || dp.is_null() || dq.is_null() || qinv.is_null()
-                    {
-                        return Err(Error::GenericError);
-                    }
-
-                    params[0] = p;
-                    lens[0] = p_len;
-                    params[1] = q;
-                    lens[1] = q_len;
-                    params[2] = dp;
-                    lens[2] = dp_len;
-                    params[3] = dq;
-                    lens[3] = dq_len;
-                    params[4] = qinv;
-                    lens[4] = qinv_len;
-                    param_tag = 0x1;
-                    n_params = 5u8;
+                    (
+                        match algorithm {
+                            AlgorithmId::EccP256 => 32,
+                            AlgorithmId::EccP384 => 48,
+                            _ => unreachable!(),
+                        },
+                        vec![ec_data],
+                        0x06,
+                    )
                 }
-            }
-            YKPIV_ALGO_ECCP256 | YKPIV_ALGO_ECCP384 => {
-                if ec_data_len >= key_data.len() {
-                    return Err(Error::SizeError);
-                }
+                _ => return Err(Error::GenericError),
+            },
+        };
 
-                if algorithm == YKPIV_ALGO_ECCP256 {
-                    elem_len = 32;
-                } else if algorithm == YKPIV_ALGO_ECCP384 {
-                    elem_len = 48;
-                }
+        let mut offset = 0;
 
-                if ec_data.is_null() {
-                    return Err(Error::GenericError);
-                }
+        for (i, param) in params.into_iter().enumerate() {
+            key_data[offset] = param_tag + i as u8;
+            offset += 1;
 
-                params[0] = ec_data;
-                lens[0] = ec_data_len;
-                param_tag = 0x6;
-                n_params = 1;
-            }
-            _ => return Err(Error::AlgorithmError),
-        }
+            offset += set_length(&mut key_data[offset..], elem_len);
 
-        for i in 0..n_params {
-            unsafe {
-                *in_ptr = (param_tag + i as i32) as u8;
-                in_ptr = in_ptr.offset(1);
-
-                in_ptr = in_ptr.add(set_length(
-                    slice::from_raw_parts_mut(
-                        in_ptr,
-                        key_data.as_mut_ptr() as usize - in_ptr as usize,
-                    ),
-                    elem_len as usize,
-                ));
-            }
-
-            let padding = elem_len as usize - lens[i as usize];
-            let remaining = (key_data.as_mut_ptr() as usize) + 1024 - in_ptr as usize;
+            let padding = elem_len - param.len();
+            let remaining = key_data.len() - offset;
 
             if padding > remaining {
                 return Err(Error::AlgorithmError);
             }
 
-            unsafe {
-                ptr::write_bytes(in_ptr, 0, padding);
-                in_ptr = in_ptr.add(padding);
-                ptr::copy(params[i as usize], in_ptr, lens[i as usize]);
-                in_ptr = in_ptr.add(lens[i as usize]);
+            for b in &mut key_data[offset..offset + padding] {
+                *b = 0;
             }
+            offset += padding;
+            key_data[offset..offset + param.len()].copy_from_slice(param);
+            offset += param.len();
         }
 
         if pin_policy != YKPIV_PINPOLICY_DEFAULT {
-            unsafe {
-                *in_ptr = YKPIV_PINPOLICY_TAG;
-                *in_ptr.add(1) = 0x01;
-                *in_ptr.add(2) = pin_policy;
-                in_ptr = in_ptr.add(3);
-            }
+            key_data[offset] = YKPIV_PINPOLICY_TAG;
+            key_data[offset + 1] = 0x01;
+            key_data[offset + 2] = pin_policy;
+            offset += 3;
         }
 
         if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT {
-            unsafe {
-                *in_ptr = YKPIV_TOUCHPOLICY_TAG;
-                *in_ptr.add(1) = 0x01;
-                *in_ptr.add(2) = touch_policy;
-                in_ptr = in_ptr.add(3);
-            }
+            key_data[offset] = YKPIV_TOUCHPOLICY_TAG;
+            key_data[offset + 1] = 0x01;
+            key_data[offset + 2] = touch_policy;
+            offset += 3;
         }
 
         let txn = self.begin_transaction()?;
-        let len = in_ptr as usize - key_data.as_mut_ptr() as usize;
 
         let status_words = txn
-            .transfer_data(&templ, &key_data[..len], 256)?
+            .transfer_data(&templ, &key_data[..offset], 256)?
             .status_words();
 
         match status_words {
@@ -802,7 +728,7 @@ impl YubiKey {
     /// <https://developers.yubico.com/PIV/Introduction/PIV_attestation.html>
     #[cfg(feature = "untested")]
     pub fn attest(&mut self, key: SlotId) -> Result<Buffer, Error> {
-        let templ = [0, Ins::Attest.code(), key, 0];
+        let templ = [0, Ins::Attest.code(), key.into(), 0];
         let txn = self.begin_transaction()?;
         let response = txn.transfer_data(&templ, &[], CB_OBJ_MAX)?;
 

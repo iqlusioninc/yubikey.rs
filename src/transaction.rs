@@ -9,14 +9,13 @@ use crate::{
 use crate::{
     apdu::{Response, StatusWords},
     consts::*,
+    key::{AlgorithmId, SlotId},
     mgm::MgmKey,
     serialization::*,
     Buffer, ObjectId,
 };
 use log::{error, trace};
 use std::convert::TryInto;
-#[cfg(feature = "untested")]
-use std::ptr;
 #[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
@@ -165,20 +164,28 @@ impl<'tx> Transaction<'tx> {
     /// Verify device PIN.
     #[cfg(feature = "untested")]
     pub fn verify_pin(&self, pin: &[u8]) -> Result<(), Error> {
-        // TODO(tarcieri): allow unpadded (with `0xFF`) PIN shorter than CB_PIN_MAX?
-        if pin.len() != CB_PIN_MAX {
+        if pin.len() > CB_PIN_MAX {
             return Err(Error::SizeError);
         }
 
-        let response = APDU::new(Ins::Verify)
-            .params(0x00, 0x80)
-            .data(pin)
-            .transmit(self, 261)?;
+        let mut query = APDU::new(Ins::Verify);
+        query.params(0x00, 0x80);
+
+        // Empty pin means we are querying the number of retries. We set no data in this
+        // case; if we instead sent [0xff; CB_PIN_MAX] it would count as an attempt and
+        // decrease the retry counter.
+        if !pin.is_empty() {
+            let mut data = Zeroizing::new([0xff; CB_PIN_MAX]);
+            data[0..pin.len()].copy_from_slice(pin);
+            query.data(data.as_ref());
+        }
+
+        let response = query.transmit(self, 261)?;
 
         match response.status_words() {
             StatusWords::Success => Ok(()),
             StatusWords::AuthBlockedError => Err(Error::WrongPin { tries: 0 }),
-            StatusWords::Other(sw) if sw >> 8 == 0x63 => Err(Error::WrongPin { tries: sw & 0xf }),
+            StatusWords::VerifyFailError { tries } => Err(Error::WrongPin { tries }),
             _ => Err(Error::GenericError),
         }
     }
@@ -187,7 +194,6 @@ impl<'tx> Transaction<'tx> {
     #[cfg(feature = "untested")]
     pub fn change_pin(&self, action: i32, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         let mut templ = [0, Ins::ChangeReference.code(), 0, 0x80];
-        let mut indata = Zeroizing::new([0u8; 16]);
 
         if current_pin.len() > CB_PIN_MAX || new_pin.len() > CB_PIN_MAX {
             return Err(Error::SizeError);
@@ -199,31 +205,9 @@ impl<'tx> Transaction<'tx> {
             templ[3] = 0x81;
         }
 
-        unsafe {
-            ptr::copy(current_pin.as_ptr(), indata.as_mut_ptr(), current_pin.len());
-
-            if current_pin.len() < CB_PIN_MAX {
-                ptr::write_bytes(
-                    indata.as_mut_ptr().add(current_pin.len()),
-                    0xff,
-                    CB_PIN_MAX - current_pin.len(),
-                );
-            }
-
-            ptr::copy(
-                new_pin.as_ptr(),
-                indata.as_mut_ptr().offset(8),
-                new_pin.len(),
-            );
-
-            if new_pin.len() < CB_PIN_MAX {
-                ptr::write_bytes(
-                    indata.as_mut_ptr().offset(8).add(new_pin.len()),
-                    0xff,
-                    CB_PIN_MAX - new_pin.len(),
-                );
-            }
-        }
+        let mut indata = Zeroizing::new([0xff; CB_PIN_MAX * 2]);
+        indata[0..current_pin.len()].copy_from_slice(current_pin);
+        indata[CB_PIN_MAX..CB_PIN_MAX + new_pin.len()].copy_from_slice(new_pin);
 
         let status_words = self
             .transfer_data(&templ, indata.as_ref(), 0xFF)?
@@ -232,7 +216,7 @@ impl<'tx> Transaction<'tx> {
         match status_words {
             StatusWords::Success => Ok(()),
             StatusWords::AuthBlockedError => Err(Error::PinLocked),
-            StatusWords::Other(sw) if sw >> 8 == 0x63 => Err(Error::WrongPin { tries: sw & 0xf }),
+            StatusWords::VerifyFailError { tries } => Err(Error::WrongPin { tries }),
             _ => {
                 error!(
                     "failed changing pin, token response code: {:x}.",
@@ -283,18 +267,18 @@ impl<'tx> Transaction<'tx> {
     pub(crate) fn authenticated_command(
         &self,
         sign_in: &[u8],
-        algorithm: u8,
-        key: u8,
+        algorithm: AlgorithmId,
+        key: SlotId,
         decipher: bool,
     ) -> Result<Buffer, Error> {
         let in_len = sign_in.len();
         let mut indata = [0u8; 1024];
-        let templ = [0, Ins::Authenticate.code(), algorithm, key];
+        let templ = [0, Ins::Authenticate.code(), algorithm.into(), key.into()];
         let mut len: usize = 0;
 
         match algorithm {
-            YKPIV_ALGO_RSA1024 | YKPIV_ALGO_RSA2048 => {
-                let key_len = if algorithm == YKPIV_ALGO_RSA1024 {
+            AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
+                let key_len = if let AlgorithmId::Rsa1024 = algorithm {
                     128
                 } else {
                     256
@@ -304,8 +288,8 @@ impl<'tx> Transaction<'tx> {
                     return Err(Error::SizeError);
                 }
             }
-            YKPIV_ALGO_ECCP256 | YKPIV_ALGO_ECCP384 => {
-                let key_len = if algorithm == YKPIV_ALGO_ECCP256 {
+            AlgorithmId::EccP256 | AlgorithmId::EccP384 => {
+                let key_len = if let AlgorithmId::EccP256 = algorithm {
                     32
                 } else {
                     48
@@ -316,7 +300,6 @@ impl<'tx> Transaction<'tx> {
                     return Err(Error::SizeError);
                 }
             }
-            _ => return Err(Error::AlgorithmError),
         }
 
         let bytes = if in_len < 0x80 {
@@ -331,12 +314,10 @@ impl<'tx> Transaction<'tx> {
         let mut offset = 1 + set_length(&mut indata[1..], in_len + bytes + 3);
         indata[offset] = 0x82;
         indata[offset + 1] = 0x00;
-        indata[offset + 2] =
-            if (algorithm == YKPIV_ALGO_ECCP256 || algorithm == YKPIV_ALGO_ECCP384) && decipher {
-                0x85
-            } else {
-                0x81
-            };
+        indata[offset + 2] = match (algorithm, decipher) {
+            (AlgorithmId::EccP256, true) | (AlgorithmId::EccP384, true) => 0x85,
+            _ => 0x81,
+        };
 
         offset += 3;
         offset += set_length(&mut indata[offset..], in_len);
