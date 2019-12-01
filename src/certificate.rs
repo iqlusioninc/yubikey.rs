@@ -39,35 +39,38 @@ use crate::{
     yubikey::YubiKey,
     Buffer,
 };
+use ecdsa::{
+    curve::{CompressedCurvePoint, NistP256, NistP384, UncompressedCurvePoint},
+    generic_array::GenericArray,
+};
 use log::error;
 use rsa::{PublicKey, RSAPublicKey};
+use std::fmt;
 use x509_parser::{parse_x509_der, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
 
-/// An encoded point for some elliptic curve.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum EcPoint {
-    /// A point in compressed form.
-    Compressed {
-        /// EC algorithm
-        algorithm: AlgorithmId,
+/// An encoded point on the Nist P-256 curve.
+#[derive(Clone, Eq, PartialEq)]
+pub enum EcP256Point {
+    /// Compressed encoding of a point on the curve.
+    Compressed(CompressedCurvePoint<NistP256>),
 
-        /// Encoded point
-        bytes: Buffer,
-    },
+    /// Uncompressed encoding of a point on the curve.
+    Uncompressed(UncompressedCurvePoint<NistP256>),
+}
 
-    /// A point in uncompressed form.
-    Uncompressed {
-        /// EC algorithm
-        algorithm: AlgorithmId,
+/// An encoded point on the Nist P-384 curve.
+#[derive(Clone, Eq, PartialEq)]
+pub enum EcP384Point {
+    /// Compressed encoding of a point on the curve.
+    Compressed(CompressedCurvePoint<NistP384>),
 
-        /// Encoded point
-        bytes: Buffer,
-    },
+    /// Uncompressed encoding of a point on the curve.
+    Uncompressed(UncompressedCurvePoint<NistP384>),
 }
 
 /// Information about a public key within a [`Certificate`].
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum PublicKeyInfo {
     /// RSA keys
     Rsa {
@@ -78,8 +81,17 @@ pub enum PublicKeyInfo {
         pubkey: RSAPublicKey,
     },
 
-    /// EC keys
-    Ec(EcPoint),
+    /// EC P-256 keys
+    EcP256(EcP256Point),
+
+    /// EC P-384 keys
+    EcP384(EcP384Point),
+}
+
+impl fmt::Debug for PublicKeyInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PublicKeyInfo({:?})", self.algorithm())
+    }
 }
 
 impl PublicKeyInfo {
@@ -100,9 +112,36 @@ impl PublicKeyInfo {
             }
             // EC Public Key
             "1.2.840.10045.2.1" => {
-                let algorithm = read_pki::ec_parameters(&subject_pki.algorithm.parameters)?;
-                read_pki::ec_point(algorithm, subject_pki.subject_public_key.data)
-                    .map(PublicKeyInfo::Ec)
+                let key_bytes = &subject_pki.subject_public_key.data;
+                match read_pki::ec_parameters(&subject_pki.algorithm.parameters)? {
+                    AlgorithmId::EccP256 => match key_bytes.len() {
+                        33 => CompressedCurvePoint::<NistP256>::from_bytes(
+                            GenericArray::clone_from_slice(key_bytes),
+                        )
+                        .map(EcP256Point::Compressed),
+                        65 => UncompressedCurvePoint::<NistP256>::from_bytes(
+                            GenericArray::clone_from_slice(key_bytes),
+                        )
+                        .map(EcP256Point::Uncompressed),
+                        _ => None,
+                    }
+                    .map(PublicKeyInfo::EcP256)
+                    .ok_or(Error::InvalidObject),
+                    AlgorithmId::EccP384 => match key_bytes.len() {
+                        49 => CompressedCurvePoint::<NistP384>::from_bytes(
+                            GenericArray::clone_from_slice(key_bytes),
+                        )
+                        .map(EcP384Point::Compressed),
+                        97 => UncompressedCurvePoint::<NistP384>::from_bytes(
+                            GenericArray::clone_from_slice(key_bytes),
+                        )
+                        .map(EcP384Point::Uncompressed),
+                        _ => None,
+                    }
+                    .map(PublicKeyInfo::EcP384)
+                    .ok_or(Error::InvalidObject),
+                    _ => Err(Error::AlgorithmError),
+                }
             }
             _ => Err(Error::InvalidObject),
         }
@@ -112,10 +151,8 @@ impl PublicKeyInfo {
     pub fn algorithm(&self) -> AlgorithmId {
         match self {
             PublicKeyInfo::Rsa { algorithm, .. } => *algorithm,
-            PublicKeyInfo::Ec(point) => match point {
-                EcPoint::Compressed { algorithm, .. } => *algorithm,
-                EcPoint::Uncompressed { algorithm, .. } => *algorithm,
-            },
+            PublicKeyInfo::EcP256(_) => AlgorithmId::EccP256,
+            PublicKeyInfo::EcP384(_) => AlgorithmId::EccP384,
         }
     }
 }
@@ -294,9 +331,7 @@ mod read_pki {
     };
     use nom::{combinator, IResult};
     use rsa::{BigUint, RSAPublicKey};
-    use zeroize::Zeroizing;
 
-    use super::EcPoint;
     use crate::{error::Error, key::AlgorithmId};
 
     /// From [RFC 8017](https://tools.ietf.org/html/rfc8017#appendix-A.1.1):
@@ -356,59 +391,7 @@ mod read_pki {
         match curve_oid.to_string().as_str() {
             "1.2.840.10045.3.1.7" => Ok(AlgorithmId::EccP256),
             "1.3.132.0.34" => Ok(AlgorithmId::EccP384),
-            _ => Err(Error::InvalidObject),
-        }
-    }
-
-    /// From [RFC 5480](https://tools.ietf.org/html/rfc5480#section-2.2):
-    /// ```text
-    /// ECPoint ::= OCTET STRING
-    ///
-    /// o The first octet of the OCTET STRING indicates whether the key is
-    ///   compressed or uncompressed.  The uncompressed form is indicated
-    ///   by 0x04 and the compressed form is indicated by either 0x02 or
-    ///   0x03 (see 2.3.3 in [SEC1]).  The public key MUST be rejected if
-    ///   any other value is included in the first octet.
-    /// ```
-    pub(super) fn ec_point(algorithm: AlgorithmId, encoded: &[u8]) -> Result<EcPoint, Error> {
-        if encoded.is_empty() {
-            return Err(Error::InvalidObject);
-        }
-
-        match encoded[0] {
-            0x02 | 0x03 => {
-                if encoded.len()
-                    == match algorithm {
-                        AlgorithmId::EccP256 => 33,
-                        AlgorithmId::EccP384 => 49,
-                        _ => return Err(Error::AlgorithmError),
-                    }
-                {
-                    Ok(EcPoint::Compressed {
-                        algorithm,
-                        bytes: Zeroizing::new(encoded[1..].to_vec()),
-                    })
-                } else {
-                    Err(Error::InvalidObject)
-                }
-            }
-            0x04 => {
-                if encoded.len()
-                    == match algorithm {
-                        AlgorithmId::EccP256 => 65,
-                        AlgorithmId::EccP384 => 97,
-                        _ => return Err(Error::AlgorithmError),
-                    }
-                {
-                    Ok(EcPoint::Uncompressed {
-                        algorithm,
-                        bytes: Zeroizing::new(encoded[1..].to_vec()),
-                    })
-                } else {
-                    Err(Error::InvalidObject)
-                }
-            }
-            _ => Err(Error::InvalidObject),
+            _ => Err(Error::AlgorithmError),
         }
     }
 }
