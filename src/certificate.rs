@@ -31,15 +31,67 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    consts::*, error::Error, key::SlotId, serialization::*, transaction::Transaction,
-    yubikey::YubiKey, Buffer,
+    consts::*,
+    error::Error,
+    key::{AlgorithmId, SlotId},
+    serialization::*,
+    transaction::Transaction,
+    yubikey::YubiKey,
+    Buffer,
 };
 use log::error;
+use rsa::{PublicKey, RSAPublicKey};
+use x509_parser::{parse_x509_der, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
+
+/// Information about a public key within a [`Certificate`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PublicKeyInfo {
+    /// RSA keys
+    Rsa {
+        /// RSA algorithm
+        algorithm: AlgorithmId,
+
+        /// Public key
+        pubkey: RSAPublicKey,
+    },
+}
+
+impl PublicKeyInfo {
+    fn parse(subject_pki: &SubjectPublicKeyInfo<'_>) -> Result<Self, Error> {
+        match subject_pki.algorithm.algorithm.to_string().as_str() {
+            // RSA encryption
+            "1.2.840.113549.1.1.1" => {
+                let pubkey = read_pki::rsa_pubkey(subject_pki.subject_public_key.data)?;
+
+                Ok(PublicKeyInfo::Rsa {
+                    algorithm: match pubkey.n().bits() {
+                        1024 => AlgorithmId::Rsa1024,
+                        2048 => AlgorithmId::Rsa2048,
+                        _ => return Err(Error::AlgorithmError),
+                    },
+                    pubkey,
+                })
+            }
+            _ => Err(Error::InvalidObject),
+        }
+    }
+
+    /// Returns the algorithm that this public key can be used with.
+    pub fn algorithm(&self) -> AlgorithmId {
+        match self {
+            PublicKeyInfo::Rsa { algorithm, .. } => *algorithm,
+        }
+    }
+}
 
 /// Certificates
 #[derive(Clone, Debug)]
-pub struct Certificate(Buffer);
+pub struct Certificate {
+    subject: String,
+    subject_pki: PublicKeyInfo,
+    data: Buffer,
+}
 
 impl Certificate {
     /// Read a certificate from the given slot in the YubiKey
@@ -51,14 +103,14 @@ impl Certificate {
             return Err(Error::InvalidObject);
         }
 
-        Ok(Certificate(buf))
+        Certificate::new(buf)
     }
 
     /// Write this certificate into the YubiKey in the given slot
     pub fn write(&self, yubikey: &mut YubiKey, slot: SlotId, certinfo: u8) -> Result<(), Error> {
         let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
-        write_certificate(&txn, slot, Some(&self.0), certinfo, max_size)
+        write_certificate(&txn, slot, Some(&self.data), certinfo, max_size)
     }
 
     /// Delete a certificate located at the given slot of the given YubiKey
@@ -77,18 +129,40 @@ impl Certificate {
             return Err(Error::SizeError);
         }
 
-        Ok(Certificate(cert))
+        let parsed_cert = match parse_x509_der(&cert) {
+            Ok((_, cert)) => cert,
+            _ => return Err(Error::InvalidObject),
+        };
+
+        let subject = format!("{}", parsed_cert.tbs_certificate.subject);
+        let subject_pki = PublicKeyInfo::parse(&parsed_cert.tbs_certificate.subject_pki)?;
+
+        Ok(Certificate {
+            subject,
+            subject_pki,
+            data: cert,
+        })
+    }
+
+    /// Returns the SubjectName field of the certificate.
+    pub fn subject(&self) -> &str {
+        &self.subject
+    }
+
+    /// Returns the SubjectPublicKeyInfo field of the certificate.
+    pub fn subject_pki(&self) -> &PublicKeyInfo {
+        &self.subject_pki
     }
 
     /// Extract the inner buffer
     pub fn into_buffer(self) -> Buffer {
-        self.0
+        self.data
     }
 }
 
 impl AsRef<[u8]> for Certificate {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
+        self.data.as_ref()
     }
 }
 
@@ -174,4 +248,55 @@ pub(crate) fn write_certificate(
     offset += 5;
 
     txn.save_object(object_id, &buf[..offset])
+}
+
+mod read_pki {
+    use der_parser::{
+        ber::BerObjectContent,
+        der::{parse_der_integer, DerObject},
+        error::BerError,
+        *,
+    };
+    use nom::{combinator, IResult};
+    use rsa::{BigUint, RSAPublicKey};
+
+    use crate::error::Error;
+
+    /// From [RFC 8017](https://tools.ietf.org/html/rfc8017#appendix-A.1.1):
+    /// ```text
+    /// RSAPublicKey ::= SEQUENCE {
+    ///     modulus           INTEGER,  -- n
+    ///     publicExponent    INTEGER   -- e
+    /// }
+    /// ```
+    pub(super) fn rsa_pubkey(encoded: &[u8]) -> Result<RSAPublicKey, Error> {
+        fn parse_rsa_pubkey(i: &[u8]) -> IResult<&[u8], DerObject<'_>, BerError> {
+            parse_der_sequence_defined!(i, parse_der_integer >> parse_der_integer)
+        }
+
+        fn rsa_pubkey_parts(i: &[u8]) -> IResult<&[u8], (BigUint, BigUint), BerError> {
+            combinator::map(parse_rsa_pubkey, |object| {
+                let seq = object.as_sequence().expect("is DER sequence");
+                assert_eq!(seq.len(), 2);
+
+                let n = match seq[0].content {
+                    BerObjectContent::Integer(s) => BigUint::from_bytes_be(s),
+                    _ => panic!("expected DER integer"),
+                };
+                let e = match seq[1].content {
+                    BerObjectContent::Integer(s) => BigUint::from_bytes_be(s),
+                    _ => panic!("expected DER integer"),
+                };
+
+                (n, e)
+            })(i)
+        }
+
+        let (n, e) = match rsa_pubkey_parts(encoded) {
+            Ok((_, res)) => res,
+            _ => return Err(Error::InvalidObject),
+        };
+
+        RSAPublicKey::new(n, e).map_err(|_| Error::InvalidObject)
+    }
 }

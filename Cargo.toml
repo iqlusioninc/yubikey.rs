@@ -19,15 +19,19 @@ keywords   = ["ccid", "ecdsa", "rsa", "piv", "yubikey"]
 maintenance = { status = "experimental" }
 
 [dependencies]
+der-parser = "3"
 des = "0.3"
 getrandom = "0.1"
 hmac = "0.7"
 log = "0.4"
+nom = "5"
 pbkdf2 = "0.3"
 pcsc = "2"
+rsa = "0.1.4"
 secrecy = "0.5"
 sha-1 = "0.8"
 subtle = "2"
+x509-parser = "0.6"
 zeroize = "1"
 
 [dev-dependencies]
