@@ -45,7 +45,6 @@ use ecdsa::{
 };
 use log::error;
 use rsa::{PublicKey, RSAPublicKey};
-use sha2::{Digest, Sha256};
 use std::fmt;
 use x509_parser::{parse_x509_der, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
@@ -402,48 +401,4 @@ mod read_pki {
     }
 }
 
-///Write information about certificate found in slot a la yubico-piv-tool output.
-pub fn print_cert_info(yubikey: &mut YubiKey, slot: SlotId) -> Result<(), Error> {
-    let txn = yubikey.begin_transaction()?;
-    let buf = match read_certificate(&txn, slot) {
-        Ok(b) => b,
-        Err(e) => {
-            println!("error reading certificate in slot {:?}: {}", slot, e);
-            return Err(e);
-        }
-    };
 
-    if !buf.is_empty() {
-        let mut hasher = Sha256::new();
-        hasher.input(buf.clone().to_vec());
-        let fingerprint = hasher.result();
-
-        let slot_id: u8 = slot.into();
-        println!("Slot {:x}: ", slot_id);
-        match parse_x509_der(&buf) {
-            Ok((_rem, cert)) => {
-                println!(
-                    "\tAlgorithm: {}",
-                    cert.tbs_certificate.subject_pki.algorithm.algorithm
-                );
-                println!("\tSubject: {}", cert.tbs_certificate.subject);
-                println!("\tIssuer: {}", cert.tbs_certificate.issuer);
-                println!("\tFingerprint: {:X}", fingerprint);
-                println!(
-                    "\tNot Before: {}",
-                    cert.tbs_certificate.validity.not_before.asctime()
-                );
-                println!(
-                    "\tNot After: {}",
-                    cert.tbs_certificate.validity.not_after.asctime()
-                );
-            }
-            _ => {
-                println!("Failed to parse certificate");
-                return Err(Error::GenericError);
-            }
-        };
-    }
-
-    Ok(())
-}
