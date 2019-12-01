@@ -52,7 +52,7 @@ use std::convert::TryFrom;
 
 /// Slot identifiers.
 /// <https://developers.yubico.com/PIV/Introduction/Certificate_slots.html>
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SlotId {
     /// This certificate and its associated private key is used to authenticate the card
     /// and the cardholder. This slot is used for things like system login. The end user
@@ -136,7 +136,7 @@ impl SlotId {
 
 /// Retired slot IDs.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum RetiredSlotId {
     R1,
     R2,
