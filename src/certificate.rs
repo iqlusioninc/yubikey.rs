@@ -44,6 +44,28 @@ use rsa::{PublicKey, RSAPublicKey};
 use x509_parser::{parse_x509_der, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
 
+/// An encoded point for some elliptic curve.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EcPoint {
+    /// A point in compressed form.
+    Compressed {
+        /// EC algorithm
+        algorithm: AlgorithmId,
+
+        /// Encoded point
+        bytes: Buffer,
+    },
+
+    /// A point in uncompressed form.
+    Uncompressed {
+        /// EC algorithm
+        algorithm: AlgorithmId,
+
+        /// Encoded point
+        bytes: Buffer,
+    },
+}
+
 /// Information about a public key within a [`Certificate`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PublicKeyInfo {
@@ -55,6 +77,9 @@ pub enum PublicKeyInfo {
         /// Public key
         pubkey: RSAPublicKey,
     },
+
+    /// EC keys
+    Ec(EcPoint),
 }
 
 impl PublicKeyInfo {
@@ -73,6 +98,12 @@ impl PublicKeyInfo {
                     pubkey,
                 })
             }
+            // EC Public Key
+            "1.2.840.10045.2.1" => {
+                let algorithm = read_pki::ec_parameters(&subject_pki.algorithm.parameters)?;
+                read_pki::ec_point(algorithm, subject_pki.subject_public_key.data)
+                    .map(PublicKeyInfo::Ec)
+            }
             _ => Err(Error::InvalidObject),
         }
     }
@@ -81,6 +112,10 @@ impl PublicKeyInfo {
     pub fn algorithm(&self) -> AlgorithmId {
         match self {
             PublicKeyInfo::Rsa { algorithm, .. } => *algorithm,
+            PublicKeyInfo::Ec(point) => match point {
+                EcPoint::Compressed { algorithm, .. } => *algorithm,
+                EcPoint::Uncompressed { algorithm, .. } => *algorithm,
+            },
         }
     }
 }
@@ -259,8 +294,10 @@ mod read_pki {
     };
     use nom::{combinator, IResult};
     use rsa::{BigUint, RSAPublicKey};
+    use zeroize::Zeroizing;
 
-    use crate::error::Error;
+    use super::EcPoint;
+    use crate::{error::Error, key::AlgorithmId};
 
     /// From [RFC 8017](https://tools.ietf.org/html/rfc8017#appendix-A.1.1):
     /// ```text
@@ -298,5 +335,80 @@ mod read_pki {
         };
 
         RSAPublicKey::new(n, e).map_err(|_| Error::InvalidObject)
+    }
+
+    /// From [RFC 5480](https://tools.ietf.org/html/rfc5480#section-2.1.1):
+    /// ```text
+    /// ECParameters ::= CHOICE {
+    ///   namedCurve         OBJECT IDENTIFIER
+    ///   -- implicitCurve   NULL
+    ///   -- specifiedCurve  SpecifiedECDomain
+    /// }
+    /// ```
+    pub(super) fn ec_parameters(parameters: &DerObject<'_>) -> Result<AlgorithmId, Error> {
+        let curve_oid = match parameters.as_context_specific() {
+            Ok((_, Some(named_curve))) => {
+                named_curve.as_oid_val().map_err(|_| Error::InvalidObject)
+            }
+            _ => Err(Error::InvalidObject),
+        }?;
+
+        match curve_oid.to_string().as_str() {
+            "1.2.840.10045.3.1.7" => Ok(AlgorithmId::EccP256),
+            "1.3.132.0.34" => Ok(AlgorithmId::EccP384),
+            _ => Err(Error::InvalidObject),
+        }
+    }
+
+    /// From [RFC 5480](https://tools.ietf.org/html/rfc5480#section-2.2):
+    /// ```text
+    /// ECPoint ::= OCTET STRING
+    ///
+    /// o The first octet of the OCTET STRING indicates whether the key is
+    ///   compressed or uncompressed.  The uncompressed form is indicated
+    ///   by 0x04 and the compressed form is indicated by either 0x02 or
+    ///   0x03 (see 2.3.3 in [SEC1]).  The public key MUST be rejected if
+    ///   any other value is included in the first octet.
+    /// ```
+    pub(super) fn ec_point(algorithm: AlgorithmId, encoded: &[u8]) -> Result<EcPoint, Error> {
+        if encoded.is_empty() {
+            return Err(Error::InvalidObject);
+        }
+
+        match encoded[0] {
+            0x02 | 0x03 => {
+                if encoded.len()
+                    == match algorithm {
+                        AlgorithmId::EccP256 => 33,
+                        AlgorithmId::EccP384 => 49,
+                        _ => return Err(Error::AlgorithmError),
+                    }
+                {
+                    Ok(EcPoint::Compressed {
+                        algorithm,
+                        bytes: Zeroizing::new(encoded[1..].to_vec()),
+                    })
+                } else {
+                    Err(Error::InvalidObject)
+                }
+            }
+            0x04 => {
+                if encoded.len()
+                    == match algorithm {
+                        AlgorithmId::EccP256 => 65,
+                        AlgorithmId::EccP384 => 97,
+                        _ => return Err(Error::AlgorithmError),
+                    }
+                {
+                    Ok(EcPoint::Uncompressed {
+                        algorithm,
+                        bytes: Zeroizing::new(encoded[1..].to_vec()),
+                    })
+                } else {
+                    Err(Error::InvalidObject)
+                }
+            }
+            _ => Err(Error::InvalidObject),
+        }
     }
 }
