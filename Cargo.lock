@@ -836,7 +836,7 @@ dependencies = [
 
 [[package]]
 name = "yubikey-cli"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "env_logger 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "gumdrop 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
