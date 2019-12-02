@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.3] (2019-12-02)
+### Added
+- Initial `Readers` enumerator for detecting YubiKeys ([#51])
+- Certificate parsing ([#45])
+
+### Changed
+- Use `Reader` to connect to `YubiKey` ([#51])
+- Convert `SlotId` and `AlgorithmId` into enums ([#44])
+- Use `secrecy` crate for storing `CachedPin` ([#43])
+- Change `CHUID` struct to hold complete CHUID value ([#42])
+- Eliminate all usages of `unsafe` ([#37], [#39])
+- Make anonymous CHUID struct public ([#36])
+- Have `sign_data` and `decrypt_data` return a `Buffer` ([#34])
+- `Ins` (APDU instruction codes) enum ([#33])
+- Factor `Response` into `apdu` module; improved debugging ([#32])
+
+[0.0.3]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/53
+[#51]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/51
+[#45]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/45
+[#44]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/44
+[#43]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/43
+[#42]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/42
+[#39]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/39
+[#37]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/37
+[#36]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/36
+[#34]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/34
+[#33]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/33
+[#32]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/32
+
 ## [0.0.2] (2019-11-25)
 ### Added
 - `untested` Cargo feature to mark untested functionality ([#30])

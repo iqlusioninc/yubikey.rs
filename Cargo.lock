@@ -842,12 +842,12 @@ dependencies = [
  "gumdrop 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "termcolor 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "yubikey-piv 0.0.2",
+ "yubikey-piv 0.0.3",
 ]
 
 [[package]]
 name = "yubikey-piv"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "der-parser 3.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "des 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
