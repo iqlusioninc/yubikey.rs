@@ -42,14 +42,22 @@ use crate::{
     serialization::*,
     Buffer, ObjectId,
 };
-use crate::{consts::*, error::Error, transaction::Transaction};
+use crate::{
+    consts::*,
+    error::Error,
+    readers::{Reader, Readers},
+    transaction::Transaction,
+};
 #[cfg(feature = "untested")]
 use getrandom::getrandom;
 use log::{error, info, warn};
-use pcsc::{Card, Context};
+use pcsc::Card;
 #[cfg(feature = "untested")]
 use secrecy::ExposeSecret;
-use std::fmt::{self, Display};
+use std::{
+    convert::TryFrom,
+    fmt::{self, Display},
+};
 #[cfg(feature = "untested")]
 use std::{
     convert::TryInto,
@@ -130,96 +138,28 @@ pub struct YubiKey {
 }
 
 impl YubiKey {
-    /// Open a connection to a YubiKey, optionally giving the name
-    /// (needed if e.g. there are multiple YubiKeys connected).
-    pub fn open(name: Option<&[u8]>) -> Result<YubiKey, Error> {
-        let context = Context::establish(pcsc::Scope::System)?;
-        let mut card = Self::connect(&context, name)?;
+    /// Open a connection to a YubiKey.
+    ///
+    /// Returns an error if there is more than one YubiKey detected.
+    ///
+    /// If you need to operate in environments with more than one YubiKey
+    /// attached to the same system, use [`yubikey_piv::Readers`] to select
+    /// from the available PC/SC readers connected.
+    pub fn open() -> Result<Self, Error> {
+        let mut readers = Readers::open()?;
+        let mut reader_iter = readers.iter()?;
 
-        let mut is_neo = false;
-        let version: Version;
-        let serial: Serial;
-
-        {
-            let txn = Transaction::new(&mut card)?;
-            let mut atr_buf = [0; CB_ATR_MAX];
-            let atr = txn.get_attribute(pcsc::Attribute::AtrString, &mut atr_buf)?;
-            if atr == YKPIV_ATR_NEO_R3 {
-                is_neo = true;
+        if let Some(reader) = reader_iter.next() {
+            if reader_iter.next().is_some() {
+                error!("multiple YubiKeys detected!");
+                return Err(Error::PcscError { inner: None });
             }
 
-            txn.select_application()?;
-
-            // now that the PIV application is selected, retrieve the version
-            // and serial number.  Previously the NEO/YK4 required switching
-            // to the yk applet to retrieve the serial, YK5 implements this
-            // as a PIV applet command.  Unfortunately, this change requires
-            // that we retrieve the version number first, so that get_serial
-            // can determine how to get the serial number, which for the NEO/Yk4
-            // will result in another selection of the PIV applet.
-
-            version = txn.get_version().map_err(|e| {
-                warn!("failed to retrieve version: '{}'", e);
-                e
-            })?;
-
-            serial = txn.get_serial(version).map_err(|e| {
-                warn!("failed to retrieve serial number: '{}'", e);
-                e
-            })?;
+            return reader.open();
         }
 
-        let yubikey = YubiKey {
-            card,
-            pin: None,
-            is_neo,
-            version,
-            serial,
-        };
-
-        Ok(yubikey)
-    }
-
-    /// Connect to a YubiKey PC/SC card.
-    fn connect(context: &Context, name: Option<&[u8]>) -> Result<Card, Error> {
-        // ensure PC/SC context is valid
-        context.is_valid()?;
-
-        let buffer_len = context.list_readers_len()?;
-        let mut buffer = vec![0u8; buffer_len];
-
-        for reader in context.list_readers(&mut buffer)? {
-            if let Some(wanted) = name {
-                if reader.to_bytes() != wanted {
-                    warn!(
-                        "skipping reader '{}' since it doesn't match '{}'",
-                        reader.to_string_lossy(),
-                        String::from_utf8_lossy(wanted)
-                    );
-
-                    continue;
-                }
-            }
-
-            info!("trying to connect to reader '{}'", reader.to_string_lossy());
-
-            match context.connect(reader, pcsc::ShareMode::Shared, pcsc::Protocols::T1) {
-                Ok(card) => {
-                    info!("connected to '{}' successfully", reader.to_string_lossy());
-                    return Ok(card);
-                }
-                Err(err) => {
-                    error!(
-                        "skipping '{}' due to connection error: {}",
-                        reader.to_string_lossy(),
-                        err
-                    );
-                }
-            }
-        }
-
-        error!("error: no usable reader found");
-        Err(Error::PcscError { inner: None })
+        error!("no YubiKey detected!");
+        Err(Error::GenericError)
     }
 
     /// Reconnect to a YubiKey
@@ -816,5 +756,61 @@ impl YubiKey {
         } else {
             CB_OBJ_MAX
         }
+    }
+}
+
+impl<'a> TryFrom<&'a Reader<'_>> for YubiKey {
+    type Error = Error;
+
+    fn try_from(reader: &'a Reader<'_>) -> Result<Self, Error> {
+        let mut card = reader.connect().map_err(|e| {
+            error!("error connecting to reader '{}': {}", reader.name(), e);
+            e
+        })?;
+
+        info!("connected to reader: {}", reader.name());
+
+        let mut is_neo = false;
+        let version: Version;
+        let serial: Serial;
+
+        {
+            let txn = Transaction::new(&mut card)?;
+            let mut atr_buf = [0; CB_ATR_MAX];
+            let atr = txn.get_attribute(pcsc::Attribute::AtrString, &mut atr_buf)?;
+            if atr == YKPIV_ATR_NEO_R3 {
+                is_neo = true;
+            }
+
+            txn.select_application()?;
+
+            // now that the PIV application is selected, retrieve the version
+            // and serial number.  Previously the NEO/YK4 required switching
+            // to the yk applet to retrieve the serial, YK5 implements this
+            // as a PIV applet command.  Unfortunately, this change requires
+            // that we retrieve the version number first, so that get_serial
+            // can determine how to get the serial number, which for the NEO/Yk4
+            // will result in another selection of the PIV applet.
+
+            version = txn.get_version().map_err(|e| {
+                warn!("failed to retrieve version: '{}'", e);
+                e
+            })?;
+
+            serial = txn.get_serial(version).map_err(|e| {
+                warn!("failed to retrieve serial number: '{}'", e);
+                e
+            })?;
+        }
+
+        let yubikey = YubiKey {
+            card,
+            pin: None,
+            is_neo,
+            version,
+            serial,
+        };
+
+        Ok(yubikey)
     }
 }
