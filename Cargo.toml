@@ -13,7 +13,10 @@ license    = "BSD-2-Clause"
 repository = "https://github.com/iqlusioninc/yubikey-piv.rs"
 readme     = "README.md"
 categories = ["api-bindings", "cryptography", "hardware-support"]
-keywords   = ["ccid", "ecdsa", "rsa", "piv", "yubikey"]
+keywords   = ["ecdsa", "rsa", "piv", "pcsc", "yubikey"]
+
+[workspace]
+members = [".", "cli"]
 
 [badges]
 maintenance = { status = "experimental" }

@@ -164,9 +164,10 @@ pub mod settings;
 mod transaction;
 pub mod yubikey;
 
+pub use self::{readers::Readers, yubikey::YubiKey};
+
 #[cfg(feature = "untested")]
-pub use self::{key::Key, mgm::MgmKey, readers::Readers};
-pub use yubikey::YubiKey;
+pub use self::{key::Key, mgm::MgmKey};
 
 /// Object identifiers
 pub type ObjectId = u32;
