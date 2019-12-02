@@ -156,6 +156,7 @@ mod metadata;
 pub mod mgm;
 #[cfg(feature = "untested")]
 pub mod msroots;
+pub mod readers;
 #[cfg(feature = "untested")]
 mod serialization;
 #[cfg(feature = "untested")]
@@ -164,7 +165,7 @@ mod transaction;
 pub mod yubikey;
 
 #[cfg(feature = "untested")]
-pub use self::{key::Key, mgm::MgmKey};
+pub use self::{key::Key, mgm::MgmKey, readers::Readers};
 pub use yubikey::YubiKey;
 
 /// Object identifiers
