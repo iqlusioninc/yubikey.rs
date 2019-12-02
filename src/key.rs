@@ -422,7 +422,6 @@ pub fn generate(
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
 ) -> Result<GeneratedKey, Error> {
-    let mut templ = [0, Ins::GenerateAsymmetric.code(), 0, 0];
     let setting_roca: settings::BoolValue;
 
     match algorithm {
@@ -470,7 +469,7 @@ pub fn generate(
 
     let txn = yubikey.begin_transaction()?;
 
-    templ[3] = slot.into();
+    let templ = [0, Ins::GenerateAsymmetric.code(), 0, slot.into()];
 
     let mut in_data = [0u8; 11];
     in_data[0] = 0xac;
@@ -512,7 +511,7 @@ pub fn generate(
                 return Err(Error::AuthenticationError);
             }
             other => {
-                error!("{} (error {:x})", err_msg, other.code());
+                error!("{} (error {:?})", err_msg, other);
                 return Err(Error::GenericError);
             }
         }

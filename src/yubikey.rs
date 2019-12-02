@@ -227,10 +227,12 @@ impl YubiKey {
     pub fn authenticate(&mut self, mgm_key: MgmKey) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
 
+        const TAG_DYN_AUTH: u8 = 0x7c;
+
         // get a challenge from the card
         let challenge = APDU::new(Ins::Authenticate)
             .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
-            .data(&[0x7c, 0x02, 0x80, 0x00])
+            .data(&[TAG_DYN_AUTH, 0x02, 0x80, 0x00])
             .transmit(&txn, 261)?;
 
         if !challenge.is_success() || challenge.data().len() < 12 {
@@ -241,7 +243,7 @@ impl YubiKey {
         let response = mgm_key.decrypt(challenge.data()[4..12].try_into().unwrap());
 
         let mut data = [0u8; 22];
-        data[0] = 0x7c;
+        data[0] = TAG_DYN_AUTH;
         data[1] = 20; // 2 + 8 + 2 +8
         data[2] = 0x80;
         data[3] = 8;
