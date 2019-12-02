@@ -18,4 +18,4 @@ gumdrop = "0.7"
 env_logger = "0.7"
 lazy_static = "1"
 termcolor = "1"
-yubikey-piv = { version = "0.0.2", path = ".." }
+yubikey-piv = { version = "0.0.3", path = ".." }
