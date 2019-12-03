@@ -4,7 +4,7 @@
 
 [![crate][crate-image]][crate-link]
 [![Docs][docs-image]][docs-link]
-![Apache2/MIT licensed][license-image]
+[![2-Clause BSD Licensed][license-image]][license-link]
 ![Rust Version][rustc-image]
 ![Maintenance Status: Experimental][maintenance-image]
 [![Safety Dance][safety-image]][safety-link]
@@ -192,6 +192,7 @@ or conditions.
 [docs-image]: https://docs.rs/yubikey-piv/badge.svg
 [docs-link]: https://docs.rs/yubikey-piv/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
+[license-link]: https://github.com/iqlusioninc/yubikey-piv.rs/blob/develop/COPYING
 [rustc-image]: https://img.shields.io/badge/rustc-1.39+-blue.svg
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
