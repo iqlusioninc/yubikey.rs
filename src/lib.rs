@@ -123,7 +123,7 @@
 
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/tarcieri/yubikey-piv.rs/develop/img/logo.png",
-    html_root_url = "https://docs.rs/yubikey-piv/0.0.2"
+    html_root_url = "https://docs.rs/yubikey-piv/0.0.3"
 )]
 #![forbid(unsafe_code)]
 #![warn(
@@ -156,6 +156,7 @@ mod metadata;
 pub mod mgm;
 #[cfg(feature = "untested")]
 pub mod msroots;
+pub mod readers;
 #[cfg(feature = "untested")]
 mod serialization;
 #[cfg(feature = "untested")]
@@ -163,9 +164,10 @@ pub mod settings;
 mod transaction;
 pub mod yubikey;
 
+pub use self::{readers::Readers, yubikey::YubiKey};
+
 #[cfg(feature = "untested")]
 pub use self::{key::Key, mgm::MgmKey};
-pub use yubikey::YubiKey;
 
 /// Object identifiers
 pub type ObjectId = u32;

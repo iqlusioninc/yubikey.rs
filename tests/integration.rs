@@ -14,7 +14,7 @@ fn connect() {
         env_logger::builder().format_timestamp(None).init();
     }
 
-    let mut yubikey = YubiKey::open(None).unwrap();
+    let mut yubikey = YubiKey::open().unwrap();
     dbg!(&yubikey.version());
     dbg!(&yubikey.serial());
 }

@@ -57,7 +57,7 @@ jobs:
           RUSTFLAGS: -D warnings
         with:
           command: test
-          args: --release
+          args: --all --release
 
       - name: Run cargo build --all-features
         uses: actions-rs/cargo@v1
@@ -65,7 +65,7 @@ jobs:
           RUSTFLAGS: -D warnings
         with:
           command: build
-          args: --all-features
+          args: --all --all-features
 
   test:
     name: Test Suite
@@ -94,7 +94,7 @@ jobs:
           RUSTFLAGS: -D warnings
         with:
           command: test
-          args: --release
+          args: --all --release
 
       - name: Run cargo build --all-features
         uses: actions-rs/cargo@v1
@@ -102,7 +102,7 @@ jobs:
           RUSTFLAGS: -D warnings
         with:
           command: build
-          args: --all-features
+          args: --all --all-features
 
   fmt:
     name: Rustfmt
@@ -149,7 +149,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all-features -- -D warnings
+          args: --all --all-features -- -D warnings
 
   # TODO: use actions-rs/audit-check
   security_audit:
