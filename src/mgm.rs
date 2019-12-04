@@ -268,7 +268,7 @@ impl MgmKey {
     pub(crate) fn decrypt(&self, input: &[u8; DES_LEN_DES]) -> [u8; DES_LEN_DES] {
         let mut output = input.to_owned();
         TdesEde3::new(GenericArray::from_slice(&self.0))
-            .encrypt_block(GenericArray::from_mut_slice(&mut output));
+            .decrypt_block(GenericArray::from_mut_slice(&mut output));
         output
     }
 }

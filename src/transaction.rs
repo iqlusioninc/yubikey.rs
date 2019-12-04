@@ -375,7 +375,7 @@ impl<'tx> Transaction<'tx> {
     ) -> Result<Response, Error> {
         let mut in_offset = 0;
         let mut out_data = vec![];
-        let mut sw = 0;
+        let mut sw;
 
         loop {
             let mut this_size = 0xff;
@@ -395,12 +395,12 @@ impl<'tx> Transaction<'tx> {
                 .data(&in_data[in_offset..(in_offset + this_size)])
                 .transmit(self, 261)?;
 
-            if !response.is_success() && (response.status_words().code() >> 8 != 0x61) {
+            sw = response.status_words().code();
+
+            if !response.is_success() && (sw >> 8 != 0x61) {
                 // TODO(tarcieri): is this really OK?
                 return Ok(Response::new(sw.into(), out_data));
             }
-
-            sw = response.status_words().code();
 
             if !out_data.is_empty() && (out_data.len() - response.data().len() > max_out) {
                 error!(

@@ -42,6 +42,7 @@ use crate::{
     certificate::{self, Certificate},
     consts::*,
     error::Error,
+    policy::{PinPolicy, TouchPolicy},
     serialization::*,
     settings,
     yubikey::YubiKey,
@@ -311,6 +312,16 @@ impl From<AlgorithmId> for u8 {
     }
 }
 
+impl AlgorithmId {
+    /// Writes the `AlgorithmId` in the format the YubiKey expects during key generation.
+    pub(crate) fn write(self, buf: &mut [u8]) -> usize {
+        buf[0] = 0x80;
+        buf[1] = 0x01;
+        buf[2] = self.into();
+        3
+    }
+}
+
 /// PIV cryptographic keys stored in a YubiKey
 #[derive(Clone, Debug)]
 pub struct Key {
@@ -408,11 +419,9 @@ pub fn generate(
     yubikey: &mut YubiKey,
     slot: SlotId,
     algorithm: AlgorithmId,
-    pin_policy: u8,
-    touch_policy: u8,
+    pin_policy: PinPolicy,
+    touch_policy: TouchPolicy,
 ) -> Result<GeneratedKey, Error> {
-    let mut in_data = [0u8; 11];
-    let mut templ = [0, Ins::GenerateAsymmetric.code(), 0, 0];
     let setting_roca: settings::BoolValue;
 
     match algorithm {
@@ -460,32 +469,21 @@ pub fn generate(
 
     let txn = yubikey.begin_transaction()?;
 
-    templ[3] = slot.into();
+    let templ = [0, Ins::GenerateAsymmetric.code(), 0, slot.into()];
 
+    let mut in_data = [0u8; 11];
+    in_data[0] = 0xac;
+    in_data[1] = 3; // length sans this 2-byte header
+    assert_eq!(algorithm.write(&mut in_data[2..]), 3);
     let mut offset = 5;
-    in_data[..offset].copy_from_slice(&[
-        0xac,
-        3, // length sans this 2-byte header
-        YKPIV_ALGO_TAG,
-        1,
-        algorithm.into(),
-    ]);
 
-    if in_data[4] == 0 {
-        error!("unexpected algorithm");
-        return Err(Error::AlgorithmError);
-    }
+    let pin_len = pin_policy.write(&mut in_data[offset..]);
+    in_data[1] += pin_len as u8;
+    offset += pin_len;
 
-    if pin_policy != YKPIV_PINPOLICY_DEFAULT {
-        in_data[1] += 3;
-        in_data[offset..(offset + 3)].copy_from_slice(&[YKPIV_PINPOLICY_TAG, 1, pin_policy]);
-        offset += 3;
-    }
-
-    if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT {
-        in_data[1] += 3;
-        in_data[offset..(offset + 3)].copy_from_slice(&[YKPIV_TOUCHPOLICY_TAG, 1, touch_policy]);
-    }
+    let touch_len = touch_policy.write(&mut in_data[offset..]);
+    in_data[1] += touch_len as u8;
+    offset += touch_len;
 
     let response = txn.transfer_data(&templ, &in_data[..offset], 1024)?;
 
@@ -498,12 +496,12 @@ pub fn generate(
                 return Err(Error::KeyError);
             }
             StatusWords::IncorrectParamError => {
-                if pin_policy != YKPIV_PINPOLICY_DEFAULT {
-                    error!("{} (pin policy not supported?)", err_msg);
-                } else if touch_policy != YKPIV_TOUCHPOLICY_DEFAULT {
-                    error!("{} (touch policy not supported?)", err_msg);
-                } else {
-                    error!("{} (algorithm not supported?)", err_msg);
+                match pin_policy {
+                    PinPolicy::Default => match touch_policy {
+                        TouchPolicy::Default => error!("{} (algorithm not supported?)", err_msg),
+                        _ => error!("{} (touch policy not supported?)", err_msg),
+                    },
+                    _ => error!("{} (pin policy not supported?)", err_msg),
                 }
 
                 return Err(Error::AlgorithmError);
@@ -513,7 +511,7 @@ pub fn generate(
                 return Err(Error::AuthenticationError);
             }
             other => {
-                error!("{} (error {:x})", err_msg, other.code());
+                error!("{} (error {:?})", err_msg, other);
                 return Err(Error::GenericError);
             }
         }
