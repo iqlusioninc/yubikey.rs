@@ -31,6 +31,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
+    cccid::CCC,
+    chuid::CHUID,
     config::Config,
     error::Error,
     readers::{Reader, Readers},
@@ -152,11 +154,8 @@ impl YubiKey {
         }
 
         error!("no YubiKey detected!");
-        Err(Error::GenericError)
+        Err(Error::NotFound)
     }
-
-    /// Open a connection to a YubiKey with the given serial number.
-
 
     /// Reconnect to a YubiKey
     #[cfg(feature = "untested")]
@@ -207,6 +206,16 @@ impl YubiKey {
     /// Get device configuration.
     pub fn config(&mut self) -> Result<Config, Error> {
         Config::get(self)
+    }
+
+    /// Get CHUID
+    pub fn chuid(&mut self) -> Result<CHUID, Error> {
+        CHUID::get(self)
+    }
+
+    /// Get CCCID
+    pub fn cccid(&mut self) -> Result<CCC, Error> {
+        CCC::get(self)
     }
 
     /// Authenticate to the card using the provided management key (MGM).

@@ -88,6 +88,9 @@ pub enum Error {
 
     /// Not supported
     NotSupported,
+
+    /// Not found
+    NotFound,
 }
 
 impl Error {
@@ -113,6 +116,7 @@ impl Error {
             Error::ArgumentError => "YKPIV_ARGUMENT_ERROR",
             Error::RangeError => "YKPIV_RANGE_ERROR",
             Error::NotSupported => "YKPIV_NOT_SUPPORTED",
+            Error::NotFound => "<not found>",
         }
     }
 
@@ -135,6 +139,7 @@ impl Error {
             Error::ArgumentError => "argument error",
             Error::RangeError => "range error",
             Error::NotSupported => "not supported",
+            Error::NotFound => "not found",
         }
     }
 }

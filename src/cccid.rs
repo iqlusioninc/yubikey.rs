@@ -30,8 +30,21 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{consts::*, error::Error, yubikey::YubiKey};
+use crate::{error::Error, yubikey::YubiKey};
 use getrandom::getrandom;
+use std::fmt::{self, Debug};
+
+/// CCCID size
+pub const CCCID_SIZE: usize = 14;
+
+/// CCC size
+pub const CCC_SIZE: usize = 51;
+
+/// CCCID offset
+const CCC_ID_OFFS: usize = 9;
+
+/// CCC Object ID
+const OBJ_CAPABILITY: u32 = 0x005f_c107;
 
 /// Cardholder Capability Container (CCC) Template
 ///
@@ -50,12 +63,12 @@ const CCC_TMPL: &[u8] = &[
 
 /// Cardholder Capability Container (CCC) Identifier Card ID
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct CardId(pub [u8; YKPIV_CCCID_SIZE]);
+pub struct CardId(pub [u8; CCCID_SIZE]);
 
 impl CardId {
     /// Generate a random CCC Card ID
     pub fn generate() -> Result<Self, Error> {
-        let mut id = [0u8; YKPIV_CCCID_SIZE];
+        let mut id = [0u8; CCCID_SIZE];
         getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
         Ok(Self(id))
     }
@@ -63,36 +76,43 @@ impl CardId {
 
 /// Cardholder Capability Container (CCC) Identifier
 #[derive(Copy, Clone)]
-pub struct CCC(pub [u8; YKPIV_CCC_SIZE]);
+pub struct CCC(pub [u8; CCC_SIZE]);
 
 impl CCC {
     /// Return CardId component of CCC
     pub fn cccid(&self) -> Result<CardId, Error> {
-        let mut cccid = [0u8; YKPIV_CCCID_SIZE];
-        cccid.copy_from_slice(&self.0[CCC_ID_OFFS..(CCC_ID_OFFS + YKPIV_CCCID_SIZE)]);
+        let mut cccid = [0u8; CCCID_SIZE];
+        cccid.copy_from_slice(&self.0[CCC_ID_OFFS..(CCC_ID_OFFS + CCCID_SIZE)]);
         Ok(CardId(cccid))
     }
 
     /// Get Cardholder Capability Container (CCC) ID
     pub fn get(yubikey: &mut YubiKey) -> Result<Self, Error> {
         let txn = yubikey.begin_transaction()?;
-        let response = txn.fetch_object(YKPIV_OBJ_CAPABILITY)?;
+        let response = txn.fetch_object(OBJ_CAPABILITY)?;
 
         if response.len() != CCC_TMPL.len() {
             return Err(Error::GenericError);
         }
 
-        let mut ccc = [0u8; YKPIV_CCC_SIZE];
-        ccc.copy_from_slice(&response[0..YKPIV_CCC_SIZE]);
+        let mut ccc = [0u8; CCC_SIZE];
+        ccc.copy_from_slice(&response[0..CCC_SIZE]);
         Ok(Self(ccc))
     }
 
     /// Get Cardholder Capability Container (CCC) ID
+    #[cfg(feature = "untested")]
     pub fn set(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
         let mut buf = CCC_TMPL.to_vec();
         buf[0..self.0.len()].copy_from_slice(&self.0);
 
         let txn = yubikey.begin_transaction()?;
-        txn.save_object(YKPIV_OBJ_CAPABILITY, &buf)
+        txn.save_object(OBJ_CAPABILITY, &buf)
+    }
+}
+
+impl Debug for CCC {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CCC({:?})", &self.0[..])
     }
 }

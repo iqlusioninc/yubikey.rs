@@ -6,7 +6,7 @@
 use lazy_static::lazy_static;
 use log::trace;
 use std::{env, sync::Mutex};
-use yubikey_piv::{key::Key, YubiKey};
+use yubikey_piv::{key::Key, Error, YubiKey};
 
 lazy_static! {
     /// Provide thread-safe access to a YubiKey
@@ -25,6 +25,38 @@ fn init_yubikey() -> Mutex<YubiKey> {
     trace!("version: {}", yubikey.version());
 
     Mutex::new(yubikey)
+}
+
+//
+// CCCID support
+//
+
+#[test]
+#[ignore]
+fn test_get_cccid() {
+    let mut yubikey = YUBIKEY.lock().unwrap();
+
+    match yubikey.cccid() {
+        Ok(cccid) => trace!("CCCID: {:?}", cccid),
+        Err(Error::NotFound) => trace!("CCCID not found"),
+        Err(err) => panic!("error getting CCCID: {:?}", err),
+    }
+}
+
+//
+// CHUID support
+//
+
+#[test]
+#[ignore]
+fn test_get_chuid() {
+    let mut yubikey = YUBIKEY.lock().unwrap();
+
+    match yubikey.chuid() {
+        Ok(chuid) => trace!("CHUID: {:?}", chuid),
+        Err(Error::NotFound) => trace!("CHUID not found"),
+        Err(err) => panic!("error getting CHUID: {:?}", err),
+    }
 }
 
 //

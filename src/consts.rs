@@ -67,12 +67,6 @@ pub const CB_OBJ_TAG_MAX: usize = (CB_OBJ_TAG_MIN + 2); // 1 byte tag + 3 bytes 
 pub const CB_PAGE: usize = 4096;
 pub const CB_PIN_MAX: usize = 8;
 
-pub const CCC_ID_OFFS: usize = 9;
-
-pub const CHUID_FASCN_OFFS: usize = 2;
-pub const CHUID_GUID_OFFS: usize = 29;
-pub const CHUID_EXPIRATION_OFFS: usize = 47;
-
 pub const CHREF_ACT_CHANGE_PIN: i32 = 0;
 pub const CHREF_ACT_UNBLOCK_PIN: i32 = 1;
 pub const CHREF_ACT_CHANGE_PUK: i32 = 2;
@@ -128,21 +122,11 @@ pub const TAG_ECC_POINT: u8 = 0x86;
 
 pub const YKPIV_ALGO_3DES: u8 = 0x03;
 
-pub const YKPIV_CHUID_SIZE: usize = 59;
-pub const YKPIV_CARDID_SIZE: usize = 16;
-pub const YKPIV_FASCN_SIZE: usize = 25;
-pub const YKPIV_EXPIRATION_SIZE: usize = 8;
-
-pub const YKPIV_CCCID_SIZE: usize = 14;
-pub const YKPIV_CCC_SIZE: usize = 51;
-
 pub const YKPIV_CERTINFO_UNCOMPRESSED: u8 = 0;
 pub const YKPIV_CERTINFO_GZIP: u8 = 1;
 
 pub const YKPIV_KEY_CARDMGM: u8 = 0x9b;
 
-pub const YKPIV_OBJ_CAPABILITY: u32 = 0x005f_c107;
-pub const YKPIV_OBJ_CHUID: u32 = 0x005f_c102;
 pub const YKPIV_OBJ_FINGERPRINTS: u32 = 0x005f_c103;
 pub const YKPIV_OBJ_SECURITY: u32 = 0x005f_c106;
 pub const YKPIV_OBJ_FACIAL: u32 = 0x005f_c108;
