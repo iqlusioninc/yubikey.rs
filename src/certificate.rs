@@ -39,9 +39,9 @@ use crate::{
     yubikey::YubiKey,
     Buffer,
 };
-use ecdsa::{
-    curve::{CompressedCurvePoint, NistP256, NistP384, UncompressedCurvePoint},
-    generic_array::GenericArray,
+use elliptic_curve::weierstrass::{
+    curve::{NistP256, NistP384},
+    PublicKey as EcPublicKey,
 };
 use log::error;
 use rsa::{PublicKey, RSAPublicKey};
@@ -54,26 +54,6 @@ const OID_RSA_ENCRYPTION: &str = "1.2.840.113549.1.1.1";
 const OID_EC_PUBLIC_KEY: &str = "1.2.840.10045.2.1";
 const OID_NIST_P256: &str = "1.2.840.10045.3.1.7";
 const OID_NIST_P384: &str = "1.3.132.0.34";
-
-/// An encoded point on the Nist P-256 curve.
-#[derive(Clone, Eq, PartialEq)]
-pub enum EcP256Point {
-    /// Compressed encoding of a point on the curve.
-    Compressed(CompressedCurvePoint<NistP256>),
-
-    /// Uncompressed encoding of a point on the curve.
-    Uncompressed(UncompressedCurvePoint<NistP256>),
-}
-
-/// An encoded point on the Nist P-384 curve.
-#[derive(Clone, Eq, PartialEq)]
-pub enum EcP384Point {
-    /// Compressed encoding of a point on the curve.
-    Compressed(CompressedCurvePoint<NistP384>),
-
-    /// Uncompressed encoding of a point on the curve.
-    Uncompressed(UncompressedCurvePoint<NistP384>),
-}
 
 /// Information about a public key within a [`Certificate`].
 #[derive(Clone, Eq, PartialEq)]
@@ -88,10 +68,10 @@ pub enum PublicKeyInfo {
     },
 
     /// EC P-256 keys
-    EcP256(EcP256Point),
+    EcP256(EcPublicKey<NistP256>),
 
     /// EC P-384 keys
-    EcP384(EcP384Point),
+    EcP384(EcPublicKey<NistP384>),
 }
 
 impl fmt::Debug for PublicKeyInfo {
@@ -118,32 +98,12 @@ impl PublicKeyInfo {
             OID_EC_PUBLIC_KEY => {
                 let key_bytes = &subject_pki.subject_public_key.data;
                 match read_pki::ec_parameters(&subject_pki.algorithm.parameters)? {
-                    AlgorithmId::EccP256 => match key_bytes.len() {
-                        33 => CompressedCurvePoint::<NistP256>::from_bytes(
-                            GenericArray::clone_from_slice(key_bytes),
-                        )
-                        .map(EcP256Point::Compressed),
-                        65 => UncompressedCurvePoint::<NistP256>::from_bytes(
-                            GenericArray::clone_from_slice(key_bytes),
-                        )
-                        .map(EcP256Point::Uncompressed),
-                        _ => None,
-                    }
-                    .map(PublicKeyInfo::EcP256)
-                    .ok_or(Error::InvalidObject),
-                    AlgorithmId::EccP384 => match key_bytes.len() {
-                        49 => CompressedCurvePoint::<NistP384>::from_bytes(
-                            GenericArray::clone_from_slice(key_bytes),
-                        )
-                        .map(EcP384Point::Compressed),
-                        97 => UncompressedCurvePoint::<NistP384>::from_bytes(
-                            GenericArray::clone_from_slice(key_bytes),
-                        )
-                        .map(EcP384Point::Uncompressed),
-                        _ => None,
-                    }
-                    .map(PublicKeyInfo::EcP384)
-                    .ok_or(Error::InvalidObject),
+                    AlgorithmId::EccP256 => EcPublicKey::from_bytes(key_bytes)
+                        .map(PublicKeyInfo::EcP256)
+                        .ok_or(Error::InvalidObject),
+                    AlgorithmId::EccP384 => EcPublicKey::from_bytes(key_bytes)
+                        .map(PublicKeyInfo::EcP384)
+                        .ok_or(Error::InvalidObject),
                     _ => Err(Error::AlgorithmError),
                 }
             }
