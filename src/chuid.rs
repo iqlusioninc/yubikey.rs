@@ -57,7 +57,16 @@ const CHUID_TMPL: &[u8] = &[
 
 /// Cardholder Unique Identifier (CHUID) Card UUID/GUID value
 #[derive(Copy, Clone, Debug)]
-pub struct ChuidUuid(pub [u8; YKPIV_CARDID_SIZE]);
+pub struct Uuid(pub [u8; YKPIV_CARDID_SIZE]);
+
+impl Uuid {
+    /// Generate a random Cardholder Unique Identifier (CHUID)
+    pub fn generate() -> Result<Self, Error> {
+        let mut id = [0u8; YKPIV_CARDID_SIZE];
+        getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
+        Ok(Self(id))
+    }
+}
 
 /// Cardholder Unique Identifier (CHUID)
 #[derive(Copy, Clone)]
@@ -85,13 +94,6 @@ impl CHUID {
             &self.0[CHUID_EXPIRATION_OFFS..(CHUID_EXPIRATION_OFFS + YKPIV_EXPIRATION_SIZE)],
         );
         Ok(expiration)
-    }
-
-    /// Generate a random Cardholder Unique Identifier (CHUID)
-    pub fn generate() -> Result<ChuidUuid, Error> {
-        let mut id = [0u8; YKPIV_CARDID_SIZE];
-        getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
-        Ok(ChuidUuid(id))
     }
 
     /// Get Cardholder Unique Identifier (CHUID)

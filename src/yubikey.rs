@@ -155,6 +155,9 @@ impl YubiKey {
         Err(Error::GenericError)
     }
 
+    /// Open a connection to a YubiKey with the given serial number.
+
+
     /// Reconnect to a YubiKey
     #[cfg(feature = "untested")]
     pub fn reconnect(&mut self) -> Result<(), Error> {
