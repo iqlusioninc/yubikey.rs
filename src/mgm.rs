@@ -30,18 +30,25 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{consts::*, error::Error, metadata, yubikey::YubiKey};
+use crate::{consts::*, error::Error};
+use getrandom::getrandom;
+use log::error;
+use std::convert::{TryFrom, TryInto};
+use zeroize::{Zeroize, Zeroizing};
+
+#[cfg(feature = "untested")]
+use crate::{metadata, yubikey::YubiKey};
+#[cfg(feature = "untested")]
 use des::{
     block_cipher_trait::{generic_array::GenericArray, BlockCipher},
     TdesEde3,
 };
-use getrandom::getrandom;
+#[cfg(feature = "untested")]
 use hmac::Hmac;
-use log::error;
+#[cfg(feature = "untested")]
 use pbkdf2::pbkdf2;
+#[cfg(feature = "untested")]
 use sha1::Sha1;
-use std::convert::{TryFrom, TryInto};
-use zeroize::{Zeroize, Zeroizing};
 
 /// Default MGM key configured on all YubiKeys
 const DEFAULT_MGM_KEY: [u8; DES_LEN_3DES] = [
@@ -50,7 +57,6 @@ const DEFAULT_MGM_KEY: [u8; DES_LEN_3DES] = [
 
 /// Management Key (MGM) key types (manual/derived/protected)
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[allow(non_camel_case_types)]
 pub enum MgmType {
     /// Manual
     Manual = 0,
@@ -107,6 +113,7 @@ impl MgmKey {
     }
 
     /// Get derived management key (MGM)
+    #[cfg(feature = "untested")]
     pub fn get_derived(yubikey: &mut YubiKey, pin: &[u8]) -> Result<Self, Error> {
         let txn = yubikey.begin_transaction()?;
 
@@ -131,6 +138,7 @@ impl MgmKey {
     }
 
     /// Get protected management key (MGM)
+    #[cfg(feature = "untested")]
     pub fn get_protected(yubikey: &mut YubiKey) -> Result<Self, Error> {
         let txn = yubikey.begin_transaction()?;
 
@@ -158,12 +166,14 @@ impl MgmKey {
     }
 
     /// Set the management key (MGM)
+    #[cfg(feature = "untested")]
     pub fn set(&self, yubikey: &mut YubiKey, touch: Option<u8>) -> Result<(), Error> {
         let txn = yubikey.begin_transaction()?;
         txn.set_mgm_key(&self, touch)
     }
 
     /// Set protected management key (MGM)
+    #[cfg(feature = "untested")]
     pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
         let mut data = Zeroizing::new(vec![0u8; CB_BUF_MAX]);
 
@@ -254,6 +264,7 @@ impl MgmKey {
     }
 
     /// Encrypt with 3DES key
+    #[cfg(feature = "untested")]
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub(crate) fn encrypt(&self, input: &[u8; DES_LEN_DES]) -> [u8; DES_LEN_DES] {
         let mut output = input.to_owned();
@@ -263,6 +274,7 @@ impl MgmKey {
     }
 
     /// Decrypt with 3DES key
+    #[cfg(feature = "untested")]
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub(crate) fn decrypt(&self, input: &[u8; DES_LEN_DES]) -> [u8; DES_LEN_DES] {
         let mut output = input.to_owned();

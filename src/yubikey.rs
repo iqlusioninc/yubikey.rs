@@ -31,6 +31,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
+    config::Config,
     error::Error,
     readers::{Reader, Readers},
     transaction::Transaction,
@@ -198,6 +199,11 @@ impl YubiKey {
     /// This always uses the cached version queried when the key is initialized.
     pub fn serial(&mut self) -> Serial {
         self.serial
+    }
+
+    /// Get device configuration.
+    pub fn config(&mut self) -> Result<Config, Error> {
+        Config::get(self)
     }
 
     /// Authenticate to the card using the provided management key (MGM).

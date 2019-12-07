@@ -27,13 +27,22 @@ fn init_yubikey() -> Mutex<YubiKey> {
     Mutex::new(yubikey)
 }
 
+//
+// Device config support
+//
+
 #[test]
 #[ignore]
-fn test_verify_pin() {
+fn test_get_config() {
     let mut yubikey = YUBIKEY.lock().unwrap();
-    assert!(yubikey.verify_pin(b"000000").is_err());
-    assert!(yubikey.verify_pin(b"123456").is_ok());
+    let config_result = yubikey.config();
+    assert!(config_result.is_ok());
+    trace!("config: {:?}", config_result.unwrap());
 }
+
+//
+// Cryptographic key support
+//
 
 #[test]
 #[ignore]
@@ -42,4 +51,16 @@ fn test_list_keys() {
     let keys_result = Key::list(&mut yubikey);
     assert!(keys_result.is_ok());
     trace!("keys: {:?}", keys_result.unwrap());
+}
+
+//
+// PIN support
+//
+
+#[test]
+#[ignore]
+fn test_verify_pin() {
+    let mut yubikey = YUBIKEY.lock().unwrap();
+    assert!(yubikey.verify_pin(b"000000").is_err());
+    assert!(yubikey.verify_pin(b"123456").is_ok());
 }

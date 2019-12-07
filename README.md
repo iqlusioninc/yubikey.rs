@@ -68,7 +68,7 @@ functions of the YubiKey:
 | ⚠️ | `cccid`       | [#21] | Cardholder Capability Container (CCC) IDs |
 | 🚧️ | `certificate` | [#22] | Certificates for stored keys |
 | ⚠️ | `chuid`       | [#23] | Cardholder Unique Identifier (CHUID) |
-| ⚠️ | `config`      | [#24] | Support for reading on-key configuration |
+| ✅️ | `config`      | [#24] | Support for reading on-key configuration |
 | ⚠️ | `container`   | [#25] | MS Container Map Records |
 | 🚧 | `key`         | [#26] | Crypto key management: list, generate, import |
 | ⚠️ | `mgm`         | [#26] | Management Key (MGM) support: set, get, derive |
@@ -78,6 +78,7 @@ Legend:
 
 |    | Description                        |
 |----|------------------------------------|
+| ✅ | Working                            |
 | 🚧 | Testing and validation in progress |
 | ⚠️ | Untested support                   |
 
