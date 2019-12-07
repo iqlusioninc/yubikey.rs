@@ -190,7 +190,6 @@ impl YubiKey {
     }
 
     /// Begin a transaction.
-    #[cfg(feature = "untested")]
     pub(crate) fn begin_transaction(&mut self) -> Result<Transaction<'_>, Error> {
         // TODO(tarcieri): reconnect support
         Ok(Transaction::new(&mut self.card)?)
@@ -330,7 +329,6 @@ impl YubiKey {
     }
 
     /// Verify device PIN.
-    #[cfg(feature = "untested")]
     pub fn verify_pin(&mut self, pin: &[u8]) -> Result<(), Error> {
         {
             let txn = self.begin_transaction()?;

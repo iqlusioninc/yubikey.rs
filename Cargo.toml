@@ -40,6 +40,7 @@ zeroize = "1"
 
 [dev-dependencies]
 env_logger = "0.7"
+lazy_static = "1"
 
 [features]
 untested = []
