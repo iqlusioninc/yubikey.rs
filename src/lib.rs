@@ -136,10 +136,8 @@
 )]
 
 mod apdu;
-#[cfg(feature = "untested")]
 pub mod cccid;
 pub mod certificate;
-#[cfg(feature = "untested")]
 pub mod chuid;
 pub mod config;
 pub mod consts;
@@ -159,10 +157,7 @@ pub mod settings;
 mod transaction;
 pub mod yubikey;
 
-pub use self::{readers::Readers, yubikey::YubiKey};
-
-#[cfg(feature = "untested")]
-pub use self::{key::Key, mgm::MgmKey};
+pub use self::{error::Error, key::Key, mgm::MgmKey, readers::Readers, yubikey::YubiKey};
 
 /// Object identifiers
 pub type ObjectId = u32;

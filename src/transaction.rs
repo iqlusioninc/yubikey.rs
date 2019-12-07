@@ -448,7 +448,11 @@ impl<'tx> Transaction<'tx> {
         let response = self.transfer_data(&templ, &indata[..inlen], CB_BUF_MAX)?;
 
         if !response.is_success() {
-            return Err(Error::GenericError);
+            if response.status_words() == StatusWords::NotFoundError {
+                return Err(Error::NotFound);
+            } else {
+                return Err(Error::GenericError);
+            }
         }
 
         let data = Buffer::new(response.data().into());
