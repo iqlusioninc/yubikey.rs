@@ -141,16 +141,13 @@ pub mod cccid;
 pub mod certificate;
 #[cfg(feature = "untested")]
 pub mod chuid;
-#[cfg(feature = "untested")]
 pub mod config;
 pub mod consts;
 #[cfg(feature = "untested")]
 pub mod container;
 pub mod error;
 pub mod key;
-#[cfg(feature = "untested")]
 mod metadata;
-#[cfg(feature = "untested")]
 pub mod mgm;
 #[cfg(feature = "untested")]
 pub mod msroots;

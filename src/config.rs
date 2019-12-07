@@ -32,10 +32,13 @@
 
 use crate::{consts::*, error::Error, metadata, mgm::MgmType, yubikey::YubiKey};
 use log::error;
-use std::convert::TryInto;
+use std::{
+    convert::TryInto,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 /// Config
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Config {
     /// Protected data available
     protected_data_available: bool,
@@ -47,7 +50,7 @@ pub struct Config {
     puk_noblock_on_upgrade: bool,
 
     /// PIN last changed
-    pin_last_changed: u32,
+    pin_last_changed: Option<SystemTime>,
 
     /// MGM type
     mgm_type: MgmType,
@@ -60,7 +63,7 @@ impl Config {
             protected_data_available: false,
             puk_blocked: false,
             puk_noblock_on_upgrade: false,
-            pin_last_changed: 0,
+            pin_last_changed: None,
             mgm_type: MgmType::Manual,
         };
 
@@ -93,8 +96,13 @@ impl Config {
                 if item.len() != CB_ADMIN_TIMESTAMP {
                     error!("pin timestamp in admin metadata is an invalid size");
                 } else {
-                    // TODO(tarcieri): double check this is little endian
-                    config.pin_last_changed = u32::from_le_bytes(item.try_into().unwrap());
+                    // TODO(tarcieri): double-check endianness is correct
+                    let pin_last_changed = u32::from_le_bytes(item.try_into().unwrap());
+
+                    if pin_last_changed != 0 {
+                        config.pin_last_changed =
+                            Some(UNIX_EPOCH + Duration::from_secs(pin_last_changed as u64));
+                    }
                 }
             }
         }

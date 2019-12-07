@@ -31,6 +31,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{consts::*, error::Error, serialization::*, transaction::Transaction, Buffer};
+
+#[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
 /// Get metadata item
@@ -64,6 +66,7 @@ pub(crate) fn get_item(data: &[u8], tag: u8) -> Result<&[u8], Error> {
 }
 
 /// Set metadata item
+#[cfg(feature = "untested")]
 pub(crate) fn set_item(
     data: &mut [u8],
     pcb_data: &mut usize,
@@ -191,6 +194,7 @@ pub(crate) fn read(txn: &Transaction<'_>, tag: u8) -> Result<Buffer, Error> {
 }
 
 /// Write metadata
+#[cfg(feature = "untested")]
 pub(crate) fn write(txn: &Transaction<'_>, tag: u8, data: &[u8]) -> Result<(), Error> {
     let mut buf = Zeroizing::new(vec![0u8; CB_OBJ_MAX]);
 
@@ -218,6 +222,7 @@ pub(crate) fn write(txn: &Transaction<'_>, tag: u8, data: &[u8]) -> Result<(), E
 }
 
 /// Get the size of a length tag for the given length
+#[cfg(feature = "untested")]
 fn get_length_size(length: usize) -> usize {
     if length < 0x80 {
         1
