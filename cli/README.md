@@ -22,11 +22,11 @@ utility with general-purpose public-key encryption and signing support.
 
 ## Supported YubiKeys
 
-- [YubiKey NEO] series (may be dropped in the future, see [#18])
 - [YubiKey 4] series
 - [YubiKey 5] series
 
-NOTE: Nano and USB-C variants of the above are also supported
+NOTE: Nano and USB-C variants of the above are also supported.
+      Pre-YK4 [YubiKey NEO] series is **NOT** supported (see [#18]).
 
 ## Security Warning
 

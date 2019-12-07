@@ -51,11 +51,10 @@ impl MsRoots {
 
     /// Read `msroots` file from YubiKey
     pub fn read(yubikey: &mut YubiKey) -> Result<Option<Self>, Error> {
-        let cb_data = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
 
         // allocate first page
-        let mut data = Vec::with_capacity(cb_data);
+        let mut data = Vec::with_capacity(CB_OBJ_MAX);
 
         for object_id in YKPIV_OBJ_MSROOTS1..YKPIV_OBJ_MSROOTS5 {
             let buf = txn.fetch_object(object_id)?;
@@ -106,7 +105,6 @@ impl MsRoots {
         let data = &self.0;
         let data_len = data.len();
         let n_objs: usize;
-        let cb_obj_max = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
 
         if data_len == 0 {
@@ -114,7 +112,7 @@ impl MsRoots {
         }
 
         // Calculate number of objects required to store blob
-        n_objs = (data_len / (cb_obj_max - CB_OBJ_TAG_MAX)) + 1;
+        n_objs = (data_len / (CB_OBJ_MAX - CB_OBJ_TAG_MAX)) + 1;
 
         if n_objs > 5 {
             return Err(Error::SizeError);
@@ -123,8 +121,8 @@ impl MsRoots {
         for i in 0..n_objs {
             offset = 0;
 
-            data_chunk = if cb_obj_max - CB_OBJ_TAG_MAX < data_len - data_offset {
-                cb_obj_max - CB_OBJ_TAG_MAX
+            data_chunk = if CB_OBJ_MAX - CB_OBJ_TAG_MAX < data_len - data_offset {
+                CB_OBJ_MAX - CB_OBJ_TAG_MAX
             } else {
                 data_len - data_offset
             };

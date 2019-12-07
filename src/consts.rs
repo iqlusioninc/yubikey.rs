@@ -39,21 +39,27 @@ pub const szLOG_SOURCE: &str = "yubikey-piv.rs";
 pub const ADMIN_FLAGS_1_PUK_BLOCKED: u8 = 0x01;
 pub const ADMIN_FLAGS_1_PROTECTED_MGM: u8 = 0x02;
 
+/// PIV Applet ID
+pub const PIV_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
+
+/// MGMT Applet ID.
+/// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
+pub const MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
+
+/// YubiKey OTP Applet ID. Needed to query serial on YK4.
+pub const YK_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01];
+
 pub const CB_ADMIN_TIMESTAMP: usize = 0x04;
 pub const CB_ADMIN_SALT: usize = 16;
 
 pub const CB_ATR_MAX: usize = 33;
 
-pub const CB_BUF_MAX_NEO: usize = 2048;
-pub const CB_BUF_MAX_YK4: usize = 3072;
-pub const CB_BUF_MAX: usize = CB_BUF_MAX_YK4;
+pub const CB_BUF_MAX: usize = 3072;
 
 pub const CB_ECC_POINTP256: usize = 65;
 pub const CB_ECC_POINTP384: usize = 97;
 
-pub const CB_OBJ_MAX_YK4: usize = CB_BUF_MAX_YK4 - 9;
-pub const CB_OBJ_MAX: usize = CB_OBJ_MAX_YK4;
-pub const CB_OBJ_MAX_NEO: usize = CB_BUF_MAX_NEO - 9;
+pub const CB_OBJ_MAX: usize = CB_BUF_MAX - 9;
 
 pub const CB_OBJ_TAG_MIN: usize = 2; // 1 byte tag + 1 byte len
 pub const CB_OBJ_TAG_MAX: usize = (CB_OBJ_TAG_MIN + 2); // 1 byte tag + 3 bytes len
@@ -82,9 +88,7 @@ pub const DES_LEN_3DES: usize = DES_LEN_DES * 3;
 // device types
 
 pub const DEVTYPE_UNKNOWN: u32 = 0x0000_0000;
-pub const DEVTYPE_NEO: u32 = 0x4E45_0000; //"NE"
 pub const DEVTYPE_YK: u32 = 0x594B_0000; //"YK"
-pub const DEVTYPE_NEOr3: u32 = (DEVTYPE_NEO | 0x0000_7233); //"r3"
 pub const DEVTYPE_YK4: u32 = (DEVTYPE_YK | 0x0000_0034); // "4"
 pub const DEVYTPE_YK5: u32 = (DEVTYPE_YK | 0x0000_0035); // "5"
 
@@ -123,8 +127,6 @@ pub const TAG_RSA_EXP: u8 = 0x82;
 pub const TAG_ECC_POINT: u8 = 0x86;
 
 pub const YKPIV_ALGO_3DES: u8 = 0x03;
-
-pub const YKPIV_ATR_NEO_R3: &[u8] = b";\xFC\x13\0\0\x811\xFE\x15YubikeyNEOr3\xE1\0";
 
 pub const YKPIV_CHUID_SIZE: usize = 59;
 pub const YKPIV_CARDID_SIZE: usize = 16;

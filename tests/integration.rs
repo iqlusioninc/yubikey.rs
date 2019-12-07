@@ -4,6 +4,7 @@
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
 
 use lazy_static::lazy_static;
+use log::trace;
 use std::{env, sync::Mutex};
 use yubikey_piv::{key::Key, YubiKey};
 
@@ -19,7 +20,11 @@ fn init_yubikey() -> Mutex<YubiKey> {
         env_logger::builder().format_timestamp(None).init();
     }
 
-    Mutex::new(YubiKey::open().unwrap())
+    let mut yubikey = YubiKey::open().unwrap();
+    trace!("serial: {}", yubikey.serial());
+    trace!("version: {}", yubikey.version());
+
+    Mutex::new(yubikey)
 }
 
 #[test]
@@ -36,5 +41,5 @@ fn test_list_keys() {
     let mut yubikey = YUBIKEY.lock().unwrap();
     let keys_result = Key::list(&mut yubikey);
     assert!(keys_result.is_ok());
-    dbg!(keys_result.unwrap());
+    trace!("keys: {:?}", keys_result.unwrap());
 }

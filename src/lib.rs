@@ -18,11 +18,11 @@
 //!
 //! ## Supported YubiKeys
 //!
-//! - [YubiKey NEO] series
 //! - [YubiKey 4] series
 //! - [YubiKey 5] series
 //!
-//! NOTE: Nano and USB-C variants of the above are also supported
+//! NOTE: Nano and USB-C variants of the above are also supported.
+//!       Pre-YK4 [YubiKey NEO] series is **NOT** supported.
 //!
 //! ## Supported Algorithms
 //!
