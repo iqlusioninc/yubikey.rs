@@ -30,42 +30,35 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#![allow(non_snake_case, non_upper_case_globals)]
-#![allow(clippy::too_many_arguments, clippy::missing_safety_doc)]
-
-#[cfg(feature = "untested")]
-use crate::{
-    apdu::{Ins, StatusWords, APDU},
-    key::{AlgorithmId, SlotId},
-    metadata,
-    mgm::MgmKey,
-    policy::{PinPolicy, TouchPolicy},
-    serialization::*,
-    Buffer, ObjectId,
-};
 use crate::{
     consts::*,
     error::Error,
     readers::{Reader, Readers},
     transaction::Transaction,
 };
-#[cfg(feature = "untested")]
-use getrandom::getrandom;
 use log::{error, info, warn};
 use pcsc::Card;
-#[cfg(feature = "untested")]
-use secrecy::ExposeSecret;
 use std::{
     convert::TryFrom,
     fmt::{self, Display},
 };
+
+#[cfg(feature = "untested")]
+use crate::{
+    apdu::{Ins, StatusWords, APDU},
+    metadata,
+    mgm::MgmKey,
+    Buffer, ObjectId,
+};
+#[cfg(feature = "untested")]
+use getrandom::getrandom;
+#[cfg(feature = "untested")]
+use secrecy::ExposeSecret;
 #[cfg(feature = "untested")]
 use std::{
     convert::TryInto,
     time::{SystemTime, UNIX_EPOCH},
 };
-#[cfg(feature = "untested")]
-use zeroize::Zeroizing;
 
 /// PIV Application ID
 pub const AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
@@ -300,34 +293,6 @@ impl YubiKey {
         Ok(())
     }
 
-    /// Sign data using a PIV key
-    #[cfg(feature = "untested")]
-    pub fn sign_data(
-        &mut self,
-        raw_in: &[u8],
-        algorithm: AlgorithmId,
-        key: SlotId,
-    ) -> Result<Buffer, Error> {
-        let txn = self.begin_transaction()?;
-
-        // don't attempt to reselect in crypt operations to avoid problems with PIN_ALWAYS
-        txn.authenticated_command(raw_in, algorithm, key, false)
-    }
-
-    /// Decrypt data using a PIV key
-    #[cfg(feature = "untested")]
-    pub fn decrypt_data(
-        &mut self,
-        input: &[u8],
-        algorithm: AlgorithmId,
-        key: SlotId,
-    ) -> Result<Buffer, Error> {
-        let txn = self.begin_transaction()?;
-
-        // don't attempt to reselect in crypt operations to avoid problems with PIN_ALWAYS
-        txn.authenticated_command(input, algorithm, key, true)
-    }
-
     /// Verify device PIN.
     pub fn verify_pin(&mut self, pin: &[u8]) -> Result<(), Error> {
         {
@@ -538,127 +503,6 @@ impl YubiKey {
     pub fn save_object(&mut self, object_id: ObjectId, indata: &mut [u8]) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
         txn.save_object(object_id, indata)
-    }
-
-    /// Import a private encryption or signing key into the YubiKey
-    // TODO(tarcieri): refactor this into separate methods per key type
-    #[cfg(feature = "untested")]
-    pub fn import_private_key(
-        &mut self,
-        key: SlotId,
-        algorithm: AlgorithmId,
-        p: Option<&[u8]>,
-        q: Option<&[u8]>,
-        dp: Option<&[u8]>,
-        dq: Option<&[u8]>,
-        qinv: Option<&[u8]>,
-        ec_data: Option<&[u8]>,
-        pin_policy: PinPolicy,
-        touch_policy: TouchPolicy,
-    ) -> Result<(), Error> {
-        let mut key_data = Zeroizing::new(vec![0u8; 1024]);
-        let templ = [0, Ins::ImportKey.code(), algorithm.into(), key.into()];
-
-        let (elem_len, params, param_tag) = match algorithm {
-            AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => match (p, q, dp, dq, qinv) {
-                (Some(p), Some(q), Some(dp), Some(dq), Some(qinv)) => {
-                    if p.len() + q.len() + dp.len() + dq.len() + qinv.len() >= key_data.len() {
-                        return Err(Error::SizeError);
-                    }
-
-                    (
-                        match algorithm {
-                            AlgorithmId::Rsa1024 => 64,
-                            AlgorithmId::Rsa2048 => 128,
-                            _ => unreachable!(),
-                        },
-                        vec![p, q, dp, dq, qinv],
-                        0x01,
-                    )
-                }
-                _ => return Err(Error::GenericError),
-            },
-            AlgorithmId::EccP256 | AlgorithmId::EccP384 => match ec_data {
-                Some(ec_data) => {
-                    if ec_data.len() >= key_data.len() {
-                        // This can never be true, but check to be explicit.
-                        return Err(Error::SizeError);
-                    }
-
-                    (
-                        match algorithm {
-                            AlgorithmId::EccP256 => 32,
-                            AlgorithmId::EccP384 => 48,
-                            _ => unreachable!(),
-                        },
-                        vec![ec_data],
-                        0x06,
-                    )
-                }
-                _ => return Err(Error::GenericError),
-            },
-        };
-
-        let mut offset = 0;
-
-        for (i, param) in params.into_iter().enumerate() {
-            key_data[offset] = param_tag + i as u8;
-            offset += 1;
-
-            offset += set_length(&mut key_data[offset..], elem_len);
-
-            let padding = elem_len - param.len();
-            let remaining = key_data.len() - offset;
-
-            if padding > remaining {
-                return Err(Error::AlgorithmError);
-            }
-
-            for b in &mut key_data[offset..offset + padding] {
-                *b = 0;
-            }
-            offset += padding;
-            key_data[offset..offset + param.len()].copy_from_slice(param);
-            offset += param.len();
-        }
-
-        offset += pin_policy.write(&mut key_data[offset..]);
-        offset += touch_policy.write(&mut key_data[offset..]);
-
-        let txn = self.begin_transaction()?;
-
-        let status_words = txn
-            .transfer_data(&templ, &key_data[..offset], 256)?
-            .status_words();
-
-        match status_words {
-            StatusWords::Success => Ok(()),
-            StatusWords::SecurityStatusError => Err(Error::AuthenticationError),
-            _ => Err(Error::GenericError),
-        }
-    }
-
-    /// Generate an attestation certificate for a stored key.
-    /// <https://developers.yubico.com/PIV/Introduction/PIV_attestation.html>
-    #[cfg(feature = "untested")]
-    pub fn attest(&mut self, key: SlotId) -> Result<Buffer, Error> {
-        let templ = [0, Ins::Attest.code(), key.into(), 0];
-        let txn = self.begin_transaction()?;
-        let response = txn.transfer_data(&templ, &[], CB_OBJ_MAX)?;
-
-        if !response.is_success() {
-            if response.status_words() == StatusWords::NotSupportedError {
-                return Err(Error::NotSupported);
-            } else {
-                return Err(Error::GenericError);
-            }
-        }
-
-        if response.data()[0] != 0x30 {
-            return Err(Error::GenericError);
-        }
-
-        Ok(Buffer::new(response.data().into()))
     }
 
     /// Get an auth challenge
