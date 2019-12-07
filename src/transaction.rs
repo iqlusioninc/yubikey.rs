@@ -1,22 +1,21 @@
 //! YubiKey PC/SC transactions
 
-use crate::{
-    apdu::{Ins, APDU},
-    error::Error,
-    yubikey::*,
-};
 #[cfg(feature = "untested")]
 use crate::{
-    apdu::{Response, StatusWords},
-    consts::*,
+    apdu::Response,
     key::{AlgorithmId, SlotId},
     mgm::MgmKey,
     serialization::*,
     Buffer, ObjectId,
 };
+use crate::{
+    apdu::{Ins, StatusWords, APDU},
+    consts::*,
+    error::Error,
+    yubikey::*,
+};
 use log::{error, trace};
 use std::convert::TryInto;
-#[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
 /// Exclusive transaction with the YubiKey's PC/SC card.
@@ -25,7 +24,7 @@ pub(crate) struct Transaction<'tx> {
 }
 
 impl<'tx> Transaction<'tx> {
-    /// Create a new transaction with the given card
+    /// Create a new transaction with the given card.
     pub fn new(card: &'tx mut pcsc::Card) -> Result<Self, Error> {
         Ok(Transaction {
             inner: card.transaction()?,
@@ -84,7 +83,7 @@ impl<'tx> Transaction<'tx> {
         Ok(())
     }
 
-    /// Get the version of the PIV application installed on the YubiKey
+    /// Get the version of the PIV application installed on the YubiKey.
     pub fn get_version(&self) -> Result<Version, Error> {
         // get version from device
         let response = APDU::new(Ins::GetVersion).transmit(self, 261)?;
@@ -100,7 +99,7 @@ impl<'tx> Transaction<'tx> {
         Ok(Version::new(response.data()[..3].try_into().unwrap()))
     }
 
-    /// Get YubiKey device serial number
+    /// Get YubiKey device serial number.
     pub fn get_serial(&self, version: Version) -> Result<Serial, Error> {
         let yk_applet = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01];
 
@@ -162,7 +161,6 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Verify device PIN.
-    #[cfg(feature = "untested")]
     pub fn verify_pin(&self, pin: &[u8]) -> Result<(), Error> {
         if pin.len() > CB_PIN_MAX {
             return Err(Error::SizeError);
@@ -190,7 +188,7 @@ impl<'tx> Transaction<'tx> {
         }
     }
 
-    /// Change the PIN
+    /// Change the PIN.
     #[cfg(feature = "untested")]
     pub fn change_pin(&self, action: i32, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         let mut templ = [0, Ins::ChangeReference.code(), 0, 0x80];
@@ -449,7 +447,7 @@ impl<'tx> Transaction<'tx> {
         Ok(Response::new(sw.into(), out_data))
     }
 
-    /// Fetch an object
+    /// Fetch an object.
     #[cfg(feature = "untested")]
     pub fn fetch_object(&self, object_id: ObjectId) -> Result<Buffer, Error> {
         let mut indata = [0u8; 5];
@@ -493,7 +491,7 @@ impl<'tx> Transaction<'tx> {
         ))
     }
 
-    /// Save an object
+    /// Save an object.
     #[cfg(feature = "untested")]
     pub fn save_object(&self, object_id: ObjectId, indata: &[u8]) -> Result<(), Error> {
         let templ = [0, Ins::PutData.code(), 0x3f, 0xff];

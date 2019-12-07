@@ -3,18 +3,29 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
 
-use std::env;
+use lazy_static::lazy_static;
+use std::{env, sync::Mutex};
 use yubikey_piv::YubiKey;
 
-#[test]
-#[ignore]
-fn connect() {
+lazy_static! {
+    /// Provide thread-safe access to a YubiKey
+    static ref YUBIKEY: Mutex<YubiKey> = init_yubikey();
+}
+
+/// One-time test initialization and setup
+fn init_yubikey() -> Mutex<YubiKey> {
     // Only show logs if `RUST_LOG` is set
     if env::var("RUST_LOG").is_ok() {
         env_logger::builder().format_timestamp(None).init();
     }
 
-    let mut yubikey = YubiKey::open().unwrap();
-    dbg!(&yubikey.version());
-    dbg!(&yubikey.serial());
+    Mutex::new(YubiKey::open().unwrap())
+}
+
+#[test]
+#[ignore]
+fn test_verify_pin() {
+    let mut yubikey = YUBIKEY.lock().unwrap();
+    assert!(yubikey.verify_pin(b"000000").is_err());
+    assert!(yubikey.verify_pin(b"123456").is_ok());
 }
