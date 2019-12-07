@@ -143,6 +143,7 @@ impl Certificate {
     }
 
     /// Write this certificate into the YubiKey in the given slot
+    #[cfg(feature = "untested")]
     pub fn write(&self, yubikey: &mut YubiKey, slot: SlotId, certinfo: u8) -> Result<(), Error> {
         let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
@@ -150,6 +151,7 @@ impl Certificate {
     }
 
     /// Delete a certificate located at the given slot of the given YubiKey
+    #[cfg(feature = "untested")]
     pub fn delete(yubikey: &mut YubiKey, slot: SlotId) -> Result<(), Error> {
         let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
@@ -236,6 +238,7 @@ pub(crate) fn read_certificate(txn: &Transaction<'_>, slot: SlotId) -> Result<Bu
 }
 
 /// Write certificate
+#[cfg(feature = "untested")]
 pub(crate) fn write_certificate(
     txn: &Transaction<'_>,
     slot: SlotId,

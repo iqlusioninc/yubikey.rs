@@ -5,7 +5,7 @@
 
 use lazy_static::lazy_static;
 use std::{env, sync::Mutex};
-use yubikey_piv::YubiKey;
+use yubikey_piv::{key::Key, YubiKey};
 
 lazy_static! {
     /// Provide thread-safe access to a YubiKey
@@ -28,4 +28,13 @@ fn test_verify_pin() {
     let mut yubikey = YUBIKEY.lock().unwrap();
     assert!(yubikey.verify_pin(b"000000").is_err());
     assert!(yubikey.verify_pin(b"123456").is_ok());
+}
+
+#[test]
+#[ignore]
+fn test_list_keys() {
+    let mut yubikey = YUBIKEY.lock().unwrap();
+    let keys_result = Key::list(&mut yubikey);
+    assert!(keys_result.is_ok());
+    dbg!(keys_result.unwrap());
 }

@@ -1,22 +1,23 @@
 //! YubiKey PC/SC transactions
 
-#[cfg(feature = "untested")]
 use crate::{
     apdu::Response,
-    key::{AlgorithmId, SlotId},
-    mgm::MgmKey,
-    serialization::*,
-    Buffer, ObjectId,
-};
-use crate::{
     apdu::{Ins, StatusWords, APDU},
     consts::*,
     error::Error,
+    serialization::*,
     yubikey::*,
+    Buffer, ObjectId,
 };
 use log::{error, trace};
 use std::convert::TryInto;
 use zeroize::Zeroizing;
+
+#[cfg(feature = "untested")]
+use crate::{
+    key::{AlgorithmId, SlotId},
+    mgm::MgmKey,
+};
 
 /// Exclusive transaction with the YubiKey's PC/SC card.
 pub(crate) struct Transaction<'tx> {
@@ -364,7 +365,6 @@ impl<'tx> Transaction<'tx> {
     /// messages into smaller APDU-sized messages (using the provided APDU
     /// template to construct them), and then sending those via
     /// [`Transaction::transmit`].
-    #[cfg(feature = "untested")]
     pub fn transfer_data(
         &self,
         templ: &[u8],
@@ -448,7 +448,6 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Fetch an object.
-    #[cfg(feature = "untested")]
     pub fn fetch_object(&self, object_id: ObjectId) -> Result<Buffer, Error> {
         let mut indata = [0u8; 5];
         let templ = [0, Ins::GetData.code(), 0x3f, 0xff];

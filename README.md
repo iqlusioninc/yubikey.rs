@@ -66,12 +66,12 @@ functions of the YubiKey:
 |----|---------------|-------|-------------|
 | 🚧 | `yubikey`     | [#20] | Core functionality: auth, keys, PIN/PUK, encrypt, sign, attest |
 | ⚠️ | `cccid`       | [#21] | Cardholder Capability Container (CCC) IDs |
-| ⚠️ | `certificate` | [#22] | Certificates for stored keys |
+| 🚧️ | `certificate` | [#22] | Certificates for stored keys |
 | ⚠️ | `chuid`       | [#23] | Cardholder Unique Identifier (CHUID) |
 | ⚠️ | `config`      | [#24] | Support for reading on-key configuration |
 | ⚠️ | `container`   | [#25] | MS Container Map Records |
-| ⚠️ | `key`         | [#26] | Crypto key management: list, generate, import |
-| ⚠️ | `mgm`         | [#26] | Management Key (MGM) support: set, get, derive
+| 🚧 | `key`         | [#26] | Crypto key management: list, generate, import |
+| ⚠️ | `mgm`         | [#26] | Management Key (MGM) support: set, get, derive |
 | ⚠️ | `msroots`     | [#28] | `msroots` file: PKCS#7 formatted certificate store for enterprise trusted roots |
 
 Legend:
