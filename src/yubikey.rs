@@ -31,12 +31,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    consts::*,
     error::Error,
     readers::{Reader, Readers},
     transaction::Transaction,
 };
-use log::{error, info, warn};
+use log::{error, info};
 use pcsc::Card;
 use std::{
     convert::TryFrom,
@@ -46,6 +45,7 @@ use std::{
 #[cfg(feature = "untested")]
 use crate::{
     apdu::{Ins, StatusWords, APDU},
+    consts::*,
     metadata,
     mgm::MgmKey,
     Buffer, ObjectId,
@@ -59,13 +59,6 @@ use std::{
     convert::TryInto,
     time::{SystemTime, UNIX_EPOCH},
 };
-
-/// PIV Application ID
-pub const AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
-
-/// MGMT Application ID.
-/// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
-pub const MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
 
 /// Cached YubiKey PIN
 pub type CachedPin = secrecy::SecretVec<u8>;
@@ -116,6 +109,12 @@ impl Version {
     }
 }
 
+impl Display for Version {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
 /// YubiKey Device: this is the primary API for opening a session and
 /// performing various operations.
 ///
@@ -126,7 +125,6 @@ impl Version {
 pub struct YubiKey {
     pub(crate) card: Card,
     pub(crate) pin: Option<CachedPin>,
-    pub(crate) is_neo: bool,
     pub(crate) version: Version,
     pub(crate) serial: Serial,
 }
@@ -200,18 +198,6 @@ impl YubiKey {
     /// This always uses the cached version queried when the key is initialized.
     pub fn serial(&mut self) -> Serial {
         self.serial
-    }
-
-    /// Get YubiKey device model
-    // TODO(tarcieri): use an emum for this
-    #[cfg(feature = "untested")]
-    pub fn device_model(&self) -> u32 {
-        if self.is_neo {
-            DEVTYPE_NEOr3
-        } else {
-            // TODO(tarcieri): YK5?
-            DEVTYPE_YK4
-        }
     }
 
     /// Authenticate to the card using the provided management key (MGM).
@@ -368,7 +354,6 @@ impl YubiKey {
     #[cfg(feature = "untested")]
     pub fn set_pin_last_changed(yubikey: &mut YubiKey) -> Result<(), Error> {
         let mut data = [0u8; CB_BUF_MAX];
-        let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
 
         let buffer = metadata::read(&txn, TAG_ADMIN)?;
@@ -394,7 +379,7 @@ impl YubiKey {
             e
         })?;
 
-        metadata::write(&txn, TAG_ADMIN, &data, max_size).map_err(|e| {
+        metadata::write(&txn, TAG_ADMIN, &data).map_err(|e| {
             error!("could not write admin data, err = {}", e);
             e
         })?;
@@ -422,7 +407,6 @@ impl YubiKey {
         let mut tries_remaining: i32 = -1;
         let mut flags = [0];
 
-        let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
 
         while tries_remaining != 0 {
@@ -473,7 +457,7 @@ impl YubiKey {
         )
         .is_ok()
         {
-            if metadata::write(&txn, TAG_ADMIN, &data[..cb_data], max_size).is_err() {
+            if metadata::write(&txn, TAG_ADMIN, &data[..cb_data]).is_err() {
                 error!("could not write admin metadata");
             }
         } else {
@@ -565,16 +549,6 @@ impl YubiKey {
 
         Ok(())
     }
-
-    /// Get max object size supported by this device
-    #[cfg(feature = "untested")]
-    pub(crate) fn obj_size_max(&self) -> usize {
-        if self.is_neo {
-            CB_OBJ_MAX_NEO
-        } else {
-            CB_OBJ_MAX
-        }
-    }
 }
 
 impl<'a> TryFrom<&'a Reader<'_>> for YubiKey {
@@ -588,43 +562,18 @@ impl<'a> TryFrom<&'a Reader<'_>> for YubiKey {
 
         info!("connected to reader: {}", reader.name());
 
-        let mut is_neo = false;
-        let version: Version;
-        let serial: Serial;
-
-        {
+        let (version, serial) = {
             let txn = Transaction::new(&mut card)?;
-            let mut atr_buf = [0; CB_ATR_MAX];
-            let atr = txn.get_attribute(pcsc::Attribute::AtrString, &mut atr_buf)?;
-            if atr == YKPIV_ATR_NEO_R3 {
-                is_neo = true;
-            }
-
             txn.select_application()?;
 
-            // now that the PIV application is selected, retrieve the version
-            // and serial number.  Previously the NEO/YK4 required switching
-            // to the yk applet to retrieve the serial, YK5 implements this
-            // as a PIV applet command.  Unfortunately, this change requires
-            // that we retrieve the version number first, so that get_serial
-            // can determine how to get the serial number, which for the NEO/Yk4
-            // will result in another selection of the PIV applet.
-
-            version = txn.get_version().map_err(|e| {
-                warn!("failed to retrieve version: '{}'", e);
-                e
-            })?;
-
-            serial = txn.get_serial(version).map_err(|e| {
-                warn!("failed to retrieve serial number: '{}'", e);
-                e
-            })?;
-        }
+            let v = txn.get_version()?;
+            let s = txn.get_serial(v)?;
+            (v, s)
+        };
 
         let yubikey = YubiKey {
             card,
             pin: None,
-            is_neo,
             version,
             serial,
         };

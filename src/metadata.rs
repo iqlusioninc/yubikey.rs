@@ -191,15 +191,10 @@ pub(crate) fn read(txn: &Transaction<'_>, tag: u8) -> Result<Buffer, Error> {
 }
 
 /// Write metadata
-pub(crate) fn write(
-    txn: &Transaction<'_>,
-    tag: u8,
-    data: &[u8],
-    max_size: usize,
-) -> Result<(), Error> {
+pub(crate) fn write(txn: &Transaction<'_>, tag: u8, data: &[u8]) -> Result<(), Error> {
     let mut buf = Zeroizing::new(vec![0u8; CB_OBJ_MAX]);
 
-    if data.len() > max_size - CB_OBJ_TAG_MAX {
+    if data.len() > CB_OBJ_MAX - CB_OBJ_TAG_MAX {
         return Err(Error::GenericError);
     }
 

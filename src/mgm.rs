@@ -167,7 +167,6 @@ impl MgmKey {
     pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
         let mut data = Zeroizing::new(vec![0u8; CB_BUF_MAX]);
 
-        let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
 
         txn.set_mgm_key(self, None).map_err(|e| {
@@ -200,7 +199,7 @@ impl MgmKey {
         ) {
             error!("could not set protected mgm item, err = {:?}", e);
         } else {
-            metadata::write(&txn, TAG_PROTECTED, &data, max_size).map_err(|e| {
+            metadata::write(&txn, TAG_PROTECTED, &data).map_err(|e| {
                 error!("could not write protected data, err = {:?}", e);
                 e
             })?;
@@ -247,7 +246,7 @@ impl MgmKey {
             &flags_1,
         ) {
             error!("could not set admin flags item, err = {}", e);
-        } else if let Err(e) = metadata::write(&txn, TAG_ADMIN, &data[..cb_data], max_size) {
+        } else if let Err(e) = metadata::write(&txn, TAG_ADMIN, &data[..cb_data]) {
             error!("could not write admin data, err = {}", e);
         }
 

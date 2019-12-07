@@ -32,15 +32,6 @@ impl<'tx> Transaction<'tx> {
         })
     }
 
-    /// Get an attribute of the card or card reader.
-    pub fn get_attribute<'buf>(
-        &self,
-        attribute: pcsc::Attribute,
-        buffer: &'buf mut [u8],
-    ) -> Result<&'buf [u8], Error> {
-        Ok(self.inner.get_attribute(attribute, buffer)?)
-    }
-
     /// Transmit a single serialized APDU to the card this transaction is open
     /// with and receive a response.
     ///
@@ -66,7 +57,7 @@ impl<'tx> Transaction<'tx> {
     pub fn select_application(&self) -> Result<(), Error> {
         let response = APDU::new(Ins::SelectApplication)
             .p1(0x04)
-            .data(&AID)
+            .data(&PIV_AID)
             .transmit(self, 0xFF)
             .map_err(|e| {
                 error!("failed communicating with card: '{}'", e);
@@ -102,13 +93,11 @@ impl<'tx> Transaction<'tx> {
 
     /// Get YubiKey device serial number.
     pub fn get_serial(&self, version: Version) -> Result<Serial, Error> {
-        let yk_applet = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01];
-
         let response = if version.major < 5 {
-            // get serial from neo/yk4 devices using the otp applet
+            // YK4 requires switching to the yk applet to retrieve the serial
             let sw = APDU::new(Ins::SelectApplication)
                 .p1(0x04)
-                .data(&yk_applet)
+                .data(&YK_AID)
                 .transmit(self, 0xFF)?
                 .status_words();
 
@@ -130,7 +119,7 @@ impl<'tx> Transaction<'tx> {
             // reselect the PIV applet
             let sw = APDU::new(Ins::SelectApplication)
                 .p1(0x04)
-                .data(&AID)
+                .data(&PIV_AID)
                 .transmit(self, 0xFF)?
                 .status_words();
 
@@ -141,7 +130,7 @@ impl<'tx> Transaction<'tx> {
 
             resp
         } else {
-            // get serial from yk5 and later devices using the f8 command
+            // YK5 implements getting the serial as a PIV applet command (0xf8)
             let resp = APDU::new(Ins::GetSerial).transmit(self, 0xFF)?;
 
             if !resp.is_success() {

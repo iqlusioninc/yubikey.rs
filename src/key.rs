@@ -438,8 +438,7 @@ pub fn generate(
 
     match algorithm {
         AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
-            if yubikey.device_model() == DEVTYPE_YK4
-                && yubikey.version.major == 4
+            if yubikey.version.major == 4
                 && (yubikey.version.minor < 3
                     || yubikey.version.minor == 3 && (yubikey.version.patch < 5))
             {

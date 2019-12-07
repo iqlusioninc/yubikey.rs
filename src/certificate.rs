@@ -145,17 +145,15 @@ impl Certificate {
     /// Write this certificate into the YubiKey in the given slot
     #[cfg(feature = "untested")]
     pub fn write(&self, yubikey: &mut YubiKey, slot: SlotId, certinfo: u8) -> Result<(), Error> {
-        let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
-        write_certificate(&txn, slot, Some(&self.data), certinfo, max_size)
+        write_certificate(&txn, slot, Some(&self.data), certinfo)
     }
 
     /// Delete a certificate located at the given slot of the given YubiKey
     #[cfg(feature = "untested")]
     pub fn delete(yubikey: &mut YubiKey, slot: SlotId) -> Result<(), Error> {
-        let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
-        write_certificate(&txn, slot, None, 0, max_size)
+        write_certificate(&txn, slot, None, 0)
     }
 
     /// Initialize a local certificate struct from the given bytebuffer
@@ -244,7 +242,6 @@ pub(crate) fn write_certificate(
     slot: SlotId,
     data: Option<&[u8]>,
     certinfo: u8,
-    max_size: usize,
 ) -> Result<(), Error> {
     let mut buf = [0u8; CB_OBJ_MAX];
     let mut offset = 0;
@@ -261,7 +258,7 @@ pub(crate) fn write_certificate(
     req_len += set_length(&mut buf, data.len());
     req_len += data.len();
 
-    if req_len < data.len() || req_len > max_size {
+    if req_len < data.len() || req_len > CB_OBJ_MAX {
         return Err(Error::SizeError);
     }
 

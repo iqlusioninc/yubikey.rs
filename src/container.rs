@@ -107,7 +107,6 @@ impl Container {
         let n_containers = containers.len();
         let data_len = n_containers * CONTAINER_REC_LEN;
 
-        let max_size = yubikey.obj_size_max();
         let txn = yubikey.begin_transaction()?;
 
         if n_containers == 0 {
@@ -116,7 +115,7 @@ impl Container {
 
         let req_len = 1 + set_length(&mut buf, data_len) + data_len;
 
-        if req_len > max_size {
+        if req_len > CB_OBJ_MAX {
             return Err(Error::SizeError);
         }
 
