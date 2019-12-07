@@ -48,16 +48,27 @@ const CCC_TMPL: &[u8] = &[
     0x00, 0xfe, 0x00,
 ];
 
-/// Cardholder Capability Container (CCC) Identifier
+/// Cardholder Capability Container (CCC) Identifier card ID
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct CCCID(pub [u8; YKPIV_CCCID_SIZE]);
+pub struct CccCardId(pub [u8; YKPIV_CCCID_SIZE]);
 
-impl CCCID {
+/// Cardholder Capability Container (CCC) Identifier
+#[derive(Copy, Clone)]
+pub struct CCC(pub [u8; YKPIV_CCC_SIZE]);
+
+impl CCC {
+    /// Return CardId component of CHUID
+    pub fn cccid(&self) -> Result<CccCardId, Error> {
+        let mut cccid = [0u8; YKPIV_CCCID_SIZE];
+        cccid.copy_from_slice(&self.0[CCC_ID_OFFS..(CCC_ID_OFFS + YKPIV_CCCID_SIZE)]);
+        Ok(CccCardId(cccid))
+    }
+
     /// Generate a random CCCID
-    pub fn generate() -> Result<Self, Error> {
+    pub fn generate() -> Result<CccCardId, Error> {
         let mut id = [0u8; YKPIV_CCCID_SIZE];
         getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
-        Ok(CCCID(id))
+        Ok(CccCardId(id))
     }
 
     /// Get Cardholder Capability Container (CCC) ID
@@ -69,15 +80,15 @@ impl CCCID {
             return Err(Error::GenericError);
         }
 
-        let mut cccid = [0u8; YKPIV_CCCID_SIZE];
-        cccid.copy_from_slice(&response[CCC_ID_OFFS..(CCC_ID_OFFS + YKPIV_CCCID_SIZE)]);
-        Ok(CCCID(cccid))
+        let mut ccc = [0u8; YKPIV_CCC_SIZE];
+        ccc.copy_from_slice(&response[0..YKPIV_CCC_SIZE]);
+        Ok(CCC { 0: ccc })
     }
 
     /// Get Cardholder Capability Container (CCC) ID
     pub fn set(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
         let mut buf = CCC_TMPL.to_vec();
-        buf[CCC_ID_OFFS..(CCC_ID_OFFS + self.0.len())].copy_from_slice(&self.0);
+        buf[0..self.0.len()].copy_from_slice(&self.0);
 
         let txn = yubikey.begin_transaction()?;
         txn.save_object(YKPIV_OBJ_CAPABILITY, &buf)

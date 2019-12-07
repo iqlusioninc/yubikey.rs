@@ -134,6 +134,7 @@ pub const YKPIV_FASCN_SIZE: usize = 25;
 pub const YKPIV_EXPIRATION_SIZE: usize = 8;
 
 pub const YKPIV_CCCID_SIZE: usize = 14;
+pub const YKPIV_CCC_SIZE: usize = 51;
 
 pub const YKPIV_CERTINFO_UNCOMPRESSED: u8 = 0;
 pub const YKPIV_CERTINFO_GZIP: u8 = 1;
