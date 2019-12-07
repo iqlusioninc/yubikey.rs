@@ -38,18 +38,24 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    apdu::{Ins, StatusWords},
     certificate::{self, Certificate},
-    consts::*,
     error::Error,
+    yubikey::YubiKey,
+    ObjectId,
+};
+use log::debug;
+use std::convert::TryFrom;
+
+#[cfg(feature = "untested")]
+use crate::{
+    apdu::{Ins, StatusWords},
+    consts::*,
     policy::{PinPolicy, TouchPolicy},
     serialization::*,
-    settings,
-    yubikey::YubiKey,
-    Buffer, ObjectId,
+    settings, Buffer,
 };
-use log::{debug, error, warn};
-use std::convert::TryFrom;
+#[cfg(feature = "untested")]
+use log::{error, warn};
 
 /// Slot identifiers.
 /// <https://developers.yubico.com/PIV/Introduction/Certificate_slots.html>
@@ -312,6 +318,7 @@ impl From<AlgorithmId> for u8 {
     }
 }
 
+#[cfg(feature = "untested")]
 impl AlgorithmId {
     /// Writes the `AlgorithmId` in the format the YubiKey expects during key generation.
     pub(crate) fn write(self, buf: &mut [u8]) -> usize {
@@ -367,19 +374,9 @@ impl Key {
     }
 }
 
-// Keygen messages
-// TODO(tarcieri): extract these into an I18N-handling type?
-const SZ_SETTING_ROCA: &str = "Enable_Unsafe_Keygen_ROCA";
-const SZ_ROCA_ALLOW_USER: &str =
-    "was permitted by an end-user configuration setting, but is not recommended.";
-const SZ_ROCA_ALLOW_ADMIN: &str =
-    "was permitted by an administrator configuration setting, but is not recommended.";
-const SZ_ROCA_BLOCK_USER: &str = "was blocked due to an end-user configuration setting.";
-const SZ_ROCA_BLOCK_ADMIN: &str = "was blocked due to an administrator configuration setting.";
-const SZ_ROCA_DEFAULT: &str = "was permitted by default, but is not recommended.  The default behavior will change in a future Yubico release.";
-
 /// Information about a generated key
 // TODO(tarcieri): this could use some more work
+#[cfg(feature = "untested")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum GeneratedKey {
     /// RSA keys
@@ -403,6 +400,7 @@ pub enum GeneratedKey {
     },
 }
 
+#[cfg(feature = "untested")]
 impl GeneratedKey {
     /// Get the algorithm
     pub fn algorithm(&self) -> AlgorithmId {
@@ -414,6 +412,7 @@ impl GeneratedKey {
 }
 
 /// Generate key
+#[cfg(feature = "untested")]
 #[allow(clippy::cognitive_complexity)]
 pub fn generate(
     yubikey: &mut YubiKey,
@@ -422,6 +421,17 @@ pub fn generate(
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
 ) -> Result<GeneratedKey, Error> {
+    // Keygen messages
+    // TODO(tarcieri): extract these into an I18N-handling type?
+    const SZ_SETTING_ROCA: &str = "Enable_Unsafe_Keygen_ROCA";
+    const SZ_ROCA_ALLOW_USER: &str =
+        "was permitted by an end-user configuration setting, but is not recommended.";
+    const SZ_ROCA_ALLOW_ADMIN: &str =
+        "was permitted by an administrator configuration setting, but is not recommended.";
+    const SZ_ROCA_BLOCK_USER: &str = "was blocked due to an end-user configuration setting.";
+    const SZ_ROCA_BLOCK_ADMIN: &str = "was blocked due to an administrator configuration setting.";
+    const SZ_ROCA_DEFAULT: &str = "was permitted by default, but is not recommended.  The default behavior will change in a future Yubico release.";
+
     let setting_roca: settings::BoolValue;
 
     match algorithm {

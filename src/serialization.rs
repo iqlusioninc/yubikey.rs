@@ -35,6 +35,7 @@ use crate::{consts::*, ObjectId};
 // TODO(tarcieri): refactor these into better serializers/message builders
 
 /// Set length
+#[cfg(feature = "untested")]
 pub(crate) fn set_length(buffer: &mut [u8], length: usize) -> usize {
     if length < 0x80 {
         buffer[0] = length as u8;

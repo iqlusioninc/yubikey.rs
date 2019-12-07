@@ -138,7 +138,6 @@
 mod apdu;
 #[cfg(feature = "untested")]
 pub mod cccid;
-#[cfg(feature = "untested")]
 pub mod certificate;
 #[cfg(feature = "untested")]
 pub mod chuid;
@@ -148,7 +147,6 @@ pub mod consts;
 #[cfg(feature = "untested")]
 pub mod container;
 pub mod error;
-#[cfg(feature = "untested")]
 pub mod key;
 #[cfg(feature = "untested")]
 mod metadata;
@@ -156,10 +154,8 @@ mod metadata;
 pub mod mgm;
 #[cfg(feature = "untested")]
 pub mod msroots;
-#[cfg(feature = "untested")]
 pub mod policy;
 pub mod readers;
-#[cfg(feature = "untested")]
 mod serialization;
 #[cfg(feature = "untested")]
 pub mod settings;

@@ -71,7 +71,6 @@ impl APDU {
     }
 
     /// Set this APDU's class
-    #[cfg(feature = "untested")]
     pub fn cla(&mut self, value: u8) -> &mut Self {
         self.cla = value;
         self
@@ -267,7 +266,6 @@ pub(crate) struct Response {
 
 impl Response {
     /// Create a new response from the given status words and buffer
-    #[cfg(feature = "untested")]
     pub fn new(status_words: StatusWords, data: Vec<u8>) -> Response {
         Response { status_words, data }
     }
