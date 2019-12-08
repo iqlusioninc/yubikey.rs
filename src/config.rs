@@ -30,7 +30,14 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{consts::*, error::Error, metadata, mgm::MgmType, yubikey::YubiKey};
+use crate::{
+    error::Error,
+    metadata,
+    mgm::{MgmType, ADMIN_FLAGS_1_PROTECTED_MGM},
+    yubikey::{YubiKey, ADMIN_FLAGS_1_PUK_BLOCKED},
+    TAG_ADMIN, TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_ADMIN_TIMESTAMP, TAG_PROTECTED,
+    TAG_PROTECTED_FLAGS_1, TAG_PROTECTED_MGM,
+};
 use log::error;
 use std::{
     convert::TryInto,

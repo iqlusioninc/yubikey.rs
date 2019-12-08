@@ -37,7 +37,10 @@ use std::convert::{TryFrom, TryInto};
 use zeroize::{Zeroize, Zeroizing};
 
 #[cfg(feature = "untested")]
-use crate::{consts::*, metadata, yubikey::YubiKey};
+use crate::{
+    metadata, yubikey::YubiKey, CB_BUF_MAX, CB_OBJ_MAX, TAG_ADMIN, TAG_ADMIN_FLAGS_1,
+    TAG_ADMIN_SALT, TAG_PROTECTED, TAG_PROTECTED_MGM,
+};
 #[cfg(feature = "untested")]
 use des::{
     block_cipher_trait::{generic_array::GenericArray, BlockCipher},
@@ -49,6 +52,8 @@ use hmac::Hmac;
 use pbkdf2::pbkdf2;
 #[cfg(feature = "untested")]
 use sha1::Sha1;
+
+pub(crate) const ADMIN_FLAGS_1_PROTECTED_MGM: u8 = 0x02;
 
 #[cfg(feature = "untested")]
 const CB_ADMIN_SALT: usize = 16;

@@ -48,10 +48,10 @@ use std::{
 #[cfg(feature = "untested")]
 use crate::{
     apdu::{Ins, StatusWords, APDU},
-    consts::*,
     metadata,
     mgm::MgmKey,
-    Buffer, ObjectId,
+    Buffer, ObjectId, CB_BUF_MAX, CB_OBJ_MAX, MGMT_AID, TAG_ADMIN, TAG_ADMIN_FLAGS_1,
+    TAG_ADMIN_TIMESTAMP,
 };
 #[cfg(feature = "untested")]
 use getrandom::getrandom;
@@ -62,6 +62,9 @@ use std::{
     convert::TryInto,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+/// Flag for PUK blocked
+pub(crate) const ADMIN_FLAGS_1_PUK_BLOCKED: u8 = 0x01;
 
 /// 3DES authentication
 #[cfg(feature = "untested")]
@@ -78,16 +81,8 @@ pub(crate) const CHREF_ACT_UNBLOCK_PIN: i32 = 1;
 #[cfg(feature = "untested")]
 pub(crate) const CHREF_ACT_CHANGE_PUK: i32 = 2;
 
-/// PIV Applet ID
-pub(crate) const PIV_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
-
-/// MGMT Applet ID.
-/// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
 #[cfg(feature = "untested")]
-pub(crate) const MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
-
-/// YubiKey OTP Applet ID. Needed to query serial on YK4.
-pub(crate) const YK_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01];
+const TAG_DYN_AUTH: u8 = 0x7c;
 
 /// Cached YubiKey PIN
 pub type CachedPin = secrecy::SecretVec<u8>;
@@ -248,8 +243,6 @@ impl YubiKey {
     #[cfg(feature = "untested")]
     pub fn authenticate(&mut self, mgm_key: MgmKey) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
-
-        const TAG_DYN_AUTH: u8 = 0x7c;
 
         // get a challenge from the card
         let challenge = APDU::new(Ins::Authenticate)

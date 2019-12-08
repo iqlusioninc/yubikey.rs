@@ -37,7 +37,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{consts::*, error::Error, serialization::*, yubikey::YubiKey};
+use crate::{error::Error, serialization::*, yubikey::YubiKey};
+use crate::{CB_OBJ_MAX, CB_OBJ_TAG_MAX, CB_OBJ_TAG_MIN};
 use log::error;
 
 const OBJ_MSROOTS1: u32 = 0x005f_ff11;
@@ -48,6 +49,9 @@ const OBJ_MSROOTS3: u32 = 0x005f_ff13;
 #[allow(dead_code)]
 const OBJ_MSROOTS4: u32 = 0x005f_ff14;
 const OBJ_MSROOTS5: u32 = 0x005f_ff15;
+
+const TAG_MSROOTS_END: u8 = 0x82;
+const TAG_MSROOTS_MID: u8 = 0x83;
 
 /// `msroots` file: PKCS#7-formatted certificate store for enterprise trust roots
 pub struct MsRoots(Vec<u8>);

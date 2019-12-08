@@ -49,10 +49,9 @@ use std::convert::TryFrom;
 #[cfg(feature = "untested")]
 use crate::{
     apdu::{Ins, StatusWords},
-    consts::*,
     policy::{PinPolicy, TouchPolicy},
     serialization::*,
-    settings, Buffer,
+    settings, Buffer, CB_OBJ_MAX,
 };
 #[cfg(feature = "untested")]
 use log::{error, warn};
@@ -63,6 +62,13 @@ use zeroize::Zeroizing;
 const CB_ECC_POINTP256: usize = 65;
 #[cfg(feature = "untested")]
 const CB_ECC_POINTP384: usize = 97;
+
+#[cfg(feature = "untested")]
+const TAG_RSA_MODULUS: u8 = 0x81;
+#[cfg(feature = "untested")]
+const TAG_RSA_EXP: u8 = 0x82;
+#[cfg(feature = "untested")]
+const TAG_ECC_POINT: u8 = 0x86;
 
 /// Slot identifiers.
 /// <https://developers.yubico.com/PIV/Introduction/Certificate_slots.html>
