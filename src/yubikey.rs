@@ -159,8 +159,8 @@ impl YubiKey {
     /// Returns an error if there is more than one YubiKey detected.
     ///
     /// If you need to operate in environments with more than one YubiKey
-    /// attached to the same system, use [`yubikey_piv::Readers`] to select
-    /// from the available PC/SC readers connected.
+    /// attached to the same system, use [`YubiKey::open_by_serial`] or
+    ///[`yubikey_piv::Readers`] to select from the available PC/SC readers.
     pub fn open() -> Result<Self, Error> {
         let mut readers = Readers::open()?;
         let mut reader_iter = readers.iter()?;
@@ -175,6 +175,25 @@ impl YubiKey {
         }
 
         error!("no YubiKey detected!");
+        Err(Error::NotFound)
+    }
+
+    /// Open a YubiKey with a specific serial number.
+    pub fn open_by_serial(serial: Serial) -> Result<Self, Error> {
+        let mut readers = Readers::open()?;
+
+        for reader in readers.iter()? {
+            let mut yubikey = match reader.open() {
+                Ok(yk) => yk,
+                Err(_) => continue,
+            };
+
+            if serial == yubikey.serial() {
+                return Ok(yubikey);
+            }
+        }
+
+        error!("no YubiKey detected with serial: {}", serial);
         Err(Error::NotFound)
     }
 
