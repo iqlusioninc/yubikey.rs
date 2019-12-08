@@ -33,7 +33,9 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{consts::*, error::Error, key::SlotId, serialization::*, yubikey::YubiKey};
+use crate::{
+    error::Error, key::SlotId, serialization::*, yubikey::YubiKey, CB_OBJ_MAX, CB_OBJ_TAG_MIN,
+};
 use log::error;
 use std::{
     convert::{TryFrom, TryInto},
@@ -47,6 +49,8 @@ const CONTAINER_NAME_LEN: usize = 40;
 const CONTAINER_REC_LEN: usize = (2 * CONTAINER_NAME_LEN) + 27;
 
 const OBJ_MSCMAP: u32 = 0x005f_ff10;
+
+const TAG_MSCMAP: u8 = 0x81;
 
 /// MS Container Map(?) Records
 #[derive(Copy, Clone)]

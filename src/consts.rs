@@ -35,29 +35,7 @@
 #![allow(missing_docs, non_upper_case_globals)]
 #![cfg_attr(not(feature = "untested"), allow(dead_code))]
 
-pub const ADMIN_FLAGS_1_PUK_BLOCKED: u8 = 0x01;
-pub const ADMIN_FLAGS_1_PROTECTED_MGM: u8 = 0x02;
 
-pub const CB_BUF_MAX: usize = 3072;
 
-pub const CB_OBJ_MAX: usize = CB_BUF_MAX - 9;
-pub const CB_OBJ_TAG_MIN: usize = 2; // 1 byte tag + 1 byte len
-pub const CB_OBJ_TAG_MAX: usize = (CB_OBJ_TAG_MIN + 2); // 1 byte tag + 3 bytes len
 
-pub const TAG_CERT: u8 = 0x70;
-pub const TAG_CERT_COMPRESS: u8 = 0x71;
-pub const TAG_CERT_LRC: u8 = 0xFE;
-pub const TAG_ADMIN: u8 = 0x80;
-pub const TAG_ADMIN_FLAGS_1: u8 = 0x81;
-pub const TAG_ADMIN_SALT: u8 = 0x82;
-pub const TAG_ADMIN_TIMESTAMP: u8 = 0x83;
-pub const TAG_PROTECTED: u8 = 0x88;
-pub const TAG_PROTECTED_FLAGS_1: u8 = 0x81;
-pub const TAG_PROTECTED_MGM: u8 = 0x89;
-pub const TAG_MSCMAP: u8 = 0x81;
-pub const TAG_MSROOTS_END: u8 = 0x82;
-pub const TAG_MSROOTS_MID: u8 = 0x83;
 
-pub const TAG_RSA_MODULUS: u8 = 0x81;
-pub const TAG_RSA_EXP: u8 = 0x82;
-pub const TAG_ECC_POINT: u8 = 0x86;

@@ -31,13 +31,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    consts::*,
     error::Error,
     key::{AlgorithmId, SlotId},
     serialization::*,
     transaction::Transaction,
     yubikey::YubiKey,
-    Buffer,
+    Buffer, CB_OBJ_TAG_MIN,
 };
 use elliptic_curve::weierstrass::{
     curve::{NistP256, NistP384},
@@ -49,6 +48,9 @@ use std::fmt;
 use x509_parser::{parse_x509_der, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
 
+#[cfg(feature = "untested")]
+use crate::CB_OBJ_MAX;
+
 // TODO: Make these der_parser::oid::Oid constants when it has const fn support.
 const OID_RSA_ENCRYPTION: &str = "1.2.840.113549.1.1.1";
 const OID_EC_PUBLIC_KEY: &str = "1.2.840.10045.2.1";
@@ -59,6 +61,12 @@ const OID_NIST_P384: &str = "1.3.132.0.34";
 const CERTINFO_UNCOMPRESSED: u8 = 0;
 #[cfg(feature = "untested")]
 const CERTINFO_GZIP: u8 = 1;
+
+const TAG_CERT: u8 = 0x70;
+#[cfg(feature = "untested")]
+const TAG_CERT_COMPRESS: u8 = 0x71;
+#[cfg(feature = "untested")]
+const TAG_CERT_LRC: u8 = 0xFE;
 
 /// Information about a public key within a [`Certificate`].
 #[derive(Clone, Eq, PartialEq)]

@@ -3,11 +3,10 @@
 use crate::{
     apdu::Response,
     apdu::{Ins, StatusWords, APDU},
-    consts::*,
     error::Error,
     serialization::*,
     yubikey::*,
-    Buffer, ObjectId,
+    Buffer, ObjectId, CB_BUF_MAX, PIV_AID, YK_AID,
 };
 use log::{error, trace};
 use std::convert::TryInto;
@@ -17,6 +16,7 @@ use zeroize::Zeroizing;
 use crate::{
     key::{AlgorithmId, SlotId},
     mgm::{MgmKey, DES_LEN_3DES},
+    CB_OBJ_MAX,
 };
 
 const CB_PIN_MAX: usize = 8;

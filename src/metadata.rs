@@ -30,7 +30,13 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{consts::*, error::Error, serialization::*, transaction::Transaction, Buffer};
+use crate::{
+    error::Error, serialization::*, transaction::Transaction, Buffer, CB_OBJ_TAG_MIN, TAG_ADMIN,
+    TAG_PROTECTED,
+};
+
+#[cfg(feature = "untested")]
+use crate::{CB_OBJ_MAX, CB_OBJ_TAG_MAX};
 
 #[cfg(feature = "untested")]
 use zeroize::Zeroizing;
