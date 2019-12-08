@@ -49,12 +49,17 @@ use std::convert::TryFrom;
 #[cfg(feature = "untested")]
 use crate::{
     apdu::{Ins, StatusWords},
+    certificate::PublicKeyInfo,
     policy::{PinPolicy, TouchPolicy},
     serialization::*,
     settings, Buffer, CB_OBJ_MAX,
 };
 #[cfg(feature = "untested")]
+use elliptic_curve::weierstrass::PublicKey as EcPublicKey;
+#[cfg(feature = "untested")]
 use log::{error, warn};
+#[cfg(feature = "untested")]
+use rsa::{BigUint, RSAPublicKey};
 #[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
@@ -429,43 +434,6 @@ impl Key {
     }
 }
 
-/// Information about a generated key
-// TODO(tarcieri): this could use some more work
-#[cfg(feature = "untested")]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum GeneratedKey {
-    /// RSA keys
-    Rsa {
-        /// RSA algorithm
-        algorithm: AlgorithmId,
-
-        /// Modulus
-        modulus: Vec<u8>,
-
-        /// Exponent
-        exp: Vec<u8>,
-    },
-    /// ECC keys
-    Ecc {
-        /// ECC algorithm
-        algorithm: AlgorithmId,
-
-        /// Public curve point (i.e. public key)
-        point: Vec<u8>,
-    },
-}
-
-#[cfg(feature = "untested")]
-impl GeneratedKey {
-    /// Get the algorithm
-    pub fn algorithm(&self) -> AlgorithmId {
-        *match self {
-            GeneratedKey::Rsa { algorithm, .. } => algorithm,
-            GeneratedKey::Ecc { algorithm, .. } => algorithm,
-        }
-    }
-}
-
 /// Generate key
 #[cfg(feature = "untested")]
 #[allow(clippy::cognitive_complexity)]
@@ -475,7 +443,7 @@ pub fn generate(
     algorithm: AlgorithmId,
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
-) -> Result<GeneratedKey, Error> {
+) -> Result<PublicKeyInfo, Error> {
     // Keygen messages
     // TODO(tarcieri): extract these into an I18N-handling type?
     const SZ_SETTING_ROCA: &str = "Enable_Unsafe_Keygen_ROCA";
@@ -596,10 +564,13 @@ pub fn generate(
             }
             let exp = exp_tlv.value.to_vec();
 
-            Ok(GeneratedKey::Rsa {
+            Ok(PublicKeyInfo::Rsa {
                 algorithm,
-                modulus,
-                exp,
+                pubkey: RSAPublicKey::new(
+                    BigUint::from_bytes_be(&modulus),
+                    BigUint::from_bytes_be(&exp),
+                )
+                .map_err(|_| Error::InvalidObject)?,
             })
         }
         AlgorithmId::EccP256 | AlgorithmId::EccP384 => {
@@ -623,7 +594,13 @@ pub fn generate(
             }
 
             let point = tlv.value.to_vec();
-            Ok(GeneratedKey::Ecc { algorithm, point })
+
+            if let AlgorithmId::EccP256 = algorithm {
+                EcPublicKey::from_bytes(point).map(PublicKeyInfo::EcP256)
+            } else {
+                EcPublicKey::from_bytes(point).map(PublicKeyInfo::EcP384)
+            }
+            .ok_or(Error::InvalidObject)
         }
     }
 }
