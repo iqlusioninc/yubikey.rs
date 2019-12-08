@@ -140,12 +140,12 @@ pub mod cccid;
 pub mod certificate;
 pub mod chuid;
 pub mod config;
-#[cfg(feature = "untested")]
-pub mod container;
 pub mod error;
 pub mod key;
 mod metadata;
 pub mod mgm;
+#[cfg(feature = "untested")]
+pub mod mscmap;
 #[cfg(feature = "untested")]
 pub mod msroots;
 pub mod policy;
