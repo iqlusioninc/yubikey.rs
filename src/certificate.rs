@@ -152,7 +152,7 @@ impl Certificate {
             return Err(Error::InvalidObject);
         }
 
-        Certificate::new(buf)
+        Certificate::from_bytes(buf)
     }
 
     /// Write this certificate into the YubiKey in the given slot
@@ -170,7 +170,7 @@ impl Certificate {
     }
 
     /// Initialize a local certificate struct from the given bytebuffer
-    pub fn new(cert: impl Into<Buffer>) -> Result<Self, Error> {
+    pub fn from_bytes(cert: impl Into<Buffer>) -> Result<Self, Error> {
         let cert = cert.into();
 
         if cert.is_empty() {

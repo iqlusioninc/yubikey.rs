@@ -410,7 +410,7 @@ impl Key {
             };
 
             if !buf.is_empty() {
-                let cert = Certificate::new(buf)?;
+                let cert = Certificate::from_bytes(buf)?;
                 keys.push(Key { slot, cert });
             }
         }
