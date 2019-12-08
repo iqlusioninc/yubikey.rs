@@ -37,6 +37,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+const CB_ADMIN_TIMESTAMP: usize = 0x04;
+const PROTECTED_FLAGS_1_PUK_NOBLOCK: u8 = 0x01;
+
 /// Config
 #[derive(Copy, Clone, Debug)]
 pub struct Config {

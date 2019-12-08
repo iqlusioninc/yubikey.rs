@@ -140,7 +140,7 @@ pub mod cccid;
 pub mod certificate;
 pub mod chuid;
 pub mod config;
-pub mod consts;
+mod consts;
 #[cfg(feature = "untested")]
 pub mod container;
 pub mod error;

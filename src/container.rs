@@ -40,6 +40,14 @@ use std::{
     fmt::{self, Debug},
 };
 
+/// Container name length
+const CONTAINER_NAME_LEN: usize = 40;
+
+/// Container record length: 27 = 80 + 1 + 1 + 2 + 1 + 1 + 1 + 20
+const CONTAINER_REC_LEN: usize = (2 * CONTAINER_NAME_LEN) + 27;
+
+const OBJ_MSCMAP: u32 = 0x005f_ff10;
+
 /// MS Container Map(?) Records
 #[derive(Copy, Clone)]
 pub struct Container {
@@ -72,7 +80,7 @@ impl Container {
     /// Read MS Container Map records
     pub fn read_mscmap(yubikey: &mut YubiKey) -> Result<Vec<Self>, Error> {
         let txn = yubikey.begin_transaction()?;
-        let response = txn.fetch_object(YKPIV_OBJ_MSCMAP)?;
+        let response = txn.fetch_object(OBJ_MSCMAP)?;
         let mut containers = vec![];
 
         if response.len() < CB_OBJ_TAG_MIN {
@@ -110,7 +118,7 @@ impl Container {
         let txn = yubikey.begin_transaction()?;
 
         if n_containers == 0 {
-            return txn.save_object(YKPIV_OBJ_MSCMAP, &[]);
+            return txn.save_object(OBJ_MSCMAP, &[]);
         }
 
         let req_len = 1 + set_length(&mut buf, data_len) + data_len;
@@ -131,7 +139,7 @@ impl Container {
         }
 
         offset += data_len;
-        txn.save_object(YKPIV_OBJ_MSCMAP, &buf[..offset])
+        txn.save_object(OBJ_MSCMAP, &buf[..offset])
     }
 
     /// Parse a container record from a byte slice

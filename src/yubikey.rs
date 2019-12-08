@@ -63,6 +63,32 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+/// 3DES authentication
+#[cfg(feature = "untested")]
+pub(crate) const ALGO_3DES: u8 = 0x03;
+
+/// Card management key
+#[cfg(feature = "untested")]
+pub(crate) const KEY_CARDMGM: u8 = 0x9b;
+
+#[cfg(feature = "untested")]
+pub(crate) const CHREF_ACT_CHANGE_PIN: i32 = 0;
+#[cfg(feature = "untested")]
+pub(crate) const CHREF_ACT_UNBLOCK_PIN: i32 = 1;
+#[cfg(feature = "untested")]
+pub(crate) const CHREF_ACT_CHANGE_PUK: i32 = 2;
+
+/// PIV Applet ID
+pub(crate) const PIV_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
+
+/// MGMT Applet ID.
+/// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
+#[cfg(feature = "untested")]
+pub(crate) const MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
+
+/// YubiKey OTP Applet ID. Needed to query serial on YK4.
+pub(crate) const YK_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01];
+
 /// Cached YubiKey PIN
 pub type CachedPin = secrecy::SecretVec<u8>;
 
@@ -227,7 +253,7 @@ impl YubiKey {
 
         // get a challenge from the card
         let challenge = APDU::new(Ins::Authenticate)
-            .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
+            .params(ALGO_3DES, KEY_CARDMGM)
             .data(&[TAG_DYN_AUTH, 0x02, 0x80, 0x00])
             .transmit(&txn, 261)?;
 
@@ -256,7 +282,7 @@ impl YubiKey {
         challenge.copy_from_slice(&data[14..22]);
 
         let authentication = APDU::new(Ins::Authenticate)
-            .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
+            .params(ALGO_3DES, KEY_CARDMGM)
             .data(&data)
             .transmit(&txn, 261)?;
 
@@ -513,7 +539,7 @@ impl YubiKey {
         let txn = self.begin_transaction()?;
 
         let response = APDU::new(Ins::Authenticate)
-            .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
+            .params(ALGO_3DES, KEY_CARDMGM)
             .data(&[0x7c, 0x02, 0x81, 0x00])
             .transmit(&txn, 261)?;
 
@@ -538,7 +564,7 @@ impl YubiKey {
 
         // send the response to the card and a challenge of our own.
         let status_words = APDU::new(Ins::Authenticate)
-            .params(YKPIV_ALGO_3DES, YKPIV_KEY_CARDMGM)
+            .params(ALGO_3DES, KEY_CARDMGM)
             .data(&data)
             .transmit(&txn, 261)?
             .status_words();

@@ -59,6 +59,11 @@ use log::{error, warn};
 #[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
+#[cfg(feature = "untested")]
+const CB_ECC_POINTP256: usize = 65;
+#[cfg(feature = "untested")]
+const CB_ECC_POINTP384: usize = 97;
+
 /// Slot identifiers.
 /// <https://developers.yubico.com/PIV/Introduction/Certificate_slots.html>
 #[derive(Clone, Copy, Debug, PartialEq)]
