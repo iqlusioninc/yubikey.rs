@@ -30,14 +30,14 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{consts::*, error::Error};
+use crate::error::Error;
 use getrandom::getrandom;
 use log::error;
 use std::convert::{TryFrom, TryInto};
 use zeroize::{Zeroize, Zeroizing};
 
 #[cfg(feature = "untested")]
-use crate::{metadata, yubikey::YubiKey};
+use crate::{consts::*, metadata, yubikey::YubiKey};
 #[cfg(feature = "untested")]
 use des::{
     block_cipher_trait::{generic_array::GenericArray, BlockCipher},
@@ -50,10 +50,23 @@ use pbkdf2::pbkdf2;
 #[cfg(feature = "untested")]
 use sha1::Sha1;
 
+#[cfg(feature = "untested")]
+const CB_ADMIN_SALT: usize = 16;
+
 /// Default MGM key configured on all YubiKeys
 const DEFAULT_MGM_KEY: [u8; DES_LEN_3DES] = [
     1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,
 ];
+
+/// Size of a DES key
+const DES_LEN_DES: usize = 8;
+
+/// Size of a 3DES key
+pub(crate) const DES_LEN_3DES: usize = DES_LEN_DES * 3;
+
+/// Number of PBKDF2 iterations to use when deriving from a password
+#[cfg(feature = "untested")]
+const ITER_MGM_PBKDF2: usize = 10000;
 
 /// Management Key (MGM) key types (manual/derived/protected)
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

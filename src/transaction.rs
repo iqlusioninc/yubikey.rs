@@ -16,8 +16,10 @@ use zeroize::Zeroizing;
 #[cfg(feature = "untested")]
 use crate::{
     key::{AlgorithmId, SlotId},
-    mgm::MgmKey,
+    mgm::{MgmKey, DES_LEN_3DES},
 };
+
+const CB_PIN_MAX: usize = 8;
 
 /// Exclusive transaction with the YubiKey's PC/SC card.
 pub(crate) struct Transaction<'tx> {
@@ -227,8 +229,8 @@ impl<'tx> Transaction<'tx> {
         };
 
         let mut data = [0u8; DES_LEN_3DES + 3];
-        data[0] = YKPIV_ALGO_3DES;
-        data[1] = YKPIV_KEY_CARDMGM;
+        data[0] = ALGO_3DES;
+        data[1] = KEY_CARDMGM;
         data[2] = DES_LEN_3DES as u8;
         data[3..3 + DES_LEN_3DES].copy_from_slice(new_key.as_ref());
 

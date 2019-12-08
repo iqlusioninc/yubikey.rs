@@ -35,6 +35,9 @@ use crate::{consts::*, error::Error, serialization::*, transaction::Transaction,
 #[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
+pub const OBJ_ADMIN_DATA: u32 = 0x005f_ff00;
+pub const OBJ_PRINTED: u32 = 0x005f_c109;
+
 /// Get metadata item
 pub(crate) fn get_item(data: &[u8], tag: u8) -> Result<&[u8], Error> {
     let mut cb_temp: usize = 0;
@@ -166,8 +169,8 @@ pub(crate) fn set_item(
 /// Read metadata
 pub(crate) fn read(txn: &Transaction<'_>, tag: u8) -> Result<Buffer, Error> {
     let obj_id = match tag {
-        TAG_ADMIN => YKPIV_OBJ_ADMIN_DATA,
-        TAG_PROTECTED => YKPIV_OBJ_PRINTED,
+        TAG_ADMIN => OBJ_ADMIN_DATA,
+        TAG_PROTECTED => OBJ_PRINTED,
         _ => return Err(Error::InvalidObject),
     };
 
@@ -203,8 +206,8 @@ pub(crate) fn write(txn: &Transaction<'_>, tag: u8, data: &[u8]) -> Result<(), E
     }
 
     let obj_id = match tag {
-        TAG_ADMIN => YKPIV_OBJ_ADMIN_DATA,
-        TAG_PROTECTED => YKPIV_OBJ_PRINTED,
+        TAG_ADMIN => OBJ_ADMIN_DATA,
+        TAG_PROTECTED => OBJ_PRINTED,
         _ => return Err(Error::InvalidObject),
     };
 

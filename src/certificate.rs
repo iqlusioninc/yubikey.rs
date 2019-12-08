@@ -55,6 +55,11 @@ const OID_EC_PUBLIC_KEY: &str = "1.2.840.10045.2.1";
 const OID_NIST_P256: &str = "1.2.840.10045.3.1.7";
 const OID_NIST_P384: &str = "1.3.132.0.34";
 
+#[allow(dead_code)]
+const CERTINFO_UNCOMPRESSED: u8 = 0;
+#[cfg(feature = "untested")]
+const CERTINFO_GZIP: u8 = 1;
+
 /// Information about a public key within a [`Certificate`].
 #[derive(Clone, Eq, PartialEq)]
 pub enum PublicKeyInfo {
@@ -273,7 +278,7 @@ pub(crate) fn write_certificate(
     // write compression info and LRC trailer
     buf[offset] = TAG_CERT_COMPRESS;
     buf[offset + 1] = 0x01;
-    buf[offset + 2] = if certinfo == YKPIV_CERTINFO_GZIP {
+    buf[offset + 2] = if certinfo == CERTINFO_GZIP {
         0x01
     } else {
         0x00

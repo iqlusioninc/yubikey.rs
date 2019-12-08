@@ -30,7 +30,9 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{consts::*, ObjectId};
+use crate::ObjectId;
+
+pub const OBJ_DISCOVERY: u32 = 0x7e;
 
 // TODO(tarcieri): refactor these into better serializers/message builders
 
@@ -84,9 +86,9 @@ pub(crate) fn has_valid_length(buffer: &[u8], len: usize) -> bool {
 pub(crate) fn set_object(object_id: ObjectId, mut buffer: &mut [u8]) -> &mut [u8] {
     buffer[0] = 0x5c;
 
-    if object_id == YKPIV_OBJ_DISCOVERY {
+    if object_id == OBJ_DISCOVERY {
         buffer[1] = 1;
-        buffer[2] = YKPIV_OBJ_DISCOVERY as u8;
+        buffer[2] = OBJ_DISCOVERY as u8;
         buffer = &mut buffer[3..];
     } else if object_id > 0xffff && object_id <= 0x00ff_ffff {
         buffer[1] = 3;

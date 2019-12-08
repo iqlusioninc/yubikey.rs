@@ -40,6 +40,15 @@
 use crate::{consts::*, error::Error, serialization::*, yubikey::YubiKey};
 use log::error;
 
+const OBJ_MSROOTS1: u32 = 0x005f_ff11;
+#[allow(dead_code)]
+const OBJ_MSROOTS2: u32 = 0x005f_ff12;
+#[allow(dead_code)]
+const OBJ_MSROOTS3: u32 = 0x005f_ff13;
+#[allow(dead_code)]
+const OBJ_MSROOTS4: u32 = 0x005f_ff14;
+const OBJ_MSROOTS5: u32 = 0x005f_ff15;
+
 /// `msroots` file: PKCS#7-formatted certificate store for enterprise trust roots
 pub struct MsRoots(Vec<u8>);
 
@@ -56,7 +65,7 @@ impl MsRoots {
         // allocate first page
         let mut data = Vec::with_capacity(CB_OBJ_MAX);
 
-        for object_id in YKPIV_OBJ_MSROOTS1..YKPIV_OBJ_MSROOTS5 {
+        for object_id in OBJ_MSROOTS1..OBJ_MSROOTS5 {
             let buf = txn.fetch_object(object_id)?;
             let cb_buf = buf.len();
 
@@ -66,9 +75,7 @@ impl MsRoots {
 
             let tag = buf[0];
 
-            if (TAG_MSROOTS_MID != tag || YKPIV_OBJ_MSROOTS5 == object_id)
-                && (TAG_MSROOTS_END != tag)
-            {
+            if (TAG_MSROOTS_MID != tag || OBJ_MSROOTS5 == object_id) && (TAG_MSROOTS_END != tag) {
                 // the current object doesn't contain a valid part of a msroots file
 
                 // treat condition as object isn't found
@@ -108,7 +115,7 @@ impl MsRoots {
         let txn = yubikey.begin_transaction()?;
 
         if data_len == 0 {
-            return txn.save_object(YKPIV_OBJ_MSROOTS1, &[]);
+            return txn.save_object(OBJ_MSROOTS1, &[]);
         }
 
         // Calculate number of objects required to store blob
@@ -138,7 +145,7 @@ impl MsRoots {
             buf[offset..].copy_from_slice(&data[data_offset..(data_offset + data_chunk)]);
             offset += data_chunk;
 
-            txn.save_object(YKPIV_OBJ_MSROOTS1 + i as u32, &buf[..offset])?;
+            txn.save_object(OBJ_MSROOTS1 + i as u32, &buf[..offset])?;
 
             data_offset += data_chunk;
         }
