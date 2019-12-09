@@ -2,10 +2,9 @@
 name = "yubikey-cli"
 version = "0.0.1"
 description = """
-Command-line interface for performing encryption and signing using RSA and/or
-ECC keys stored on YubiKey devices.
+Command-line interface for performing encryption and signing using RSA/ECC keys stored on YubiKey devices.
 """
-authors = ["Tony Arcieri <bascule@gmail.com>"]
+authors = ["Tony Arcieri <tony@iqlusion.io>"]
 edition = "2018"
 license = "BSD-2-Clause"
 repository = "https://github.com/iqlusioninc/yubikey-piv.rs"

@@ -7,7 +7,7 @@ application providing general-purpose public-key signing and encryption
 with hardware-backed private keys for RSA (2048/1024) and ECC (P-256/P-384)
 algorithms (e.g, PKCS#1v1.5, ECDSA)
 """
-authors    = ["Tony Arcieri <bascule@gmail.com>", "Yubico AB"]
+authors    = ["Tony Arcieri <tony@iqlusion.io>", "Yubico AB"]
 edition    = "2018"
 license    = "BSD-2-Clause"
 repository = "https://github.com/iqlusioninc/yubikey-piv.rs"

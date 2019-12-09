@@ -4,12 +4,12 @@ use gumdrop::Options;
 use std::process::exit;
 use yubikey_piv::readers::Readers;
 
-/// The `list` subcommand
+/// The `readers` subcommand
 #[derive(Debug, Options)]
-pub struct ListCmd {}
+pub struct ReadersCmd {}
 
-impl ListCmd {
-    /// Run the `list` subcommand
+impl ReadersCmd {
+    /// Run the `readers` subcommand
     pub fn run(&self) {
         let mut readers = Readers::open().unwrap_or_else(|e| {
             status_err!("couldn't open PC/SC context: {}", e);
