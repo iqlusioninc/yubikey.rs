@@ -1,13 +1,16 @@
 //! Commands of the CLI application
 
-pub mod list;
+pub mod readers;
 
-use self::list::ListCmd;
-use crate::status;
+use self::readers::ReadersCmd;
+use crate::status::{self, STDOUT};
 use gumdrop::Options;
-use std::env;
-use std::process::exit;
-use termcolor::ColorChoice;
+use std::{
+    env,
+    io::{self, Write},
+    process::exit,
+};
+use termcolor::{ColorChoice, ColorSpec, WriteColor};
 
 /// The `yubikey` CLI utility
 #[derive(Debug, Options)]
@@ -34,8 +37,33 @@ impl YubikeyCli {
 
         match &self.command {
             Some(cmd) => cmd.run(),
-            None => println!("{}", Commands::usage()),
+            None => Self::print_usage().unwrap(),
         }
+    }
+
+    /// Print usage information
+    pub fn print_usage() -> Result<(), io::Error> {
+        let mut stdout = STDOUT.lock();
+        stdout.reset()?;
+
+        let mut bold = ColorSpec::new();
+        bold.set_bold(true);
+
+        stdout.set_color(&bold)?;
+        writeln!(
+            stdout,
+            "{} {}",
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION")
+        )?;
+        stdout.reset()?;
+
+        writeln!(stdout, "{}", env!("CARGO_PKG_AUTHORS"))?;
+        writeln!(stdout, "{}", env!("CARGO_PKG_DESCRIPTION").trim())?;
+        writeln!(stdout)?;
+        writeln!(stdout, "{}", Commands::usage())?;
+
+        Ok(())
     }
 }
 
@@ -50,9 +78,9 @@ pub enum Commands {
     #[options(help = "display version information")]
     Version(VersionOpts),
 
-    /// `list` subcommand
+    /// `readers` subcommand
     #[options(help = "list detected readers")]
-    List(ListCmd),
+    Readers(ReadersCmd),
 }
 
 impl Commands {
@@ -61,7 +89,7 @@ impl Commands {
         match self {
             Commands::Help(help) => help.run(),
             Commands::Version(version) => version.run(),
-            Commands::List(list) => list.run(),
+            Commands::Readers(list) => list.run(),
         }
     }
 }
