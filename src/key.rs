@@ -140,6 +140,21 @@ impl From<SlotId> for u8 {
     }
 }
 
+impl TryFrom<String> for SlotId {
+    type Error = Error;
+
+    fn try_from(s: String) -> Result<SlotId, Error> {
+        match s.as_ref() {
+            "9a" => Ok(SlotId::Authentication),
+            "9c" => Ok(SlotId::Signature),
+            "9d" => Ok(SlotId::KeyManagement),
+            "9e" => Ok(SlotId::CardAuthentication),
+            "f9" => Ok(SlotId::Attestation),
+            _ => RetiredSlotId::try_from(s).map(SlotId::Retired),
+        }
+    }
+}
+
 impl SlotId {
     /// Returns the [`ObjectId`] that corresponds to a given [`SlotId`].
     pub(crate) fn object_id(self) -> ObjectId {
@@ -205,6 +220,36 @@ impl TryFrom<u8> for RetiredSlotId {
             0x93 => Ok(RetiredSlotId::R18),
             0x94 => Ok(RetiredSlotId::R19),
             0x95 => Ok(RetiredSlotId::R20),
+            _ => Err(Error::InvalidObject),
+        }
+    }
+}
+
+impl TryFrom<String> for RetiredSlotId {
+    type Error = Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_ref() {
+            "82" => Ok(RetiredSlotId::R1),
+            "83" => Ok(RetiredSlotId::R2),
+            "84" => Ok(RetiredSlotId::R3),
+            "85" => Ok(RetiredSlotId::R4),
+            "86" => Ok(RetiredSlotId::R5),
+            "87" => Ok(RetiredSlotId::R6),
+            "88" => Ok(RetiredSlotId::R7),
+            "89" => Ok(RetiredSlotId::R8),
+            "8a" => Ok(RetiredSlotId::R9),
+            "8b" => Ok(RetiredSlotId::R10),
+            "8c" => Ok(RetiredSlotId::R11),
+            "8d" => Ok(RetiredSlotId::R12),
+            "8e" => Ok(RetiredSlotId::R13),
+            "8f" => Ok(RetiredSlotId::R14),
+            "90" => Ok(RetiredSlotId::R15),
+            "91" => Ok(RetiredSlotId::R16),
+            "92" => Ok(RetiredSlotId::R17),
+            "93" => Ok(RetiredSlotId::R18),
+            "94" => Ok(RetiredSlotId::R19),
+            "95" => Ok(RetiredSlotId::R20),
             _ => Err(Error::InvalidObject),
         }
     }
