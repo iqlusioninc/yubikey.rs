@@ -43,6 +43,7 @@ use pcsc::Card;
 use std::{
     convert::TryFrom,
     fmt::{self, Display},
+    str::FromStr,
 };
 
 #[cfg(feature = "untested")]
@@ -100,6 +101,14 @@ impl From<u32> for Serial {
 impl From<Serial> for u32 {
     fn from(serial: Serial) -> u32 {
         serial.0
+    }
+}
+
+impl FromStr for Serial {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Error> {
+        u32::from_str(s).map(Serial).map_err(|_| Error::ParseError)
     }
 }
 
@@ -350,7 +359,6 @@ impl YubiKey {
     }
 
     /// Get the number of PIN retries
-    #[cfg(feature = "untested")]
     pub fn get_pin_retries(&mut self) -> Result<u8, Error> {
         let txn = self.begin_transaction()?;
 

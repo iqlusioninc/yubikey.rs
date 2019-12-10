@@ -32,7 +32,8 @@
 
 use crate::{error::Error, yubikey::YubiKey};
 use getrandom::getrandom;
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Display};
+use subtle_encoding::hex;
 
 /// CCCID size
 pub const CCCID_SIZE: usize = 14;
@@ -114,5 +115,15 @@ impl CCC {
 impl Debug for CCC {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "CCC({:?})", &self.0[..])
+    }
+}
+
+impl Display for CCC {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            String::from_utf8(hex::encode(&self.0[..])).unwrap()
+        )
     }
 }

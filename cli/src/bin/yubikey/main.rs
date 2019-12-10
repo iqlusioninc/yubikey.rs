@@ -9,8 +9,8 @@
 )]
 
 use gumdrop::Options;
-use yubikey_cli::commands::YubikeyCli;
+use yubikey_cli::commands::YubiKeyCli;
 
 fn main() {
-    YubikeyCli::parse_args_default_or_exit().run();
+    YubiKeyCli::parse_args_default_or_exit().run();
 }

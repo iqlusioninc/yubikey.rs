@@ -32,7 +32,8 @@
 
 use crate::{error::Error, yubikey::YubiKey};
 use getrandom::getrandom;
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Display};
+use subtle_encoding::hex;
 
 /// CHUID size
 pub const CHUID_SIZE: usize = 59;
@@ -146,6 +147,16 @@ impl CHUID {
 
         let txn = yubikey.begin_transaction()?;
         txn.save_object(OBJ_CHUID, &buf)
+    }
+}
+
+impl Display for CHUID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            String::from_utf8(hex::encode(&self.0[..])).unwrap()
+        )
     }
 }
 
