@@ -38,7 +38,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{error::Error, serialization::*, yubikey::YubiKey};
-use crate::{CB_OBJ_MAX, CB_OBJ_TAG_MAX, CB_OBJ_TAG_MIN};
+use crate::{CB_OBJ_MAX, CB_OBJ_TAG_MAX};
 use log::error;
 
 const OBJ_MSROOTS1: u32 = 0x005f_ff11;
@@ -71,32 +71,24 @@ impl MsRoots {
 
         for object_id in OBJ_MSROOTS1..OBJ_MSROOTS5 {
             let buf = txn.fetch_object(object_id)?;
-            let cb_buf = buf.len();
 
-            if cb_buf < CB_OBJ_TAG_MIN {
-                return Ok(None);
-            }
+            let (_, tlv) = match Tlv::parse(&buf) {
+                Ok(res) => res,
+                Err(_) => return Ok(None),
+            };
 
-            let tag = buf[0];
-
-            if (TAG_MSROOTS_MID != tag || OBJ_MSROOTS5 == object_id) && (TAG_MSROOTS_END != tag) {
+            if (TAG_MSROOTS_MID != tlv.tag || OBJ_MSROOTS5 == object_id)
+                && (TAG_MSROOTS_END != tlv.tag)
+            {
                 // the current object doesn't contain a valid part of a msroots file
 
                 // treat condition as object isn't found
                 return Ok(None);
             }
 
-            let mut len: usize = 0;
-            let offset = 1 + get_length(&buf[1..], &mut len);
+            data.extend_from_slice(tlv.value);
 
-            // check that decoded length represents object contents
-            if len > cb_buf - offset {
-                return Ok(None);
-            }
-
-            data.extend_from_slice(&buf[offset..offset + len]);
-
-            if tag == TAG_MSROOTS_END {
+            if tlv.tag == TAG_MSROOTS_END {
                 break;
             }
         }
@@ -138,16 +130,15 @@ impl MsRoots {
                 data_len - data_offset
             };
 
-            buf[offset] = if i == n_objs - 1 {
-                TAG_MSROOTS_END
-            } else {
-                TAG_MSROOTS_MID
-            };
-
-            offset += 1;
-            offset += set_length(&mut buf[offset..], data_chunk);
-            buf[offset..].copy_from_slice(&data[data_offset..(data_offset + data_chunk)]);
-            offset += data_chunk;
+            offset += Tlv::write(
+                &mut buf,
+                if i == n_objs - 1 {
+                    TAG_MSROOTS_END
+                } else {
+                    TAG_MSROOTS_MID
+                },
+                &data[data_offset..(data_offset + data_chunk)],
+            )?;
 
             txn.save_object(OBJ_MSROOTS1 + i as u32, &buf[..offset])?;
 

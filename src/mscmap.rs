@@ -33,9 +33,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{
-    error::Error, key::SlotId, serialization::*, yubikey::YubiKey, CB_OBJ_MAX, CB_OBJ_TAG_MIN,
-};
+use crate::{error::Error, key::SlotId, serialization::*, yubikey::YubiKey, CB_OBJ_MAX};
 use log::error;
 use std::{
     convert::{TryFrom, TryInto},
@@ -87,25 +85,20 @@ impl Container {
         let response = txn.fetch_object(OBJ_MSCMAP)?;
         let mut containers = vec![];
 
-        if response.len() < CB_OBJ_TAG_MIN {
-            // TODO(tarcieri): is this really OK?
-            return Ok(containers);
-        }
+        let (_, tlv) = match Tlv::parse(&response) {
+            Ok(res) => res,
+            Err(_) => {
+                // TODO(tarcieri): is this really OK?
+                return Ok(containers);
+            }
+        };
 
-        if response[0] != TAG_MSCMAP {
+        if tlv.tag != TAG_MSCMAP {
             // TODO(tarcieri): yubico-piv-tool returned success here? should we?
             return Err(Error::InvalidObject);
         }
 
-        let mut len = 0;
-        let offset = 1 + get_length(&response[1..], &mut len);
-
-        if len > response.len() - offset {
-            // TODO(tarcieri): is this really OK?
-            return Ok(containers);
-        }
-
-        for chunk in response[offset..(offset + len)].chunks_exact(CONTAINER_REC_LEN) {
+        for chunk in tlv.value.chunks_exact(CONTAINER_REC_LEN) {
             containers.push(Container::new(chunk)?);
         }
 
@@ -114,8 +107,6 @@ impl Container {
 
     /// Write MS Container Map records.
     pub fn write_mscmap(yubikey: &mut YubiKey, containers: &[Self]) -> Result<(), Error> {
-        let mut buf = [0u8; CB_OBJ_MAX];
-        let mut offset = 0;
         let n_containers = containers.len();
         let data_len = n_containers * CONTAINER_REC_LEN;
 
@@ -125,24 +116,13 @@ impl Container {
             return txn.save_object(OBJ_MSCMAP, &[]);
         }
 
-        let req_len = 1 + set_length(&mut buf, data_len) + data_len;
+        let mut buf = [0u8; CB_OBJ_MAX];
+        let offset = Tlv::write_as(&mut buf, TAG_MSCMAP, data_len, |buf| {
+            for (i, chunk) in buf.chunks_exact_mut(CONTAINER_REC_LEN).enumerate() {
+                chunk.copy_from_slice(&containers[i].to_bytes());
+            }
+        })?;
 
-        if req_len > CB_OBJ_MAX {
-            return Err(Error::SizeError);
-        }
-
-        buf[offset] = TAG_MSCMAP;
-        offset += 1;
-        offset += set_length(&mut buf[offset..], data_len);
-
-        for (i, chunk) in buf[..data_len]
-            .chunks_exact_mut(CONTAINER_REC_LEN)
-            .enumerate()
-        {
-            chunk.copy_from_slice(&containers[i].to_bytes());
-        }
-
-        offset += data_len;
         txn.save_object(OBJ_MSCMAP, &buf[..offset])
     }
 

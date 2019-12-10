@@ -264,7 +264,6 @@ impl<'tx> Transaction<'tx> {
         let in_len = sign_in.len();
         let mut indata = [0u8; 1024];
         let templ = [0, Ins::Authenticate.code(), algorithm.into(), key.into()];
-        let mut len: usize = 0;
 
         match algorithm {
             AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
@@ -300,19 +299,21 @@ impl<'tx> Transaction<'tx> {
             3
         };
 
-        indata[0] = 0x7c;
-        let mut offset = 1 + set_length(&mut indata[1..], in_len + bytes + 3);
-        indata[offset] = 0x82;
-        indata[offset + 1] = 0x00;
-        indata[offset + 2] = match (algorithm, decipher) {
-            (AlgorithmId::EccP256, true) | (AlgorithmId::EccP384, true) => 0x85,
-            _ => 0x81,
-        };
-
-        offset += 3;
-        offset += set_length(&mut indata[offset..], in_len);
-        indata[offset..(offset + in_len)].copy_from_slice(sign_in);
-        offset += in_len;
+        let offset = Tlv::write_as(&mut indata, 0x7c, in_len + bytes + 3, |buf| {
+            assert_eq!(Tlv::write(buf, 0x82, &[]).expect("large enough"), 2);
+            assert_eq!(
+                Tlv::write(
+                    &mut buf[2..],
+                    match (algorithm, decipher) {
+                        (AlgorithmId::EccP256, true) | (AlgorithmId::EccP384, true) => 0x85,
+                        _ => 0x81,
+                    },
+                    sign_in
+                )
+                .expect("large enough"),
+                1 + bytes + in_len
+            );
+        })?;
 
         let response = self
             .transfer_data(&templ, &indata[..offset], 1024)
@@ -331,25 +332,23 @@ impl<'tx> Transaction<'tx> {
             }
         }
 
-        let data = response.data();
+        let (_, outer_tlv) = Tlv::parse(response.data())?;
 
         // skip the first 7c tag
-        if data[0] != 0x7c {
+        if outer_tlv.tag != 0x7c {
             error!("failed parsing signature reply (0x7c byte)");
             return Err(Error::ParseError);
         }
 
-        let mut offset = 1 + get_length(&data[1..], &mut len);
+        let (_, inner_tlv) = Tlv::parse(outer_tlv.value)?;
 
         // skip the 82 tag
-        if data[offset] != 0x82 {
+        if inner_tlv.tag != 0x82 {
             error!("failed parsing signature reply (0x82 byte)");
             return Err(Error::ParseError);
         }
 
-        offset += 1;
-        offset += get_length(&data[offset..], &mut len);
-        Ok(Buffer::new(data[offset..(offset + len)].into()))
+        Ok(Buffer::new(inner_tlv.value.into()))
     }
 
     /// Send/receive large amounts of data to/from the YubiKey, splitting long
@@ -457,32 +456,19 @@ impl<'tx> Transaction<'tx> {
             }
         }
 
-        let data = Buffer::new(response.data().into());
-        let mut outlen = 0;
+        let (remaining, tlv) = Tlv::parse(response.data())?;
 
-        if data.len() < 2 || !has_valid_length(&data[1..], data.len() - 1) {
-            return Err(Error::SizeError);
-        }
-
-        let offs = get_length(&data[1..], &mut outlen);
-
-        if offs == 0 {
-            return Err(Error::SizeError);
-        }
-
-        if outlen + offs + 1 != data.len() {
+        if !remaining.is_empty() {
             error!(
                 "invalid length indicated in object: total len is {} but indicated length is {}",
-                data.len(),
-                outlen
+                tlv.value.len() + remaining.len(),
+                tlv.value.len()
             );
 
             return Err(Error::SizeError);
         }
 
-        Ok(Zeroizing::new(
-            data[(1 + offs)..(1 + offs + outlen)].to_vec(),
-        ))
+        Ok(Zeroizing::new(tlv.value.to_vec()))
     }
 
     /// Save an object.
@@ -500,14 +486,8 @@ impl<'tx> Transaction<'tx> {
         let mut len = data.len();
         let mut data_remaining = set_object(object_id, &mut data);
 
-        data_remaining[0] = 0x53;
-        data_remaining = &mut data_remaining[1..];
-
-        let offset = set_length(data_remaining, indata.len());
+        let offset = Tlv::write(data_remaining, 0x53, indata)?;
         data_remaining = &mut data_remaining[offset..];
-        data_remaining[..indata.len()].copy_from_slice(indata);
-
-        data_remaining = &mut data_remaining[indata.len()..];
         len -= data_remaining.len();
 
         let status_words = self

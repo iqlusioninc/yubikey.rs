@@ -30,27 +30,126 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::ObjectId;
+use crate::{error::Error, Buffer, ObjectId, CB_OBJ_TAG_MIN};
 
 pub const OBJ_DISCOVERY: u32 = 0x7e;
 
 // TODO(tarcieri): refactor these into better serializers/message builders
 
+/// A Type-Length-Value object that has been parsed from a buffer.
+pub(crate) struct Tlv<'a> {
+    pub(crate) tag: u8,
+    pub(crate) value: &'a [u8],
+}
+
+impl<'a> Tlv<'a> {
+    /// Parses a `Tlv` from a buffer, returning the remainder of the buffer.
+    pub(crate) fn parse(buffer: &'a [u8]) -> Result<(&'a [u8], Self), Error> {
+        if buffer.len() < CB_OBJ_TAG_MIN || !has_valid_length(&buffer[1..], buffer.len() - 1) {
+            return Err(Error::SizeError);
+        }
+
+        let tag = buffer[0];
+
+        let mut len = 0;
+        let offset = 1 + get_length(&buffer[1..], &mut len);
+
+        let (value, buffer) = buffer[offset..].split_at(len);
+
+        Ok((buffer, Tlv { tag, value }))
+    }
+
+    /// Takes a [`Buffer`] containing a single `Tlv` with the given tag, and returns a
+    /// `Buffer` containing only the value part of the `Tlv`.
+    pub(crate) fn parse_single(mut buffer: Buffer, tag: u8) -> Result<Buffer, Error> {
+        if buffer.len() < CB_OBJ_TAG_MIN || !has_valid_length(&buffer[1..], buffer.len() - 1) {
+            return Err(Error::SizeError);
+        }
+
+        if tag != buffer[0] {
+            return Err(Error::GenericError);
+        };
+
+        let mut len = 0;
+        let offset = 1 + get_length(&buffer[1..], &mut len);
+
+        buffer.copy_within(offset..offset + len, 0);
+        buffer.truncate(len);
+        Ok(buffer)
+    }
+
+    /// Writes a TLV to the given buffer.
+    #[cfg(feature = "untested")]
+    pub(crate) fn write(buffer: &mut [u8], tag: u8, value: &[u8]) -> Result<usize, Error> {
+        if buffer.len() < CB_OBJ_TAG_MIN {
+            return Err(Error::SizeError);
+        }
+        buffer[0] = tag;
+
+        let offset = 1 + set_length(&mut buffer[1..], value.len())?;
+
+        if buffer.len() < offset + value.len() {
+            return Err(Error::SizeError);
+        }
+        buffer[offset..offset + value.len()].copy_from_slice(value);
+
+        Ok(offset + value.len())
+    }
+
+    /// Writes a TLV to the given buffer.
+    ///
+    /// `value` is guaranteed to be called with a mutable slice of length `length`.
+    #[cfg(feature = "untested")]
+    pub(crate) fn write_as<Gen>(
+        buffer: &mut [u8],
+        tag: u8,
+        length: usize,
+        value: Gen,
+    ) -> Result<usize, Error>
+    where
+        Gen: FnOnce(&mut [u8]),
+    {
+        if buffer.len() < CB_OBJ_TAG_MIN {
+            return Err(Error::SizeError);
+        }
+        buffer[0] = tag;
+
+        let offset = 1 + set_length(&mut buffer[1..], length)?;
+
+        if buffer.len() < offset + length {
+            return Err(Error::SizeError);
+        }
+        value(&mut buffer[offset..offset + length]);
+
+        Ok(offset + length)
+    }
+}
+
 /// Set length
 #[cfg(feature = "untested")]
-pub(crate) fn set_length(buffer: &mut [u8], length: usize) -> usize {
+pub(crate) fn set_length(buffer: &mut [u8], length: usize) -> Result<usize, Error> {
     if length < 0x80 {
-        buffer[0] = length as u8;
-        1
+        if buffer.is_empty() {
+            Err(Error::SizeError)
+        } else {
+            buffer[0] = length as u8;
+            Ok(1)
+        }
     } else if length < 0x100 {
-        buffer[0] = 0x81;
-        buffer[1] = length as u8;
-        2
+        if buffer.len() < 2 {
+            Err(Error::SizeError)
+        } else {
+            buffer[0] = 0x81;
+            buffer[1] = length as u8;
+            Ok(2)
+        }
+    } else if buffer.len() < 3 {
+        Err(Error::SizeError)
     } else {
         buffer[0] = 0x82;
         buffer[1] = ((length >> 8) & 0xff) as u8;
         buffer[2] = (length & 0xff) as u8;
-        3
+        Ok(3)
     }
 }
 

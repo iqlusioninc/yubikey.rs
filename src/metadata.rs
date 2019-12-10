@@ -31,8 +31,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    error::Error, serialization::*, transaction::Transaction, Buffer, CB_OBJ_TAG_MIN, TAG_ADMIN,
-    TAG_PROTECTED,
+    error::Error, serialization::*, transaction::Transaction, Buffer, TAG_ADMIN, TAG_PROTECTED,
 };
 
 #[cfg(feature = "untested")]
@@ -45,33 +44,18 @@ pub const OBJ_ADMIN_DATA: u32 = 0x005f_ff00;
 pub const OBJ_PRINTED: u32 = 0x005f_c109;
 
 /// Get metadata item
-pub(crate) fn get_item(data: &[u8], tag: u8) -> Result<&[u8], Error> {
-    let mut cb_temp: usize = 0;
-    let mut offset = 0;
+pub(crate) fn get_item(mut data: &[u8], tag: u8) -> Result<&[u8], Error> {
+    while !data.is_empty() {
+        let (remaining, tlv) = Tlv::parse(data)?;
+        data = remaining;
 
-    while offset < data.len() {
-        let tag_temp = data[offset];
-        offset += 1;
-
-        if !has_valid_length(&data[offset..], data.len() - 1) {
-            return Err(Error::SizeError);
-        }
-
-        offset += get_length(&data[offset..], &mut cb_temp);
-
-        if tag_temp == tag {
+        if tlv.tag == tag {
             // found tag
-            break;
+            return Ok(tlv.value);
         }
-
-        offset += cb_temp;
     }
 
-    if offset < data.len() {
-        Ok(&data[offset..offset + cb_temp])
-    } else {
-        Err(Error::GenericError)
-    }
+    Err(Error::GenericError)
 }
 
 /// Set metadata item
@@ -111,20 +95,7 @@ pub(crate) fn set_item(
         }
 
         // We did not find an existing tag, append
-        offset = *pcb_data;
-        cb_len = get_length_size(cb_item);
-
-        // If length would cause buffer overflow, return error
-        if (*pcb_data + cb_len + cb_item) > cb_data_max {
-            return Err(Error::GenericError);
-        }
-
-        data[offset] = tag;
-        offset += 1;
-        offset += set_length(&mut data[offset..], cb_item);
-        data[offset..offset + cb_item].copy_from_slice(p_item);
-
-        *pcb_data += 1 + cb_len + cb_item;
+        *pcb_data += Tlv::write(&mut data[*pcb_data..], tag, p_item)?;
 
         return Ok(());
     }
@@ -165,7 +136,7 @@ pub(crate) fn set_item(
     // Re-encode item and insert
     if cb_item != 0 {
         offset -= cb_len;
-        offset += set_length(&mut data[offset..], cb_item);
+        offset += set_length(&mut data[offset..], cb_item)?;
         data[offset..offset + cb_item].copy_from_slice(p_item);
     }
 
@@ -180,33 +151,13 @@ pub(crate) fn read(txn: &Transaction<'_>, tag: u8) -> Result<Buffer, Error> {
         _ => return Err(Error::InvalidObject),
     };
 
-    let mut data = txn.fetch_object(obj_id)?;
-
-    if data.len() < CB_OBJ_TAG_MIN {
-        return Err(Error::GenericError);
-    }
-
-    if tag != data[0] {
-        return Err(Error::GenericError);
-    }
-
-    let mut pcb_data = 0;
-    let offset = 1 + get_length(&data[1..], &mut pcb_data);
-
-    if pcb_data > data.len() - offset {
-        return Err(Error::GenericError);
-    }
-
-    data.copy_within(offset..offset + pcb_data, 0);
-    data.truncate(pcb_data);
-    Ok(data)
+    let data = txn.fetch_object(obj_id)?;
+    Tlv::parse_single(data, tag)
 }
 
 /// Write metadata
 #[cfg(feature = "untested")]
 pub(crate) fn write(txn: &Transaction<'_>, tag: u8, data: &[u8]) -> Result<(), Error> {
-    let mut buf = Zeroizing::new(vec![0u8; CB_OBJ_MAX]);
-
     if data.len() > CB_OBJ_MAX - CB_OBJ_TAG_MAX {
         return Err(Error::GenericError);
     }
@@ -222,12 +173,10 @@ pub(crate) fn write(txn: &Transaction<'_>, tag: u8, data: &[u8]) -> Result<(), E
         return txn.save_object(obj_id, &[]);
     }
 
-    buf[0] = tag;
-    let mut offset = set_length(&mut buf[1..], data.len());
-    buf[offset..(offset + data.len())].copy_from_slice(data);
-    offset += data.len();
+    let mut buf = Zeroizing::new(vec![0u8; CB_OBJ_MAX]);
+    let len = Tlv::write(&mut buf, tag, data)?;
 
-    txn.save_object(obj_id, &buf[..offset])
+    txn.save_object(obj_id, &buf[..len])
 }
 
 /// Get the size of a length tag for the given length

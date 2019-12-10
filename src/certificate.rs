@@ -36,7 +36,7 @@ use crate::{
     serialization::*,
     transaction::Transaction,
     yubikey::YubiKey,
-    Buffer, CB_OBJ_TAG_MIN,
+    Buffer,
 };
 use elliptic_curve::weierstrass::{
     curve::{NistP256, NistP384},
@@ -217,10 +217,9 @@ impl AsRef<[u8]> for Certificate {
 
 /// Read certificate
 pub(crate) fn read_certificate(txn: &Transaction<'_>, slot: SlotId) -> Result<Buffer, Error> {
-    let mut len: usize = 0;
     let object_id = slot.object_id();
 
-    let mut buf = match txn.fetch_object(object_id) {
+    let buf = match txn.fetch_object(object_id) {
         Ok(b) => b,
         Err(_) => {
             // TODO(tarcieri): is this really ok?
@@ -228,24 +227,15 @@ pub(crate) fn read_certificate(txn: &Transaction<'_>, slot: SlotId) -> Result<Bu
         }
     };
 
-    if buf.len() < CB_OBJ_TAG_MIN {
-        // TODO(tarcieri): is this really ok?
-        return Ok(Zeroizing::new(vec![]));
-    }
-
+    // TODO(str4d): Check the rest of the buffer (TAG_CERT_COMPRESS and TAG_CERT_LRC)
     if buf[0] == TAG_CERT {
-        let offset = 1 + get_length(&buf[1..], &mut len);
-
-        if len > buf.len() - offset {
+        Tlv::parse_single(buf, TAG_CERT).or_else(|_| {
             // TODO(tarcieri): is this really ok?
-            return Ok(Zeroizing::new(vec![]));
-        }
-
-        buf.copy_within(offset..offset + len, 0);
-        buf.truncate(len);
+            Ok(Zeroizing::new(vec![]))
+        })
+    } else {
+        Ok(buf)
     }
-
-    Ok(buf)
 }
 
 /// Write certificate
@@ -256,9 +246,6 @@ pub(crate) fn write_certificate(
     data: Option<&[u8]>,
     certinfo: u8,
 ) -> Result<(), Error> {
-    let mut buf = [0u8; CB_OBJ_MAX];
-    let mut offset = 0;
-
     let object_id = slot.object_id();
 
     if data.is_none() {
@@ -267,34 +254,20 @@ pub(crate) fn write_certificate(
 
     let data = data.unwrap();
 
-    let mut req_len = 1 /* cert tag */ + 3 /* compression tag + data*/ + 2 /* lrc */;
-    req_len += set_length(&mut buf, data.len());
-    req_len += data.len();
-
-    if req_len < data.len() || req_len > CB_OBJ_MAX {
-        return Err(Error::SizeError);
-    }
-
-    buf[offset] = TAG_CERT;
-    offset += 1;
-    offset += set_length(&mut buf[offset..], data.len());
-
-    buf[offset..(offset + data.len())].copy_from_slice(&data);
-
-    offset += data.len();
+    let mut buf = [0u8; CB_OBJ_MAX];
+    let mut offset = Tlv::write(&mut buf, TAG_CERT, data)?;
 
     // write compression info and LRC trailer
-    buf[offset] = TAG_CERT_COMPRESS;
-    buf[offset + 1] = 0x01;
-    buf[offset + 2] = if certinfo == CERTINFO_GZIP {
-        0x01
-    } else {
-        0x00
-    };
-    buf[offset + 3] = TAG_CERT_LRC;
-    buf[offset + 4] = 00;
-
-    offset += 5;
+    offset += Tlv::write(
+        &mut buf,
+        TAG_CERT_COMPRESS,
+        if certinfo == CERTINFO_GZIP {
+            &[0x01]
+        } else {
+            &[0x00]
+        },
+    )?;
+    offset += Tlv::write(&mut buf, TAG_CERT_LRC, &[])?;
 
     txn.save_object(object_id, &buf[..offset])
 }
