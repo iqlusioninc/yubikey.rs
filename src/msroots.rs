@@ -130,16 +130,15 @@ impl MsRoots {
                 data_len - data_offset
             };
 
-            buf[offset] = if i == n_objs - 1 {
-                TAG_MSROOTS_END
-            } else {
-                TAG_MSROOTS_MID
-            };
-
-            offset += 1;
-            offset += set_length(&mut buf[offset..], data_chunk);
-            buf[offset..].copy_from_slice(&data[data_offset..(data_offset + data_chunk)]);
-            offset += data_chunk;
+            offset += Tlv::write(
+                &mut buf,
+                if i == n_objs - 1 {
+                    TAG_MSROOTS_END
+                } else {
+                    TAG_MSROOTS_MID
+                },
+                &data[data_offset..(data_offset + data_chunk)],
+            )?;
 
             txn.save_object(OBJ_MSROOTS1 + i as u32, &buf[..offset])?;
 

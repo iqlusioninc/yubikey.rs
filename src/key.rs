@@ -379,11 +379,8 @@ impl From<AlgorithmId> for u8 {
 #[cfg(feature = "untested")]
 impl AlgorithmId {
     /// Writes the `AlgorithmId` in the format the YubiKey expects during key generation.
-    pub(crate) fn write(self, buf: &mut [u8]) -> usize {
-        buf[0] = 0x80;
-        buf[1] = 0x01;
-        buf[2] = self.into();
-        3
+    pub(crate) fn write(self, buf: &mut [u8]) -> Result<usize, Error> {
+        Tlv::write(buf, 0x80, &[self.into()])
     }
 }
 
@@ -539,16 +536,15 @@ pub fn generate(
     let templ = [0, Ins::GenerateAsymmetric.code(), 0, slot.into()];
 
     let mut in_data = [0u8; 11];
-    in_data[0] = 0xac;
-    in_data[1] = 3; // length sans this 2-byte header
-    assert_eq!(algorithm.write(&mut in_data[2..]), 3);
-    let mut offset = 5;
+    let mut offset = Tlv::write_as(&mut in_data, 0xac, 3, |buf| {
+        assert_eq!(algorithm.write(buf).expect("large enough"), 3);
+    })?;
 
-    let pin_len = pin_policy.write(&mut in_data[offset..]);
+    let pin_len = pin_policy.write(&mut in_data[offset..])?;
     in_data[1] += pin_len as u8;
     offset += pin_len;
 
-    let touch_len = touch_policy.write(&mut in_data[offset..]);
+    let touch_len = touch_policy.write(&mut in_data[offset..])?;
     in_data[1] += touch_len as u8;
     offset += touch_len;
 
@@ -695,28 +691,22 @@ pub fn import(
     let mut offset = 0;
 
     for (i, param) in params.into_iter().enumerate() {
-        key_data[offset] = param_tag + i as u8;
-        offset += 1;
-
-        offset += set_length(&mut key_data[offset..], elem_len);
-
-        let padding = elem_len - param.len();
-        let remaining = key_data.len() - offset;
-
-        if padding > remaining {
-            return Err(Error::AlgorithmError);
-        }
-
-        for b in &mut key_data[offset..offset + padding] {
-            *b = 0;
-        }
-        offset += padding;
-        key_data[offset..offset + param.len()].copy_from_slice(param);
-        offset += param.len();
+        offset += Tlv::write_as(
+            &mut key_data[offset..],
+            param_tag + i as u8,
+            elem_len,
+            |buf| {
+                let padding = elem_len - param.len();
+                for b in &mut buf[..padding] {
+                    *b = 0;
+                }
+                buf[padding..].copy_from_slice(param);
+            },
+        )?;
     }
 
-    offset += pin_policy.write(&mut key_data[offset..]);
-    offset += touch_policy.write(&mut key_data[offset..]);
+    offset += pin_policy.write(&mut key_data[offset..])?;
+    offset += touch_policy.write(&mut key_data[offset..])?;
 
     let txn = yubikey.begin_transaction()?;
 

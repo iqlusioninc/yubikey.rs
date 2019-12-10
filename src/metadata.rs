@@ -95,20 +95,7 @@ pub(crate) fn set_item(
         }
 
         // We did not find an existing tag, append
-        offset = *pcb_data;
-        cb_len = get_length_size(cb_item);
-
-        // If length would cause buffer overflow, return error
-        if (*pcb_data + cb_len + cb_item) > cb_data_max {
-            return Err(Error::GenericError);
-        }
-
-        data[offset] = tag;
-        offset += 1;
-        offset += set_length(&mut data[offset..], cb_item);
-        data[offset..offset + cb_item].copy_from_slice(p_item);
-
-        *pcb_data += 1 + cb_len + cb_item;
+        *pcb_data += Tlv::write(&mut data[*pcb_data..], tag, p_item)?;
 
         return Ok(());
     }
@@ -171,8 +158,6 @@ pub(crate) fn read(txn: &Transaction<'_>, tag: u8) -> Result<Buffer, Error> {
 /// Write metadata
 #[cfg(feature = "untested")]
 pub(crate) fn write(txn: &Transaction<'_>, tag: u8, data: &[u8]) -> Result<(), Error> {
-    let mut buf = Zeroizing::new(vec![0u8; CB_OBJ_MAX]);
-
     if data.len() > CB_OBJ_MAX - CB_OBJ_TAG_MAX {
         return Err(Error::GenericError);
     }
@@ -188,12 +173,10 @@ pub(crate) fn write(txn: &Transaction<'_>, tag: u8, data: &[u8]) -> Result<(), E
         return txn.save_object(obj_id, &[]);
     }
 
-    buf[0] = tag;
-    let mut offset = set_length(&mut buf[1..], data.len());
-    buf[offset..(offset + data.len())].copy_from_slice(data);
-    offset += data.len();
+    let mut buf = Zeroizing::new(vec![0u8; CB_OBJ_MAX]);
+    let len = Tlv::write(&mut buf, tag, data)?;
 
-    txn.save_object(obj_id, &buf[..offset])
+    txn.save_object(obj_id, &buf[..len])
 }
 
 /// Get the size of a length tag for the given length

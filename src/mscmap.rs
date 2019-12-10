@@ -107,8 +107,6 @@ impl Container {
 
     /// Write MS Container Map records.
     pub fn write_mscmap(yubikey: &mut YubiKey, containers: &[Self]) -> Result<(), Error> {
-        let mut buf = [0u8; CB_OBJ_MAX];
-        let mut offset = 0;
         let n_containers = containers.len();
         let data_len = n_containers * CONTAINER_REC_LEN;
 
@@ -118,24 +116,13 @@ impl Container {
             return txn.save_object(OBJ_MSCMAP, &[]);
         }
 
-        let req_len = 1 + set_length(&mut buf, data_len) + data_len;
+        let mut buf = [0u8; CB_OBJ_MAX];
+        let offset = Tlv::write_as(&mut buf, TAG_MSCMAP, data_len, |buf| {
+            for (i, chunk) in buf.chunks_exact_mut(CONTAINER_REC_LEN).enumerate() {
+                chunk.copy_from_slice(&containers[i].to_bytes());
+            }
+        })?;
 
-        if req_len > CB_OBJ_MAX {
-            return Err(Error::SizeError);
-        }
-
-        buf[offset] = TAG_MSCMAP;
-        offset += 1;
-        offset += set_length(&mut buf[offset..], data_len);
-
-        for (i, chunk) in buf[..data_len]
-            .chunks_exact_mut(CONTAINER_REC_LEN)
-            .enumerate()
-        {
-            chunk.copy_from_slice(&containers[i].to_bytes());
-        }
-
-        offset += data_len;
         txn.save_object(OBJ_MSCMAP, &buf[..offset])
     }
 

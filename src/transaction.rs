@@ -299,19 +299,21 @@ impl<'tx> Transaction<'tx> {
             3
         };
 
-        indata[0] = 0x7c;
-        let mut offset = 1 + set_length(&mut indata[1..], in_len + bytes + 3);
-        indata[offset] = 0x82;
-        indata[offset + 1] = 0x00;
-        indata[offset + 2] = match (algorithm, decipher) {
-            (AlgorithmId::EccP256, true) | (AlgorithmId::EccP384, true) => 0x85,
-            _ => 0x81,
-        };
-
-        offset += 3;
-        offset += set_length(&mut indata[offset..], in_len);
-        indata[offset..(offset + in_len)].copy_from_slice(sign_in);
-        offset += in_len;
+        let offset = Tlv::write_as(&mut indata, 0x7c, in_len + bytes + 3, |buf| {
+            assert_eq!(Tlv::write(buf, 0x82, &[]).expect("large enough"), 2);
+            assert_eq!(
+                Tlv::write(
+                    &mut buf[2..],
+                    match (algorithm, decipher) {
+                        (AlgorithmId::EccP256, true) | (AlgorithmId::EccP384, true) => 0x85,
+                        _ => 0x81,
+                    },
+                    sign_in
+                )
+                .expect("large enough"),
+                1 + bytes + in_len
+            );
+        })?;
 
         let response = self
             .transfer_data(&templ, &indata[..offset], 1024)
@@ -484,14 +486,8 @@ impl<'tx> Transaction<'tx> {
         let mut len = data.len();
         let mut data_remaining = set_object(object_id, &mut data);
 
-        data_remaining[0] = 0x53;
-        data_remaining = &mut data_remaining[1..];
-
-        let offset = set_length(data_remaining, indata.len());
+        let offset = Tlv::write(data_remaining, 0x53, indata)?;
         data_remaining = &mut data_remaining[offset..];
-        data_remaining[..indata.len()].copy_from_slice(indata);
-
-        data_remaining = &mut data_remaining[indata.len()..];
         len -= data_remaining.len();
 
         let status_words = self

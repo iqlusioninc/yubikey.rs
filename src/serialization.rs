@@ -77,6 +77,52 @@ impl<'a> Tlv<'a> {
         buffer.truncate(len);
         Ok(buffer)
     }
+
+    /// Writes a TLV to the given buffer.
+    pub(crate) fn write(buffer: &mut [u8], tag: u8, value: &[u8]) -> Result<usize, Error> {
+        if buffer.len() < CB_OBJ_TAG_MIN {
+            return Err(Error::SizeError);
+        }
+        buffer[0] = tag;
+
+        // TODO: Raise error
+        let offset = 1 + set_length(&mut buffer[1..], value.len());
+
+        if buffer.len() < offset + value.len() {
+            return Err(Error::SizeError);
+        }
+        buffer[offset..offset + value.len()].copy_from_slice(value);
+
+        Ok(offset + value.len())
+    }
+
+    /// Writes a TLV to the given buffer.
+    ///
+    /// `value` is guaranteed to be called with a mutable slice of length `length`.
+    pub(crate) fn write_as<Gen>(
+        buffer: &mut [u8],
+        tag: u8,
+        length: usize,
+        value: Gen,
+    ) -> Result<usize, Error>
+    where
+        Gen: FnOnce(&mut [u8]),
+    {
+        if buffer.len() < CB_OBJ_TAG_MIN {
+            return Err(Error::SizeError);
+        }
+        buffer[0] = tag;
+
+        // TODO: Raise error
+        let offset = 1 + set_length(&mut buffer[1..], length);
+
+        if buffer.len() < offset + length {
+            return Err(Error::SizeError);
+        }
+        value(&mut buffer[offset..offset + length]);
+
+        Ok(offset + length)
+    }
 }
 
 /// Set length
