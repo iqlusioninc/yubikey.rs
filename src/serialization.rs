@@ -85,8 +85,7 @@ impl<'a> Tlv<'a> {
         }
         buffer[0] = tag;
 
-        // TODO: Raise error
-        let offset = 1 + set_length(&mut buffer[1..], value.len());
+        let offset = 1 + set_length(&mut buffer[1..], value.len())?;
 
         if buffer.len() < offset + value.len() {
             return Err(Error::SizeError);
@@ -113,8 +112,7 @@ impl<'a> Tlv<'a> {
         }
         buffer[0] = tag;
 
-        // TODO: Raise error
-        let offset = 1 + set_length(&mut buffer[1..], length);
+        let offset = 1 + set_length(&mut buffer[1..], length)?;
 
         if buffer.len() < offset + length {
             return Err(Error::SizeError);
@@ -127,19 +125,29 @@ impl<'a> Tlv<'a> {
 
 /// Set length
 #[cfg(feature = "untested")]
-pub(crate) fn set_length(buffer: &mut [u8], length: usize) -> usize {
+pub(crate) fn set_length(buffer: &mut [u8], length: usize) -> Result<usize, Error> {
     if length < 0x80 {
-        buffer[0] = length as u8;
-        1
+        if buffer.is_empty() {
+            Err(Error::SizeError)
+        } else {
+            buffer[0] = length as u8;
+            Ok(1)
+        }
     } else if length < 0x100 {
-        buffer[0] = 0x81;
-        buffer[1] = length as u8;
-        2
+        if buffer.len() < 2 {
+            Err(Error::SizeError)
+        } else {
+            buffer[0] = 0x81;
+            buffer[1] = length as u8;
+            Ok(2)
+        }
+    } else if buffer.len() < 3 {
+        Err(Error::SizeError)
     } else {
         buffer[0] = 0x82;
         buffer[1] = ((length >> 8) & 0xff) as u8;
         buffer[2] = (length & 0xff) as u8;
-        3
+        Ok(3)
     }
 }
 

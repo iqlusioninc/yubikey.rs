@@ -136,7 +136,7 @@ pub(crate) fn set_item(
     // Re-encode item and insert
     if cb_item != 0 {
         offset -= cb_len;
-        offset += set_length(&mut data[offset..], cb_item);
+        offset += set_length(&mut data[offset..], cb_item)?;
         data[offset..offset + cb_item].copy_from_slice(p_item);
     }
 
