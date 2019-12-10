@@ -156,7 +156,13 @@ pub mod settings;
 mod transaction;
 pub mod yubikey;
 
-pub use self::{error::Error, key::Key, mgm::MgmKey, readers::Readers, yubikey::YubiKey};
+pub use self::{
+    error::Error,
+    key::Key,
+    mgm::MgmKey,
+    readers::Readers,
+    yubikey::{Serial, YubiKey},
+};
 
 /// Object identifiers
 pub type ObjectId = u32;

@@ -9,7 +9,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 #[macro_export]
 macro_rules! status_ok {
     ($status:expr, $msg:expr) => {
-        $crate::status::Status::new()
+        $crate::terminal::Status::new()
             .justified()
             .bold()
             .color(termcolor::Color::Green)
@@ -25,7 +25,7 @@ macro_rules! status_ok {
 #[macro_export]
 macro_rules! status_warn {
     ($msg:expr) => {
-        $crate::status::Status::new()
+        $crate::terminal::Status::new()
             .bold()
             .color(termcolor::Color::Yellow)
             .status("warning:")
@@ -40,7 +40,7 @@ macro_rules! status_warn {
 #[macro_export]
 macro_rules! status_err {
     ($msg:expr) => {
-        $crate::status::Status::new()
+        $crate::terminal::Status::new()
             .bold()
             .color(termcolor::Color::Red)
             .status("error:")

@@ -9,6 +9,6 @@
 )]
 
 #[macro_use]
-pub mod status;
+pub mod terminal;
 
 pub mod commands;
