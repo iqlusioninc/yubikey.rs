@@ -157,6 +157,7 @@ impl Display for Version {
 #[cfg_attr(not(feature = "untested"), allow(dead_code))]
 pub struct YubiKey {
     pub(crate) card: Card,
+    pub(crate) name: String,
     pub(crate) pin: Option<CachedPin>,
     pub(crate) version: Version,
     pub(crate) serial: Serial,
@@ -192,7 +193,7 @@ impl YubiKey {
         let mut readers = Readers::open()?;
 
         for reader in readers.iter()? {
-            let mut yubikey = match reader.open() {
+            let yubikey = match reader.open() {
                 Ok(yk) => yk,
                 Err(_) => continue,
             };
@@ -238,17 +239,22 @@ impl YubiKey {
         Ok(Transaction::new(&mut self.card)?)
     }
 
+    /// Get the name of the associated PC/SC card reader
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     /// Get the YubiKey's PIV application version.
     ///
     /// This always uses the cached version queried when the key is initialized.
-    pub fn version(&mut self) -> Version {
+    pub fn version(&self) -> Version {
         self.version
     }
 
     /// Get YubiKey device serial number.
     ///
     /// This always uses the cached version queried when the key is initialized.
-    pub fn serial(&mut self) -> Serial {
+    pub fn serial(&self) -> Serial {
         self.serial
     }
 
@@ -637,6 +643,7 @@ impl<'a> TryFrom<&'a Reader<'_>> for YubiKey {
 
         let yubikey = YubiKey {
             card,
+            name: String::from(reader.name()),
             pin: None,
             version,
             serial,

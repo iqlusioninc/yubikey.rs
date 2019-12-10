@@ -36,7 +36,7 @@ impl ReadersCmd {
 
         for (i, reader) in readers_iter.enumerate() {
             let name = reader.name();
-            let mut yubikey = match reader.open() {
+            let yubikey = match reader.open() {
                 Ok(yk) => yk,
                 Err(_) => continue,
             };

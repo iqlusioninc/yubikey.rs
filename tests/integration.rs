@@ -20,7 +20,7 @@ fn init_yubikey() -> Mutex<YubiKey> {
         env_logger::builder().format_timestamp(None).init();
     }
 
-    let mut yubikey = YubiKey::open().unwrap();
+    let yubikey = YubiKey::open().unwrap();
     trace!("serial: {}", yubikey.serial());
     trace!("version: {}", yubikey.version());
 

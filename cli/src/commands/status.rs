@@ -19,6 +19,7 @@ impl StatusCmd {
         let mut s = STDOUT.lock();
         s.reset().unwrap();
 
+        self.attr(&mut s, "name", yk.name()).unwrap();
         self.attr(&mut s, "version", yk.version()).unwrap();
         self.attr(&mut s, "serial", yk.serial()).unwrap();
 
