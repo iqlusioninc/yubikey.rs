@@ -264,7 +264,6 @@ impl<'tx> Transaction<'tx> {
         let in_len = sign_in.len();
         let mut indata = [0u8; 1024];
         let templ = [0, Ins::Authenticate.code(), algorithm.into(), key.into()];
-        let mut len: usize = 0;
 
         match algorithm {
             AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
@@ -331,25 +330,23 @@ impl<'tx> Transaction<'tx> {
             }
         }
 
-        let data = response.data();
+        let (_, outer_tlv) = Tlv::parse(response.data())?;
 
         // skip the first 7c tag
-        if data[0] != 0x7c {
+        if outer_tlv.tag != 0x7c {
             error!("failed parsing signature reply (0x7c byte)");
             return Err(Error::ParseError);
         }
 
-        let mut offset = 1 + get_length(&data[1..], &mut len);
+        let (_, inner_tlv) = Tlv::parse(outer_tlv.value)?;
 
         // skip the 82 tag
-        if data[offset] != 0x82 {
+        if inner_tlv.tag != 0x82 {
             error!("failed parsing signature reply (0x82 byte)");
             return Err(Error::ParseError);
         }
 
-        offset += 1;
-        offset += get_length(&data[offset..], &mut len);
-        Ok(Buffer::new(data[offset..(offset + len)].into()))
+        Ok(Buffer::new(inner_tlv.value.into()))
     }
 
     /// Send/receive large amounts of data to/from the YubiKey, splitting long
@@ -457,32 +454,19 @@ impl<'tx> Transaction<'tx> {
             }
         }
 
-        let data = Buffer::new(response.data().into());
-        let mut outlen = 0;
+        let (remaining, tlv) = Tlv::parse(response.data())?;
 
-        if data.len() < 2 || !has_valid_length(&data[1..], data.len() - 1) {
-            return Err(Error::SizeError);
-        }
-
-        let offs = get_length(&data[1..], &mut outlen);
-
-        if offs == 0 {
-            return Err(Error::SizeError);
-        }
-
-        if outlen + offs + 1 != data.len() {
+        if !remaining.is_empty() {
             error!(
                 "invalid length indicated in object: total len is {} but indicated length is {}",
-                data.len(),
-                outlen
+                tlv.value.len() + remaining.len(),
+                tlv.value.len()
             );
 
             return Err(Error::SizeError);
         }
 
-        Ok(Zeroizing::new(
-            data[(1 + offs)..(1 + offs + outlen)].to_vec(),
-        ))
+        Ok(Zeroizing::new(tlv.value.to_vec()))
     }
 
     /// Save an object.

@@ -36,7 +36,7 @@ use crate::{
     serialization::*,
     transaction::Transaction,
     yubikey::YubiKey,
-    Buffer, CB_OBJ_TAG_MIN,
+    Buffer,
 };
 use elliptic_curve::weierstrass::{
     curve::{NistP256, NistP384},
@@ -217,10 +217,9 @@ impl AsRef<[u8]> for Certificate {
 
 /// Read certificate
 pub(crate) fn read_certificate(txn: &Transaction<'_>, slot: SlotId) -> Result<Buffer, Error> {
-    let mut len: usize = 0;
     let object_id = slot.object_id();
 
-    let mut buf = match txn.fetch_object(object_id) {
+    let buf = match txn.fetch_object(object_id) {
         Ok(b) => b,
         Err(_) => {
             // TODO(tarcieri): is this really ok?
@@ -228,24 +227,15 @@ pub(crate) fn read_certificate(txn: &Transaction<'_>, slot: SlotId) -> Result<Bu
         }
     };
 
-    if buf.len() < CB_OBJ_TAG_MIN {
-        // TODO(tarcieri): is this really ok?
-        return Ok(Zeroizing::new(vec![]));
-    }
-
+    // TODO(str4d): Check the rest of the buffer (TAG_CERT_COMPRESS and TAG_CERT_LRC)
     if buf[0] == TAG_CERT {
-        let offset = 1 + get_length(&buf[1..], &mut len);
-
-        if len > buf.len() - offset {
+        Tlv::parse_single(buf, TAG_CERT).or_else(|_| {
             // TODO(tarcieri): is this really ok?
-            return Ok(Zeroizing::new(vec![]));
-        }
-
-        buf.copy_within(offset..offset + len, 0);
-        buf.truncate(len);
+            Ok(Zeroizing::new(vec![]))
+        })
+    } else {
+        Ok(buf)
     }
-
-    Ok(buf)
 }
 
 /// Write certificate

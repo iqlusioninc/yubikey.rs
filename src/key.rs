@@ -584,31 +584,22 @@ pub fn generate(
         }
     }
 
-    let data = Buffer::new(response.data().into());
-
     match algorithm {
         AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
-            let mut offset = 5;
-            let mut len = 0;
-
-            if data[offset] != TAG_RSA_MODULUS {
+            let (data, modulus_tlv) = Tlv::parse(response.data())?;
+            if modulus_tlv.tag != TAG_RSA_MODULUS {
                 error!("Failed to parse public key structure (modulus)");
                 return Err(Error::ParseError);
             }
+            let modulus = modulus_tlv.value.to_vec();
 
-            offset += 1;
-            offset += get_length(&data[offset..], &mut len);
-            let modulus = data[offset..(offset + len)].to_vec();
-            offset += len;
-
-            if data[offset] != TAG_RSA_EXP {
+            let (_, exp_tlv) = Tlv::parse(data)?;
+            if exp_tlv.tag != TAG_RSA_EXP {
                 error!("failed to parse public key structure (public exponent)");
                 return Err(Error::ParseError);
             }
+            let exp = exp_tlv.value.to_vec();
 
-            offset += 1;
-            offset += get_length(&data[offset..], &mut len);
-            let exp = data[offset..(offset + len)].to_vec();
             Ok(GeneratedKey::Rsa {
                 algorithm,
                 modulus,
@@ -616,30 +607,26 @@ pub fn generate(
             })
         }
         AlgorithmId::EccP256 | AlgorithmId::EccP384 => {
-            let mut offset = 3;
-
             let len = if let AlgorithmId::EccP256 = algorithm {
                 CB_ECC_POINTP256
             } else {
                 CB_ECC_POINTP384
             };
 
-            if data[offset] != TAG_ECC_POINT {
+            let (_, tlv) = Tlv::parse(response.data())?;
+
+            if tlv.tag != TAG_ECC_POINT {
                 error!("failed to parse public key structure");
                 return Err(Error::ParseError);
             }
-            offset += 1;
 
             // the curve point should always be determined by the curve
-            let len_byte = data[offset];
-            offset += 1;
-
-            if len_byte as usize != len {
+            if tlv.value.len() != len {
                 error!("unexpected length");
                 return Err(Error::AlgorithmError);
             }
 
-            let point = data[offset..(offset + len)].to_vec();
+            let point = tlv.value.to_vec();
             Ok(GeneratedKey::Ecc { algorithm, point })
         }
     }

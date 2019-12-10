@@ -33,9 +33,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{
-    error::Error, key::SlotId, serialization::*, yubikey::YubiKey, CB_OBJ_MAX, CB_OBJ_TAG_MIN,
-};
+use crate::{error::Error, key::SlotId, serialization::*, yubikey::YubiKey, CB_OBJ_MAX};
 use log::error;
 use std::{
     convert::{TryFrom, TryInto},
@@ -87,25 +85,20 @@ impl Container {
         let response = txn.fetch_object(OBJ_MSCMAP)?;
         let mut containers = vec![];
 
-        if response.len() < CB_OBJ_TAG_MIN {
-            // TODO(tarcieri): is this really OK?
-            return Ok(containers);
-        }
+        let (_, tlv) = match Tlv::parse(&response) {
+            Ok(res) => res,
+            Err(_) => {
+                // TODO(tarcieri): is this really OK?
+                return Ok(containers);
+            }
+        };
 
-        if response[0] != TAG_MSCMAP {
+        if tlv.tag != TAG_MSCMAP {
             // TODO(tarcieri): yubico-piv-tool returned success here? should we?
             return Err(Error::InvalidObject);
         }
 
-        let mut len = 0;
-        let offset = 1 + get_length(&response[1..], &mut len);
-
-        if len > response.len() - offset {
-            // TODO(tarcieri): is this really OK?
-            return Ok(containers);
-        }
-
-        for chunk in response[offset..(offset + len)].chunks_exact(CONTAINER_REC_LEN) {
+        for chunk in tlv.value.chunks_exact(CONTAINER_REC_LEN) {
             containers.push(Container::new(chunk)?);
         }
 

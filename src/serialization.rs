@@ -30,11 +30,54 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::ObjectId;
+use crate::{error::Error, Buffer, ObjectId, CB_OBJ_TAG_MIN};
 
 pub const OBJ_DISCOVERY: u32 = 0x7e;
 
 // TODO(tarcieri): refactor these into better serializers/message builders
+
+/// A Type-Length-Value object that has been parsed from a buffer.
+pub(crate) struct Tlv<'a> {
+    pub(crate) tag: u8,
+    pub(crate) value: &'a [u8],
+}
+
+impl<'a> Tlv<'a> {
+    /// Parses a `Tlv` from a buffer, returning the remainder of the buffer.
+    pub(crate) fn parse(buffer: &'a [u8]) -> Result<(&'a [u8], Self), Error> {
+        if buffer.len() < CB_OBJ_TAG_MIN || !has_valid_length(&buffer[1..], buffer.len() - 1) {
+            return Err(Error::SizeError);
+        }
+
+        let tag = buffer[0];
+
+        let mut len = 0;
+        let offset = 1 + get_length(&buffer[1..], &mut len);
+
+        let (value, buffer) = buffer[offset..].split_at(len);
+
+        Ok((buffer, Tlv { tag, value }))
+    }
+
+    /// Takes a [`Buffer`] containing a single `Tlv` with the given tag, and returns a
+    /// `Buffer` containing only the value part of the `Tlv`.
+    pub(crate) fn parse_single(mut buffer: Buffer, tag: u8) -> Result<Buffer, Error> {
+        if buffer.len() < CB_OBJ_TAG_MIN || !has_valid_length(&buffer[1..], buffer.len() - 1) {
+            return Err(Error::SizeError);
+        }
+
+        if tag != buffer[0] {
+            return Err(Error::GenericError);
+        };
+
+        let mut len = 0;
+        let offset = 1 + get_length(&buffer[1..], &mut len);
+
+        buffer.copy_within(offset..offset + len, 0);
+        buffer.truncate(len);
+        Ok(buffer)
+    }
+}
 
 /// Set length
 #[cfg(feature = "untested")]
