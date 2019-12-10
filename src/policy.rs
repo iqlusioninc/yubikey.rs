@@ -1,5 +1,6 @@
 //! Enums representing key policies.
 
+#[cfg(feature = "untested")]
 use crate::{error::Error, serialization::Tlv};
 
 /// Specifies how often the PIN needs to be entered for access to the credential in a
