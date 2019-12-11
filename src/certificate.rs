@@ -169,6 +169,14 @@ pub struct Certificate {
     data: Buffer,
 }
 
+impl<'a> TryFrom<&'a [u8]> for Certificate {
+    type Error = Error;
+
+    fn try_from(bytes: &'a [u8]) -> Result<Self, Error> {
+        Self::from_bytes(bytes.to_vec())
+    }
+}
+
 impl Certificate {
     /// Read a certificate from the given slot in the YubiKey
     pub fn read(yubikey: &mut YubiKey, slot: SlotId) -> Result<Self, Error> {
