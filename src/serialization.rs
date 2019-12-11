@@ -156,6 +156,8 @@ pub(crate) fn set_length(buffer: &mut [u8], length: usize) -> Result<usize, Erro
 /// Parse length tag, returning the size of the length tag itself as the
 /// returned value, and setting the len parameter to the parsed length.
 pub(crate) fn get_length(buffer: &[u8], len: &mut usize) -> usize {
+    // This is not valid ASN.1 (0x80 is the indefinite length marker).
+    // See comment in key::generate for more context.
     if buffer[0] < 0x81 {
         *len = buffer[0] as usize;
         1

@@ -49,12 +49,17 @@ use std::convert::TryFrom;
 #[cfg(feature = "untested")]
 use crate::{
     apdu::{Ins, StatusWords},
+    certificate::PublicKeyInfo,
     policy::{PinPolicy, TouchPolicy},
     serialization::*,
     settings, Buffer, CB_OBJ_MAX,
 };
 #[cfg(feature = "untested")]
+use elliptic_curve::weierstrass::PublicKey as EcPublicKey;
+#[cfg(feature = "untested")]
 use log::{error, warn};
+#[cfg(feature = "untested")]
+use rsa::{BigUint, RSAPublicKey};
 #[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
@@ -410,7 +415,7 @@ impl Key {
             };
 
             if !buf.is_empty() {
-                let cert = Certificate::new(buf)?;
+                let cert = Certificate::from_bytes(buf)?;
                 keys.push(Key { slot, cert });
             }
         }
@@ -429,43 +434,6 @@ impl Key {
     }
 }
 
-/// Information about a generated key
-// TODO(tarcieri): this could use some more work
-#[cfg(feature = "untested")]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum GeneratedKey {
-    /// RSA keys
-    Rsa {
-        /// RSA algorithm
-        algorithm: AlgorithmId,
-
-        /// Modulus
-        modulus: Vec<u8>,
-
-        /// Exponent
-        exp: Vec<u8>,
-    },
-    /// ECC keys
-    Ecc {
-        /// ECC algorithm
-        algorithm: AlgorithmId,
-
-        /// Public curve point (i.e. public key)
-        point: Vec<u8>,
-    },
-}
-
-#[cfg(feature = "untested")]
-impl GeneratedKey {
-    /// Get the algorithm
-    pub fn algorithm(&self) -> AlgorithmId {
-        *match self {
-            GeneratedKey::Rsa { algorithm, .. } => algorithm,
-            GeneratedKey::Ecc { algorithm, .. } => algorithm,
-        }
-    }
-}
-
 /// Generate key
 #[cfg(feature = "untested")]
 #[allow(clippy::cognitive_complexity)]
@@ -475,7 +443,7 @@ pub fn generate(
     algorithm: AlgorithmId,
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
-) -> Result<GeneratedKey, Error> {
+) -> Result<PublicKeyInfo, Error> {
     // Keygen messages
     // TODO(tarcieri): extract these into an I18N-handling type?
     const SZ_SETTING_ROCA: &str = "Enable_Unsafe_Keygen_ROCA";
@@ -580,9 +548,41 @@ pub fn generate(
         }
     }
 
+    // TODO(str4d): Response is wrapped in an ASN.1 TLV:
+    //
+    //    0x7f 0x49 -> Application | Constructed | 0x49
     match algorithm {
         AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
-            let (data, modulus_tlv) = Tlv::parse(response.data())?;
+            // It appears that the inner application-specific value returned by the
+            // YubiKey is constructed such that RSA pubkeys can be parsed in two ways:
+            //
+            // - Use a full ASN.1 parser on the entire datastructure:
+            //
+            //     RSA 1024:
+            //     [127, 73, 129, 136, 129, 129, 128, [ 128 octets ], 130,  3, 1, 0, 1]
+            //     | tag   | len:136 |0x81| len:128 |    modulus    |0x82|len3|  exp  |
+            //
+            //     RSA 2048:
+            //     [127, 73, 130, 1, 9, 129, 130, 1, 0, [ 256 octets ], 130,  3, 1, 0, 1]
+            //     | tag   | len:265  |0x81| len:256  |    modulus    |0x82|len3|  exp  |
+            //
+            // - Skip the first 5 bytes and use crate::serialize::get_length during TLV
+            //   parsing (which treats 128 as a single-byte definite length instead of an
+            //   indefinite length):
+            //
+            //     RSA 1024:
+            //     [127, 73, 129, 136, 129, 129, 128, [ 128 octets ], 130,  3, 1, 0, 1]
+            //     |                      |0x81|len128|   modulus   |0x82|len3|  exp  |
+            //
+            //     RSA 2048:
+            //     [127, 73, 130, 1, 9, 129, 130, 1, 0, [ 256 octets ], 130,  3, 1, 0, 1]
+            //     |                  |0x81| len:256  |    modulus    |0x82|len3|  exp  |
+            //
+            // Because of the above, treat this for now as a 2-byte ASN.1 tag with a
+            // 3-byte length.
+            let data = &response.data()[5..];
+
+            let (data, modulus_tlv) = Tlv::parse(data)?;
             if modulus_tlv.tag != TAG_RSA_MODULUS {
                 error!("Failed to parse public key structure (modulus)");
                 return Err(Error::ParseError);
@@ -596,20 +596,27 @@ pub fn generate(
             }
             let exp = exp_tlv.value.to_vec();
 
-            Ok(GeneratedKey::Rsa {
+            Ok(PublicKeyInfo::Rsa {
                 algorithm,
-                modulus,
-                exp,
+                pubkey: RSAPublicKey::new(
+                    BigUint::from_bytes_be(&modulus),
+                    BigUint::from_bytes_be(&exp),
+                )
+                .map_err(|_| Error::InvalidObject)?,
             })
         }
         AlgorithmId::EccP256 | AlgorithmId::EccP384 => {
+            // 2-byte ASN.1 tag, 1-byte length (because all supported EC pubkey lengths
+            // are shorter than 128 bytes, fitting into a definite short ASN.1 length).
+            let data = &response.data()[3..];
+
             let len = if let AlgorithmId::EccP256 = algorithm {
                 CB_ECC_POINTP256
             } else {
                 CB_ECC_POINTP384
             };
 
-            let (_, tlv) = Tlv::parse(response.data())?;
+            let (_, tlv) = Tlv::parse(data)?;
 
             if tlv.tag != TAG_ECC_POINT {
                 error!("failed to parse public key structure");
@@ -623,7 +630,13 @@ pub fn generate(
             }
 
             let point = tlv.value.to_vec();
-            Ok(GeneratedKey::Ecc { algorithm, point })
+
+            if let AlgorithmId::EccP256 = algorithm {
+                EcPublicKey::from_bytes(point).map(PublicKeyInfo::EcP256)
+            } else {
+                EcPublicKey::from_bytes(point).map(PublicKeyInfo::EcP384)
+            }
+            .ok_or(Error::InvalidObject)
         }
     }
 }
