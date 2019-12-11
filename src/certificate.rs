@@ -44,6 +44,7 @@ use elliptic_curve::weierstrass::{
 };
 use log::error;
 use rsa::{PublicKey, RSAPublicKey};
+use std::convert::TryFrom;
 use std::fmt;
 use x509_parser::{parse_x509_der, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
@@ -57,16 +58,42 @@ const OID_EC_PUBLIC_KEY: &str = "1.2.840.10045.2.1";
 const OID_NIST_P256: &str = "1.2.840.10045.3.1.7";
 const OID_NIST_P384: &str = "1.3.132.0.34";
 
-#[allow(dead_code)]
-const CERTINFO_UNCOMPRESSED: u8 = 0;
-#[cfg(feature = "untested")]
-const CERTINFO_GZIP: u8 = 1;
-
 const TAG_CERT: u8 = 0x70;
 #[cfg(feature = "untested")]
 const TAG_CERT_COMPRESS: u8 = 0x71;
 #[cfg(feature = "untested")]
 const TAG_CERT_LRC: u8 = 0xFE;
+
+/// Information about how a [`Certificate`] is stored within a YubiKey.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CertInfo {
+    /// The certificate is uncompressed.
+    Uncompressed,
+
+    /// The certificate is gzip-compressed.
+    Gzip,
+}
+
+impl TryFrom<u8> for CertInfo {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x00 => Ok(CertInfo::Uncompressed),
+            0x01 => Ok(CertInfo::Gzip),
+            _ => Err(Error::InvalidObject),
+        }
+    }
+}
+
+impl From<CertInfo> for u8 {
+    fn from(certinfo: CertInfo) -> u8 {
+        match certinfo {
+            CertInfo::Uncompressed => 0x00,
+            CertInfo::Gzip => 0x01,
+        }
+    }
+}
 
 /// Information about a public key within a [`Certificate`].
 #[derive(Clone, Eq, PartialEq)]
@@ -157,7 +184,12 @@ impl Certificate {
 
     /// Write this certificate into the YubiKey in the given slot
     #[cfg(feature = "untested")]
-    pub fn write(&self, yubikey: &mut YubiKey, slot: SlotId, certinfo: u8) -> Result<(), Error> {
+    pub fn write(
+        &self,
+        yubikey: &mut YubiKey,
+        slot: SlotId,
+        certinfo: CertInfo,
+    ) -> Result<(), Error> {
         let txn = yubikey.begin_transaction()?;
         write_certificate(&txn, slot, Some(&self.data), certinfo)
     }
@@ -166,7 +198,7 @@ impl Certificate {
     #[cfg(feature = "untested")]
     pub fn delete(yubikey: &mut YubiKey, slot: SlotId) -> Result<(), Error> {
         let txn = yubikey.begin_transaction()?;
-        write_certificate(&txn, slot, None, 0)
+        write_certificate(&txn, slot, None, CertInfo::Uncompressed)
     }
 
     /// Initialize a local certificate struct from the given bytebuffer
@@ -244,7 +276,7 @@ pub(crate) fn write_certificate(
     txn: &Transaction<'_>,
     slot: SlotId,
     data: Option<&[u8]>,
-    certinfo: u8,
+    certinfo: CertInfo,
 ) -> Result<(), Error> {
     let object_id = slot.object_id();
 
@@ -258,15 +290,7 @@ pub(crate) fn write_certificate(
     let mut offset = Tlv::write(&mut buf, TAG_CERT, data)?;
 
     // write compression info and LRC trailer
-    offset += Tlv::write(
-        &mut buf,
-        TAG_CERT_COMPRESS,
-        if certinfo == CERTINFO_GZIP {
-            &[0x01]
-        } else {
-            &[0x00]
-        },
-    )?;
+    offset += Tlv::write(&mut buf, TAG_CERT_COMPRESS, &[certinfo.into()])?;
     offset += Tlv::write(&mut buf, TAG_CERT_LRC, &[])?;
 
     txn.save_object(object_id, &buf[..offset])
