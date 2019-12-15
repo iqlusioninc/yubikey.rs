@@ -1,9 +1,10 @@
 //! Commands of the CLI application
 
+pub mod readcertificate;
 pub mod readers;
 pub mod status;
 
-use self::{readers::ReadersCmd, status::StatusCmd};
+use self::{readcertificate::ReadCertificateCmd, readers::ReadersCmd, status::StatusCmd};
 use crate::terminal::{self, STDOUT};
 use gumdrop::Options;
 use std::{
@@ -28,6 +29,14 @@ pub struct YubiKeyCli {
         help = "serial number of the YubiKey to connect to"
     )]
     pub serial: Option<Serial>,
+
+    /// Specify the slot on the YubiKey to interact with
+    #[options(
+        no_short,
+        long = "slot",
+        help = "9a, 9c, 9d, 9e, 82, 83, 84, 85, 86, 87, 88, 89, 8a, 8b, 8c, 8d, 8e, 8f, 90, 91, 92, 93, 94, 95, f9"
+    )]
+    pub slot: Option<String>,
 
     /// Subcommand to execute.
     #[options(command)]
@@ -71,7 +80,7 @@ impl YubiKeyCli {
         }
 
         match &self.command {
-            Some(cmd) => cmd.run(self.yubikey_init()),
+            Some(cmd) => cmd.run(self.yubikey_init(), self),
             None => Self::print_usage().unwrap(),
         }
     }
@@ -109,16 +118,24 @@ pub enum Commands {
     /// `status` subcommand
     #[options(help = "show yubikey status")]
     Status(StatusCmd),
+
+    //TODO limit number of options to only valid slot IDs
+    /// `readcertificate` subcommand
+    #[options(help = "read certificate from designated slot")]
+    Readcertificate(ReadCertificateCmd),
 }
 
 impl Commands {
     /// Run the given command
-    pub fn run(&self, yubikey: YubiKey) {
+    pub fn run(&self, yubikey: YubiKey, cli: &YubiKeyCli) {
         match self {
             Commands::Help(help) => help.run(),
             Commands::Version(version) => version.run(),
             Commands::Readers(list) => list.run(),
             Commands::Status(status) => status.run(yubikey),
+            Commands::Readcertificate(readcertificate) => {
+                readcertificate.run(yubikey, cli.slot.as_ref().unwrap().to_string())
+            }
         }
     }
 }
