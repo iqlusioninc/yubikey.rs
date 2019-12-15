@@ -4,7 +4,9 @@ use crate::terminal::STDOUT;
 use gumdrop::Options;
 use std::io::{self, Write};
 use termcolor::{ColorSpec, StandardStreamLock, WriteColor};
-use yubikey_piv::YubiKey;
+use yubikey_piv::{key::*, YubiKey};
+
+use crate::print_cert_info;
 
 // String to use for `None`
 const NONE_STR: &str = "<none>";
@@ -37,6 +39,10 @@ impl StatusCmd {
 
         self.attr(&mut s, "PIN retries", yk.get_pin_retries().unwrap())
             .unwrap();
+
+        for slot in SLOTS.iter().cloned() {
+            print_cert_info(&mut yk, slot, &mut s).unwrap();
+        }
     }
 
     /// Print a status attribute
