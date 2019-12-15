@@ -216,6 +216,34 @@ impl x509::SubjectPublicKeyInfo for PublicKeyInfo {
     }
 }
 
+/// Digest algorithms.
+///
+/// See RFC 4055 and RFC 8017.
+enum DigestId {
+    /// Secure Hash Algorithm 256 (SHA256)
+    Sha256,
+}
+
+impl x509::AlgorithmIdentifier for DigestId {
+    type AlgorithmOid = &'static [u64];
+
+    fn algorithm(&self) -> Self::AlgorithmOid {
+        match self {
+            // See https://tools.ietf.org/html/rfc4055#section-2.1
+            DigestId::Sha256 => &[2, 16, 840, 1, 101, 3, 4, 2, 1],
+        }
+    }
+
+    fn parameters<W: std::io::Write>(
+        &self,
+        w: cookie_factory::WriteContext<W>,
+    ) -> cookie_factory::GenResult<W> {
+        // Parameters are an explicit NULL
+        // See https://tools.ietf.org/html/rfc8017#appendix-A.2.4
+        x509::der::write::der_null()(w)
+    }
+}
+
 enum SignatureId {
     /// Public-Key Cryptography Standards (PKCS) #1 version 1.5 signature algorithm with
     /// Secure Hash Algorithm 256 (SHA256) and Rivest, Shamir and Adleman (RSA) encryption
@@ -320,7 +348,7 @@ impl Certificate {
 
                 let t = cookie_factory::gen_simple(
                     der_sequence((
-                        algorithm_identifier(&signature_algorithm),
+                        algorithm_identifier(&DigestId::Sha256),
                         der_octet_string(&h),
                     )),
                     vec![],
