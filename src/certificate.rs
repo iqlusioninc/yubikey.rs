@@ -298,8 +298,8 @@ pub(crate) fn write_certificate(
     let mut offset = Tlv::write(&mut buf, TAG_CERT, data)?;
 
     // write compression info and LRC trailer
-    offset += Tlv::write(&mut buf, TAG_CERT_COMPRESS, &[certinfo.into()])?;
-    offset += Tlv::write(&mut buf, TAG_CERT_LRC, &[])?;
+    offset += Tlv::write(&mut buf[offset..], TAG_CERT_COMPRESS, &[certinfo.into()])?;
+    offset += Tlv::write(&mut buf[offset..], TAG_CERT_LRC, &[])?;
 
     txn.save_object(object_id, &buf[..offset])
 }
