@@ -65,6 +65,40 @@ const TAG_CERT: u8 = 0x70;
 const TAG_CERT_COMPRESS: u8 = 0x71;
 const TAG_CERT_LRC: u8 = 0xFE;
 
+/// A serial number for a [`Certificate`].
+#[derive(Clone, Debug)]
+pub struct Serial(BigUint);
+
+impl From<BigUint> for Serial {
+    fn from(num: BigUint) -> Serial {
+        Serial(num)
+    }
+}
+
+impl From<[u8; 20]> for Serial {
+    fn from(bytes: [u8; 20]) -> Serial {
+        Serial(BigUint::from_bytes_be(&bytes))
+    }
+}
+
+impl TryFrom<&[u8]> for Serial {
+    type Error = ();
+
+    fn try_from(bytes: &[u8]) -> Result<Serial, ()> {
+        if bytes.len() <= 20 {
+            Ok(Serial(BigUint::from_bytes_be(&bytes)))
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl Serial {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0.to_bytes_be()
+    }
+}
+
 /// Information about how a [`Certificate`] is stored within a YubiKey.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CertInfo {
@@ -280,7 +314,7 @@ impl x509::AlgorithmIdentifier for SignatureId {
 /// Certificates
 #[derive(Clone, Debug)]
 pub struct Certificate {
-    serial: BigUint,
+    serial: Serial,
     issuer: String,
     subject: String,
     subject_pki: PublicKeyInfo,
@@ -301,11 +335,13 @@ impl Certificate {
     pub fn generate_self_signed(
         yubikey: &mut YubiKey,
         key: SlotId,
-        serial: BigUint,
+        serial: impl Into<Serial>,
         not_after: Option<DateTime<Utc>>,
         subject: String,
         subject_pki: PublicKeyInfo,
     ) -> Result<Self, Error> {
+        let serial = serial.into();
+
         // Issuer and subject are the same in self-signed certificates
         let issuer = subject.clone();
 
@@ -318,7 +354,7 @@ impl Certificate {
 
         cookie_factory::gen(
             x509::write::tbs_certificate(
-                &serial.to_bytes_be(),
+                &serial.to_bytes(),
                 &signature_algorithm,
                 &issuer,
                 Utc::now(),
@@ -441,7 +477,7 @@ impl Certificate {
             _ => return Err(Error::InvalidObject),
         };
 
-        let serial = parsed_cert.tbs_certificate.serial;
+        let serial = parsed_cert.tbs_certificate.serial.into();
         let issuer = parsed_cert.tbs_certificate.issuer.to_string();
         let subject = parsed_cert.tbs_certificate.subject.to_string();
         let subject_pki = PublicKeyInfo::parse(&parsed_cert.tbs_certificate.subject_pki)?;
@@ -456,7 +492,7 @@ impl Certificate {
     }
 
     /// Returns the serial number of the certificate.
-    pub fn serial(&self) -> &BigUint {
+    pub fn serial(&self) -> &Serial {
         &self.serial
     }
 
