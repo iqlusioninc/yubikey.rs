@@ -164,6 +164,8 @@ impl PublicKeyInfo {
 /// Certificates
 #[derive(Clone, Debug)]
 pub struct Certificate {
+    serial: BigUint,
+    issuer: String,
     subject: String,
     subject_pki: PublicKeyInfo,
     data: Buffer,
@@ -223,14 +225,28 @@ impl Certificate {
             _ => return Err(Error::InvalidObject),
         };
 
+        let serial = parsed_cert.tbs_certificate.serial;
+        let issuer = format!("{}", parsed_cert.tbs_certificate.issuer);
         let subject = format!("{}", parsed_cert.tbs_certificate.subject);
         let subject_pki = PublicKeyInfo::parse(&parsed_cert.tbs_certificate.subject_pki)?;
 
         Ok(Certificate {
+            serial,
+            issuer,
             subject,
             subject_pki,
             data: cert,
         })
+    }
+
+    /// Returns the serial number of the certificate.
+    pub fn serial(&self) -> &BigUint {
+        &self.serial
+    }
+
+    /// Returns the Issuer field of the certificate.
+    pub fn issuer(&self) -> &str {
+        &self.subject
     }
 
     /// Returns the SubjectName field of the certificate.
