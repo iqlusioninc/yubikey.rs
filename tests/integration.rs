@@ -172,3 +172,29 @@ fn generate_self_signed_rsa_cert() {
         .verify(PaddingScheme::PKCS1v15, Some(&SHA2_256), &hash, sig)
         .is_ok());
 }
+
+#[test]
+#[ignore]
+fn generate_self_signed_ec_cert() {
+    let cert = generate_self_signed_cert(AlgorithmId::EccP256);
+
+    //
+    // Verify that the certificate is signed correctly
+    //
+
+    let pubkey = match cert.subject_pki() {
+        PublicKeyInfo::EcP256(pubkey) => pubkey,
+        _ => unreachable!(),
+    };
+
+    let data = cert.as_ref();
+    let tbs_cert_len = data[6] as usize;
+    let sig_algo_len = data[7 + tbs_cert_len + 1] as usize;
+    let sig_start = 7 + tbs_cert_len + 2 + sig_algo_len + 3;
+    let msg = &data[4..7 + tbs_cert_len];
+    let sig = &data[sig_start..];
+
+    use ring::signature::{UnparsedPublicKey, ECDSA_P256_SHA256_ASN1};
+    let ring_pk = UnparsedPublicKey::new(&ECDSA_P256_SHA256_ASN1, pubkey.as_bytes());
+    assert!(ring_pk.verify(msg, sig).is_ok());
+}
