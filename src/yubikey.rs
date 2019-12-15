@@ -31,48 +31,41 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
+    apdu::{Ins, APDU},
     cccid::CCC,
     chuid::CHUID,
     config::Config,
     error::Error,
+    mgm::MgmKey,
     readers::{Reader, Readers},
     transaction::Transaction,
 };
 use log::{error, info};
 use pcsc::Card;
 use std::{
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     fmt::{self, Display},
     str::FromStr,
 };
 
 #[cfg(feature = "untested")]
 use crate::{
-    apdu::{Ins, StatusWords, APDU},
-    metadata,
-    mgm::MgmKey,
-    Buffer, ObjectId, CB_BUF_MAX, CB_OBJ_MAX, MGMT_AID, TAG_ADMIN, TAG_ADMIN_FLAGS_1,
-    TAG_ADMIN_TIMESTAMP,
+    apdu::StatusWords, metadata, Buffer, ObjectId, CB_BUF_MAX, CB_OBJ_MAX, MGMT_AID, TAG_ADMIN,
+    TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP,
 };
-#[cfg(feature = "untested")]
 use getrandom::getrandom;
 #[cfg(feature = "untested")]
 use secrecy::ExposeSecret;
 #[cfg(feature = "untested")]
-use std::{
-    convert::TryInto,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Flag for PUK blocked
 pub(crate) const ADMIN_FLAGS_1_PUK_BLOCKED: u8 = 0x01;
 
 /// 3DES authentication
-#[cfg(feature = "untested")]
 pub(crate) const ALGO_3DES: u8 = 0x03;
 
 /// Card management key
-#[cfg(feature = "untested")]
 pub(crate) const KEY_CARDMGM: u8 = 0x9b;
 
 #[cfg(feature = "untested")]
@@ -82,7 +75,6 @@ pub(crate) const CHREF_ACT_UNBLOCK_PIN: i32 = 1;
 #[cfg(feature = "untested")]
 pub(crate) const CHREF_ACT_CHANGE_PUK: i32 = 2;
 
-#[cfg(feature = "untested")]
 const TAG_DYN_AUTH: u8 = 0x7c;
 
 /// Cached YubiKey PIN
@@ -274,7 +266,6 @@ impl YubiKey {
     }
 
     /// Authenticate to the card using the provided management key (MGM).
-    #[cfg(feature = "untested")]
     pub fn authenticate(&mut self, mgm_key: MgmKey) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
 

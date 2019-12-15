@@ -22,6 +22,8 @@ members = [".", "cli"]
 maintenance = { status = "experimental" }
 
 [dependencies]
+chrono = "0.4"
+cookie-factory = "0.3"
 der-parser = "3"
 des = "0.3"
 elliptic-curve = "0.2"
@@ -29,18 +31,23 @@ getrandom = "0.1"
 hmac = "0.7"
 log = "0.4"
 nom = "5"
+num-bigint = { version = "0.2", features = ["rand"] }
 pbkdf2 = "0.3"
 pcsc = "2"
 rsa = "0.2.0"
 secrecy = "0.6"
 sha-1 = "0.8"
+sha2 = "0.8"
 subtle = "2"
 subtle-encoding = "0.5"
+x509 = "0.1.1"
 x509-parser = "0.6"
 zeroize = "1"
 
 [dev-dependencies]
 env_logger = "0.7"
+rand = "0.5"
+ring = "0.16.9"
 lazy_static = "1"
 
 [features]

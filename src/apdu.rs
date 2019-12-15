@@ -276,7 +276,6 @@ impl Response {
     }
 
     /// Get the raw [`StatusWords`] code for this response.
-    #[cfg(feature = "untested")]
     pub fn code(&self) -> u16 {
         self.status_words.code()
     }

@@ -38,8 +38,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
+    apdu::{Ins, StatusWords},
     certificate::{self, Certificate},
     error::Error,
+    serialization::*,
+    settings,
     yubikey::YubiKey,
     ObjectId,
 };
@@ -47,32 +50,23 @@ use log::debug;
 use std::convert::TryFrom;
 
 #[cfg(feature = "untested")]
+use crate::CB_OBJ_MAX;
 use crate::{
-    apdu::{Ins, StatusWords},
     certificate::PublicKeyInfo,
     policy::{PinPolicy, TouchPolicy},
-    serialization::*,
-    settings, Buffer, CB_OBJ_MAX,
+    Buffer,
 };
-#[cfg(feature = "untested")]
 use elliptic_curve::weierstrass::PublicKey as EcPublicKey;
-#[cfg(feature = "untested")]
 use log::{error, warn};
-#[cfg(feature = "untested")]
 use rsa::{BigUint, RSAPublicKey};
 #[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
-#[cfg(feature = "untested")]
 const CB_ECC_POINTP256: usize = 65;
-#[cfg(feature = "untested")]
 const CB_ECC_POINTP384: usize = 97;
 
-#[cfg(feature = "untested")]
 const TAG_RSA_MODULUS: u8 = 0x81;
-#[cfg(feature = "untested")]
 const TAG_RSA_EXP: u8 = 0x82;
-#[cfg(feature = "untested")]
 const TAG_ECC_POINT: u8 = 0x86;
 
 /// Slot identifiers.
@@ -381,7 +375,6 @@ impl From<AlgorithmId> for u8 {
     }
 }
 
-#[cfg(feature = "untested")]
 impl AlgorithmId {
     /// Writes the `AlgorithmId` in the format the YubiKey expects during key generation.
     pub(crate) fn write(self, buf: &mut [u8]) -> Result<usize, Error> {
@@ -435,7 +428,6 @@ impl Key {
 }
 
 /// Generate key
-#[cfg(feature = "untested")]
 #[allow(clippy::cognitive_complexity)]
 pub fn generate(
     yubikey: &mut YubiKey,
@@ -758,7 +750,6 @@ pub fn attest(yubikey: &mut YubiKey, key: SlotId) -> Result<Buffer, Error> {
 }
 
 /// Sign data using a PIV key
-#[cfg(feature = "untested")]
 pub fn sign_data(
     yubikey: &mut YubiKey,
     raw_in: &[u8],

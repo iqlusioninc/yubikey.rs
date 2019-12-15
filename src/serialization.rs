@@ -79,7 +79,6 @@ impl<'a> Tlv<'a> {
     }
 
     /// Writes a TLV to the given buffer.
-    #[cfg(feature = "untested")]
     pub(crate) fn write(buffer: &mut [u8], tag: u8, value: &[u8]) -> Result<usize, Error> {
         if buffer.len() < CB_OBJ_TAG_MIN {
             return Err(Error::SizeError);
@@ -99,7 +98,6 @@ impl<'a> Tlv<'a> {
     /// Writes a TLV to the given buffer.
     ///
     /// `value` is guaranteed to be called with a mutable slice of length `length`.
-    #[cfg(feature = "untested")]
     pub(crate) fn write_as<Gen>(
         buffer: &mut [u8],
         tag: u8,
@@ -126,7 +124,6 @@ impl<'a> Tlv<'a> {
 }
 
 /// Set length
-#[cfg(feature = "untested")]
 pub(crate) fn set_length(buffer: &mut [u8], length: usize) -> Result<usize, Error> {
     if length < 0x80 {
         if buffer.is_empty() {
