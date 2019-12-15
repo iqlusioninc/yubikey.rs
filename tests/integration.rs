@@ -7,9 +7,12 @@ use lazy_static::lazy_static;
 use log::trace;
 use num_bigint::RandBigInt;
 use rand::rngs::OsRng;
+use rsa::{hash::Hashes::SHA2_256, PaddingScheme, PublicKey};
+use sha2::{Digest, Sha256};
+use std::convert::TryInto;
 use std::{env, sync::Mutex};
 use yubikey_piv::{
-    certificate::Certificate,
+    certificate::{Certificate, PublicKeyInfo},
     key::{self, AlgorithmId, Key, RetiredSlotId, SlotId},
     policy::{PinPolicy, TouchPolicy},
     Error, MgmKey, YubiKey,
@@ -108,9 +111,7 @@ fn test_verify_pin() {
 // Certificate support
 //
 
-#[test]
-#[ignore]
-fn generate_self_signed_cert() {
+fn generate_self_signed_cert(algorithm: AlgorithmId) -> Certificate {
     let mut yubikey = YUBIKEY.lock().unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
@@ -122,7 +123,7 @@ fn generate_self_signed_cert() {
     let generated = key::generate(
         &mut yubikey,
         slot,
-        AlgorithmId::EccP256,
+        algorithm,
         PinPolicy::Default,
         TouchPolicy::Default,
     )
@@ -141,5 +142,33 @@ fn generate_self_signed_cert() {
     );
 
     assert!(cert_result.is_ok());
-    trace!("cert: {:?}", cert_result.unwrap());
+    let cert = cert_result.unwrap();
+    trace!("cert: {:?}", cert);
+    cert
+}
+
+#[test]
+#[ignore]
+fn generate_self_signed_rsa_cert() {
+    let cert = generate_self_signed_cert(AlgorithmId::Rsa1024);
+
+    //
+    // Verify that the certificate is signed correctly
+    //
+
+    let pubkey = match cert.subject_pki() {
+        PublicKeyInfo::Rsa { pubkey, .. } => pubkey,
+        _ => unreachable!(),
+    };
+
+    let data = cert.as_ref();
+    let tbs_cert_len = u16::from_be_bytes(data[6..8].try_into().unwrap()) as usize;
+    let msg = &data[4..8 + tbs_cert_len];
+    let sig = &data[data.len() - 128..];
+
+    let hash = Sha256::digest(msg);
+
+    assert!(pubkey
+        .verify(PaddingScheme::PKCS1v15, Some(&SHA2_256), &hash, sig)
+        .is_ok());
 }
