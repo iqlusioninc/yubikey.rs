@@ -5,8 +5,15 @@
 
 use lazy_static::lazy_static;
 use log::trace;
+use num_bigint::RandBigInt;
+use rand::rngs::OsRng;
 use std::{env, sync::Mutex};
-use yubikey_piv::{key::Key, Error, YubiKey};
+use yubikey_piv::{
+    certificate::Certificate,
+    key::{self, AlgorithmId, Key, RetiredSlotId, SlotId},
+    policy::{PinPolicy, TouchPolicy},
+    Error, MgmKey, YubiKey,
+};
 
 lazy_static! {
     /// Provide thread-safe access to a YubiKey
@@ -95,4 +102,44 @@ fn test_verify_pin() {
     let mut yubikey = YUBIKEY.lock().unwrap();
     assert!(yubikey.verify_pin(b"000000").is_err());
     assert!(yubikey.verify_pin(b"123456").is_ok());
+}
+
+//
+// Certificate support
+//
+
+#[test]
+#[ignore]
+fn generate_self_signed_cert() {
+    let mut yubikey = YUBIKEY.lock().unwrap();
+
+    assert!(yubikey.verify_pin(b"123456").is_ok());
+    assert!(yubikey.authenticate(MgmKey::default()).is_ok());
+
+    let slot = SlotId::Retired(RetiredSlotId::R1);
+
+    // Generate a new key in the selected slot.
+    let generated = key::generate(
+        &mut yubikey,
+        slot,
+        AlgorithmId::EccP256,
+        PinPolicy::Default,
+        TouchPolicy::Default,
+    )
+    .unwrap();
+
+    let mut rng = OsRng::new().unwrap();
+
+    // Generate a self-signed certificate for the new key.
+    let cert_result = Certificate::generate_self_signed(
+        &mut yubikey,
+        slot,
+        rng.gen_biguint(20 * 8),
+        None,
+        "testSubject".to_owned(),
+        generated,
+    );
+
+    assert!(cert_result.is_ok());
+    trace!("cert: {:?}", cert_result.unwrap());
 }

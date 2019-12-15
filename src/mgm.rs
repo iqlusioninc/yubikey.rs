@@ -41,7 +41,6 @@ use crate::{
     metadata, yubikey::YubiKey, CB_BUF_MAX, CB_OBJ_MAX, TAG_ADMIN, TAG_ADMIN_FLAGS_1,
     TAG_ADMIN_SALT, TAG_PROTECTED, TAG_PROTECTED_MGM,
 };
-#[cfg(feature = "untested")]
 use des::{
     block_cipher_trait::{generic_array::GenericArray, BlockCipher},
     TdesEde3,
@@ -282,7 +281,6 @@ impl MgmKey {
     }
 
     /// Encrypt with 3DES key
-    #[cfg(feature = "untested")]
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub(crate) fn encrypt(&self, input: &[u8; DES_LEN_DES]) -> [u8; DES_LEN_DES] {
         let mut output = input.to_owned();
@@ -292,7 +290,6 @@ impl MgmKey {
     }
 
     /// Decrypt with 3DES key
-    #[cfg(feature = "untested")]
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub(crate) fn decrypt(&self, input: &[u8; DES_LEN_DES]) -> [u8; DES_LEN_DES] {
         let mut output = input.to_owned();

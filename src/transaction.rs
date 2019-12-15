@@ -4,20 +4,17 @@ use crate::{
     apdu::Response,
     apdu::{Ins, StatusWords, APDU},
     error::Error,
+    key::{AlgorithmId, SlotId},
     serialization::*,
     yubikey::*,
-    Buffer, ObjectId, CB_BUF_MAX, PIV_AID, YK_AID,
+    Buffer, ObjectId, CB_BUF_MAX, CB_OBJ_MAX, PIV_AID, YK_AID,
 };
 use log::{error, trace};
 use std::convert::TryInto;
 use zeroize::Zeroizing;
 
 #[cfg(feature = "untested")]
-use crate::{
-    key::{AlgorithmId, SlotId},
-    mgm::{MgmKey, DES_LEN_3DES},
-    CB_OBJ_MAX,
-};
+use crate::mgm::{MgmKey, DES_LEN_3DES};
 
 const CB_PIN_MAX: usize = 8;
 
@@ -252,7 +249,6 @@ impl<'tx> Transaction<'tx> {
     /// This is the common backend for all public key encryption and signing
     /// operations.
     // TODO(tarcieri): refactor this to be less gross/coupled.
-    #[cfg(feature = "untested")]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn authenticated_command(
         &self,
@@ -472,7 +468,6 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Save an object.
-    #[cfg(feature = "untested")]
     pub fn save_object(&self, object_id: ObjectId, indata: &[u8]) -> Result<(), Error> {
         let templ = [0, Ins::PutData.code(), 0x3f, 0xff];
 
