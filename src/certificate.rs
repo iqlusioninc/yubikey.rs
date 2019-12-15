@@ -442,8 +442,8 @@ impl Certificate {
         };
 
         let serial = parsed_cert.tbs_certificate.serial;
-        let issuer = format!("{}", parsed_cert.tbs_certificate.issuer);
-        let subject = format!("{}", parsed_cert.tbs_certificate.subject);
+        let issuer = parsed_cert.tbs_certificate.issuer.to_string();
+        let subject = parsed_cert.tbs_certificate.subject.to_string();
         let subject_pki = PublicKeyInfo::parse(&parsed_cert.tbs_certificate.subject_pki)?;
 
         Ok(Certificate {
