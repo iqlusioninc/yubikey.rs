@@ -18,6 +18,13 @@ use crate::mgm::{MgmKey, DES_LEN_3DES};
 
 const CB_PIN_MAX: usize = 8;
 
+#[cfg(feature = "untested")]
+pub(crate) enum ChangeRefAction {
+    ChangePin,
+    ChangePuk,
+    UnblockPin,
+}
+
 /// Exclusive transaction with the YubiKey's PC/SC card.
 pub(crate) struct Transaction<'tx> {
     inner: pcsc::Transaction<'tx>,
@@ -179,18 +186,24 @@ impl<'tx> Transaction<'tx> {
 
     /// Change the PIN.
     #[cfg(feature = "untested")]
-    pub fn change_pin(&self, action: i32, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
-        let mut templ = [0, Ins::ChangeReference.code(), 0, 0x80];
-
+    pub fn change_ref(
+        &self,
+        action: ChangeRefAction,
+        current_pin: &[u8],
+        new_pin: &[u8],
+    ) -> Result<(), Error> {
         if current_pin.len() > CB_PIN_MAX || new_pin.len() > CB_PIN_MAX {
             return Err(Error::SizeError);
         }
 
-        if action == CHREF_ACT_UNBLOCK_PIN {
-            templ[1] = Ins::ResetRetry.code();
-        } else if action == CHREF_ACT_CHANGE_PUK {
-            templ[3] = 0x81;
-        }
+        const PIN: u8 = 0x80;
+        const PUK: u8 = 0x81;
+
+        let templ = match action {
+            ChangeRefAction::ChangePin => [0, Ins::ChangeReference.code(), 0, PIN],
+            ChangeRefAction::ChangePuk => [0, Ins::ChangeReference.code(), 0, PUK],
+            ChangeRefAction::UnblockPin => [0, Ins::ResetRetry.code(), 0, PIN],
+        };
 
         let mut indata = Zeroizing::new([0xff; CB_PIN_MAX * 2]);
         indata[0..current_pin.len()].copy_from_slice(current_pin);
