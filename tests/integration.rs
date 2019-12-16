@@ -3,10 +3,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
 
+use getrandom::getrandom;
 use lazy_static::lazy_static;
 use log::trace;
-use num_bigint::RandBigInt;
-use rand::rngs::OsRng;
 use rsa::{hash::Hashes::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
 use std::convert::TryInto;
@@ -129,13 +128,14 @@ fn generate_self_signed_cert(algorithm: AlgorithmId) -> Certificate {
     )
     .unwrap();
 
-    let mut rng = OsRng::new().unwrap();
+    let mut serial = [0u8; 20];
+    getrandom(&mut serial).unwrap();
 
     // Generate a self-signed certificate for the new key.
     let cert_result = Certificate::generate_self_signed(
         &mut yubikey,
         slot,
-        rng.gen_biguint(20 * 8),
+        serial,
         None,
         "testSubject".to_owned(),
         generated,
