@@ -50,8 +50,8 @@ use std::{
 
 #[cfg(feature = "untested")]
 use crate::{
-    apdu::StatusWords, metadata, Buffer, ObjectId, CB_BUF_MAX, CB_OBJ_MAX, MGMT_AID, TAG_ADMIN,
-    TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP,
+    apdu::StatusWords, metadata, transaction::ChangeRefAction, Buffer, ObjectId, CB_BUF_MAX,
+    CB_OBJ_MAX, MGMT_AID, TAG_ADMIN, TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP,
 };
 use getrandom::getrandom;
 #[cfg(feature = "untested")]
@@ -67,13 +67,6 @@ pub(crate) const ALGO_3DES: u8 = 0x03;
 
 /// Card management key
 pub(crate) const KEY_CARDMGM: u8 = 0x9b;
-
-#[cfg(feature = "untested")]
-pub(crate) const CHREF_ACT_CHANGE_PIN: i32 = 0;
-#[cfg(feature = "untested")]
-pub(crate) const CHREF_ACT_UNBLOCK_PIN: i32 = 1;
-#[cfg(feature = "untested")]
-pub(crate) const CHREF_ACT_CHANGE_PUK: i32 = 2;
 
 const TAG_DYN_AUTH: u8 = 0x7c;
 
@@ -401,7 +394,7 @@ impl YubiKey {
     pub fn change_pin(&mut self, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         {
             let txn = self.begin_transaction()?;
-            txn.change_pin(CHREF_ACT_CHANGE_PIN, current_pin, new_pin)?;
+            txn.change_ref(ChangeRefAction::ChangePin, current_pin, new_pin)?;
         }
 
         if !new_pin.is_empty() {
@@ -458,7 +451,7 @@ impl YubiKey {
     #[cfg(feature = "untested")]
     pub fn change_puk(&mut self, current_puk: &[u8], new_puk: &[u8]) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
-        txn.change_pin(CHREF_ACT_CHANGE_PUK, current_puk, new_puk)
+        txn.change_ref(ChangeRefAction::ChangePuk, current_puk, new_puk)
     }
 
     /// Block PUK: permanently prevent the PIN from becoming unblocked
@@ -472,7 +465,7 @@ impl YubiKey {
 
         while tries_remaining != 0 {
             // 2 -> change puk
-            let res = txn.change_pin(CHREF_ACT_CHANGE_PUK, &puk, &puk);
+            let res = txn.change_ref(ChangeRefAction::ChangePuk, &puk, &puk);
 
             match res {
                 Ok(()) => puk[0] += 1,
@@ -533,7 +526,7 @@ impl YubiKey {
     #[cfg(feature = "untested")]
     pub fn unblock_pin(&mut self, puk: &[u8], new_pin: &[u8]) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
-        txn.change_pin(CHREF_ACT_UNBLOCK_PIN, puk, new_pin)
+        txn.change_ref(ChangeRefAction::UnblockPin, puk, new_pin)
     }
 
     /// Fetch an object from the YubiKey
