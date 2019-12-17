@@ -157,7 +157,12 @@ impl YubiKey {
     /// attached to the same system, use [`YubiKey::open_by_serial`] or
     ///[`yubikey_piv::Readers`] to select from the available PC/SC readers.
     pub fn open() -> Result<Self, Error> {
-        let mut readers = Readers::open()?;
+        let mut readers = Readers::open().map_err(|e| match e {
+            Error::PcscError {
+                inner: Some(pcsc::Error::NoReadersAvailable),
+            } => Error::NotFound,
+            other => other,
+        })?;
         let mut reader_iter = readers.iter()?;
 
         if let Some(reader) = reader_iter.next() {
@@ -175,7 +180,12 @@ impl YubiKey {
 
     /// Open a YubiKey with a specific serial number.
     pub fn open_by_serial(serial: Serial) -> Result<Self, Error> {
-        let mut readers = Readers::open()?;
+        let mut readers = Readers::open().map_err(|e| match e {
+            Error::PcscError {
+                inner: Some(pcsc::Error::NoReadersAvailable),
+            } => Error::NotFound,
+            other => other,
+        })?;
 
         for reader in readers.iter()? {
             let yubikey = match reader.open() {
