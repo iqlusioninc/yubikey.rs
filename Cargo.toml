@@ -40,7 +40,7 @@ sha-1 = "0.8"
 sha2 = "0.8"
 subtle = "2"
 subtle-encoding = "0.5"
-x509 = "0.1.1"
+x509 = "0.1.2"
 x509-parser = "0.6"
 zeroize = "1"
 
