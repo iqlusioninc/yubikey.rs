@@ -39,12 +39,11 @@ use crate::{
     Buffer,
 };
 use chrono::{DateTime, Utc};
-use elliptic_curve::weierstrass::{
-    curve::{NistP256, NistP384},
-    PublicKey as EcPublicKey,
-};
+use elliptic_curve::weierstrass::PublicKey as EcPublicKey;
 use log::error;
 use num_bigint::BigUint;
+use p256::NistP256;
+use p384::NistP384;
 use rsa::{PublicKey, RSAPublicKey};
 use sha2::{Digest, Sha256};
 use std::convert::TryFrom;
