@@ -201,9 +201,9 @@ dependencies = [
 
 [[package]]
 name = "der-parser"
-version = "3.0.3"
+version = "3.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "537a7d6becb8c3cae3bab31439c248a12d43267ccc0b1a0333362b7cefb61c3e"
+checksum = "f51f64dcdf1cdc550d21d73dc959726c7dbeeab4a01481d08084a7736956464e"
 dependencies = [
  "nom 5.1.0",
  "num-bigint",
