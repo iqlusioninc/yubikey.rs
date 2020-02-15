@@ -122,7 +122,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/tarcieri/yubikey-piv.rs/develop/img/logo.png",
+    html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey-piv.rs/develop/img/logo.png",
     html_root_url = "https://docs.rs/yubikey-piv/0.0.3"
 )]
 #![forbid(unsafe_code)]
