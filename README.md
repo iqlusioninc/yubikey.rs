@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/tendermint/yubihsm-rs/develop/img/logo.png" width="150" height="110">
+<img src="https://raw.githubusercontent.com/iqlusioninc/yubikey-piv.rs/develop/img/logo.png" width="150" height="110">
 
 # yubikey-piv.rs
 
@@ -152,7 +152,7 @@ Yubico's [yubico-piv-tool], a C library/CLI program. The original library
 was licensed under a [2-Clause BSD License][BSDL], which this library inherits
 as a derived work.
 
-Copyright (c) 2014-2019 Yubico AB, Tony Arcieri
+Copyright (c) 2014-2020 Yubico AB, Tony Arcieri
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
