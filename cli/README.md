@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/tendermint/yubihsm-rs/develop/img/logo.png" width="150" height="110">
+<img src="https://raw.githubusercontent.com/iqlusioninc/yubikey-piv.rs/develop/img/logo.png" width="150" height="110">
 
 # yubikey-cli.rs
 
