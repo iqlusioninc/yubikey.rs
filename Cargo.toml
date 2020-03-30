@@ -48,7 +48,7 @@ zeroize = "1"
 
 [dev-dependencies]
 env_logger = "0.7"
-ring = "0.16.11"
+ring = "0.16.12"
 lazy_static = "1"
 
 [features]
