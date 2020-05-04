@@ -33,7 +33,7 @@ log = "0.4"
 nom = "5"
 num-bigint = { version = "0.2", features = ["rand"] }
 pbkdf2 = "0.3"
-p256 = "0.1"
+p256 = "0.2"
 p384 = "0.1"
 pcsc = "2"
 rsa = "0.2.0"
