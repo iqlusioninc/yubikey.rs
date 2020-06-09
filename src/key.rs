@@ -672,7 +672,7 @@ fn write_key(
     touch_policy: TouchPolicy,
     algorithm: AlgorithmId,
 ) -> Result<(), Error> {
-    let mut key_data = Zeroizing::new(vec![0u8; KEYDATA_LEN]);
+    let mut key_data = Buffer::new(vec![0u8; KEYDATA_LEN]);
     let templ = [0, Ins::ImportKey.code(), algorithm.into(), slot.into()];
     let mut offset = 0;
 
@@ -714,15 +714,15 @@ fn write_key(
 #[cfg(feature = "untested")]
 pub struct RsaKeyData {
     /// The secret prime `p`.
-    p: Zeroizing<Vec<u8>>,
+    p: Buffer,
     /// The secret prime, `q`.
-    q: Zeroizing<Vec<u8>>,
+    q: Buffer,
     /// D mod (P-1)
-    dp: Zeroizing<Vec<u8>>,
+    dp: Buffer,
     /// D mod (Q-1)
-    dq: Zeroizing<Vec<u8>>,
+    dq: Buffer,
     /// Q^-1 mod P
-    qinv: Zeroizing<Vec<u8>>,
+    qinv: Buffer,
 }
 
 #[cfg(feature = "untested")]
