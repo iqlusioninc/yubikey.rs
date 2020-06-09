@@ -31,8 +31,7 @@ getrandom = "0.1"
 hmac = "0.7"
 log = "0.4"
 nom = "5"
-num-bigint_rsa = { version = "0.6", features = ["rand"], package = "num-bigint-dig" }
-num-bigint = { version = "0.2", features = ["rand"] } 
+num-bigint = { version = "0.6", features = ["rand"], package = "num-bigint-dig" }
 num-traits = "0.2"
 num-integer = "0.1"
 pbkdf2 = "0.3"

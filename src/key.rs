@@ -59,7 +59,7 @@ use crate::{
 use elliptic_curve::weierstrass::PublicKey as EcPublicKey;
 use log::{error, warn};
 #[cfg(feature = "untested")]
-use num_bigint_rsa::traits::ModInverse;
+use num_bigint::traits::ModInverse;
 #[cfg(feature = "untested")]
 use num_integer::Integer;
 #[cfg(feature = "untested")]
