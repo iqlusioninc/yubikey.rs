@@ -58,6 +58,12 @@ use crate::{
 };
 use elliptic_curve::weierstrass::PublicKey as EcPublicKey;
 use log::{error, warn};
+#[cfg(feature = "untested")]
+use num_bigint_rsa::traits::ModInverse;
+#[cfg(feature = "untested")]
+use num_integer::Integer;
+#[cfg(feature = "untested")]
+use num_traits::{FromPrimitive, One};
 use rsa::{BigUint, RSAPublicKey};
 #[cfg(feature = "untested")]
 use zeroize::Zeroizing;
@@ -71,6 +77,9 @@ const TAG_ECC_POINT: u8 = 0x86;
 
 #[cfg(feature = "untested")]
 const KEYDATA_LEN: usize = 1024;
+
+#[cfg(feature = "untested")]
+const KEYDATA_RSA_EXP: u64 = 65537;
 
 /// Slot identifiers.
 /// <https://developers.yubico.com/PIV/Introduction/Certificate_slots.html>
@@ -703,21 +712,58 @@ fn write_key(
 
 /// The key data that makes up an RSA key.
 #[cfg(feature = "untested")]
-pub struct RsaKeyData<'a> {
+pub struct RsaKeyData {
     /// The secret prime `p`.
-    pub p: &'a [u8],
+    p: Zeroizing<Vec<u8>>,
     /// The secret prime, `q`.
-    pub q: &'a [u8],
+    q: Zeroizing<Vec<u8>>,
     /// D mod (P-1)
-    pub dp: &'a [u8],
+    dp: Zeroizing<Vec<u8>>,
     /// D mod (Q-1)
-    pub dq: &'a [u8],
+    dq: Zeroizing<Vec<u8>>,
     /// Q^-1 mod P
-    pub qinv: &'a [u8],
+    qinv: Zeroizing<Vec<u8>>,
 }
 
 #[cfg(feature = "untested")]
-impl RsaKeyData<'_> {
+impl RsaKeyData {
+    /// Generates a new RSA key data set from two randomly generated, secret, primes.
+    ///
+    /// Panics if `secret_p` or `secret_q` are invalid primes.
+    pub fn new(secret_p: &[u8], secret_q: &[u8]) -> Self {
+        let p = BigUint::from_bytes_be(secret_p);
+        let q = BigUint::from_bytes_be(secret_q);
+
+        let totient = {
+            let p_t = &p - BigUint::one();
+            let q_t = &p - BigUint::one();
+
+            p_t.lcm(&q_t)
+        };
+
+        let exp = BigUint::from_u64(KEYDATA_RSA_EXP).unwrap();
+
+        let d = exp.mod_inverse(&totient).unwrap();
+        let d = d.to_biguint().unwrap();
+
+        // We calculate the optimization values ahead of time, instead of making the user
+        // do so.
+
+        let dp = &d % (&p - BigUint::one());
+        let dq = &d % (&q - BigUint::one());
+
+        let qinv = q.clone().mod_inverse(&p).unwrap();
+        let (_, qinv) = qinv.to_bytes_be();
+
+        RsaKeyData {
+            p: Zeroizing::new(p.to_bytes_be()),
+            q: Zeroizing::new(q.to_bytes_be()),
+            dp: Zeroizing::new(dp.to_bytes_be()),
+            dq: Zeroizing::new(dq.to_bytes_be()),
+            qinv: Zeroizing::new(qinv),
+        }
+    }
+
     fn total_len(&self) -> usize {
         self.p.len() + self.q.len() + self.dp.len() + self.qinv.len()
     }
@@ -731,7 +777,7 @@ pub fn import_rsa_key(
     yubikey: &mut YubiKey,
     slot: SlotId,
     algorithm: AlgorithmId,
-    key_data: RsaKeyData<'_>,
+    key_data: RsaKeyData,
     touch_policy: TouchPolicy,
     pin_policy: PinPolicy,
 ) -> Result<(), Error> {
@@ -745,11 +791,11 @@ pub fn import_rsa_key(
     }
 
     let params = vec![
-        key_data.p,
-        key_data.q,
-        key_data.dp,
-        key_data.dq,
-        key_data.qinv,
+        key_data.p.as_slice(),
+        key_data.q.as_slice(),
+        key_data.dp.as_slice(),
+        key_data.dq.as_slice(),
+        key_data.qinv.as_slice(),
     ];
 
     write_key(yubikey, slot, params, pin_policy, touch_policy, algorithm)?;
