@@ -476,7 +476,8 @@ impl Certificate {
             _ => return Err(Error::InvalidObject),
         };
 
-        let serial = parsed_cert.tbs_certificate.serial.into();
+        let serial = Serial::try_from(parsed_cert.tbs_certificate.serial.to_bytes_be().as_slice())
+            .map_err(|_| Error::InvalidObject)?;
         let issuer = parsed_cert.tbs_certificate.issuer.to_string();
         let subject = parsed_cert.tbs_certificate.subject.to_string();
         let subject_pki = PublicKeyInfo::parse(&parsed_cert.tbs_certificate.subject_pki)?;

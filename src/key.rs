@@ -58,6 +58,12 @@ use crate::{
 };
 use elliptic_curve::weierstrass::PublicKey as EcPublicKey;
 use log::{error, warn};
+#[cfg(feature = "untested")]
+use num_bigint::traits::ModInverse;
+#[cfg(feature = "untested")]
+use num_integer::Integer;
+#[cfg(feature = "untested")]
+use num_traits::{FromPrimitive, One};
 use rsa::{BigUint, RSAPublicKey};
 #[cfg(feature = "untested")]
 use zeroize::Zeroizing;
@@ -68,6 +74,12 @@ const CB_ECC_POINTP384: usize = 97;
 const TAG_RSA_MODULUS: u8 = 0x81;
 const TAG_RSA_EXP: u8 = 0x82;
 const TAG_ECC_POINT: u8 = 0x86;
+
+#[cfg(feature = "untested")]
+const KEYDATA_LEN: usize = 1024;
+
+#[cfg(feature = "untested")]
+const KEYDATA_RSA_EXP: u64 = 65537;
 
 /// Slot identifiers.
 /// <https://developers.yubico.com/PIV/Introduction/Certificate_slots.html>
@@ -380,6 +392,24 @@ impl AlgorithmId {
     pub(crate) fn write(self, buf: &mut [u8]) -> Result<usize, Error> {
         Tlv::write(buf, 0x80, &[self.into()])
     }
+
+    #[cfg(feature = "untested")]
+    fn get_elem_len(self) -> usize {
+        match self {
+            AlgorithmId::Rsa1024 => 64,
+            AlgorithmId::Rsa2048 => 128,
+            AlgorithmId::EccP256 => 32,
+            AlgorithmId::EccP384 => 48,
+        }
+    }
+
+    #[cfg(feature = "untested")]
+    fn get_param_tag(self) -> u8 {
+        match self {
+            AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => 0x01,
+            AlgorithmId::EccP256 | AlgorithmId::EccP384 => 0x6,
+        }
+    }
 }
 
 /// PIV cryptographic keys stored in a YubiKey
@@ -633,72 +663,26 @@ pub fn generate(
     }
 }
 
-/// Import a private encryption or signing key into the YubiKey
-// TODO(tarcieri): refactor this into separate methods per key type
 #[cfg(feature = "untested")]
-#[allow(clippy::too_many_arguments)]
-pub fn import(
+fn write_key(
     yubikey: &mut YubiKey,
-    key: SlotId,
-    algorithm: AlgorithmId,
-    p: Option<&[u8]>,
-    q: Option<&[u8]>,
-    dp: Option<&[u8]>,
-    dq: Option<&[u8]>,
-    qinv: Option<&[u8]>,
-    ec_data: Option<&[u8]>,
+    slot: SlotId,
+    params: Vec<&[u8]>,
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
+    algorithm: AlgorithmId,
 ) -> Result<(), Error> {
-    let mut key_data = Zeroizing::new(vec![0u8; 1024]);
-    let templ = [0, Ins::ImportKey.code(), algorithm.into(), key.into()];
-
-    let (elem_len, params, param_tag) = match algorithm {
-        AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => match (p, q, dp, dq, qinv) {
-            (Some(p), Some(q), Some(dp), Some(dq), Some(qinv)) => {
-                if p.len() + q.len() + dp.len() + dq.len() + qinv.len() >= key_data.len() {
-                    return Err(Error::SizeError);
-                }
-
-                (
-                    match algorithm {
-                        AlgorithmId::Rsa1024 => 64,
-                        AlgorithmId::Rsa2048 => 128,
-                        _ => unreachable!(),
-                    },
-                    vec![p, q, dp, dq, qinv],
-                    0x01,
-                )
-            }
-            _ => return Err(Error::GenericError),
-        },
-        AlgorithmId::EccP256 | AlgorithmId::EccP384 => match ec_data {
-            Some(ec_data) => {
-                if ec_data.len() >= key_data.len() {
-                    // This can never be true, but check to be explicit.
-                    return Err(Error::SizeError);
-                }
-
-                (
-                    match algorithm {
-                        AlgorithmId::EccP256 => 32,
-                        AlgorithmId::EccP384 => 48,
-                        _ => unreachable!(),
-                    },
-                    vec![ec_data],
-                    0x06,
-                )
-            }
-            _ => return Err(Error::GenericError),
-        },
-    };
-
+    let mut key_data = Buffer::new(vec![0u8; KEYDATA_LEN]);
+    let templ = [0, Ins::ImportKey.code(), algorithm.into(), slot.into()];
     let mut offset = 0;
+
+    let elem_len = algorithm.get_elem_len();
+    let param_tag = algorithm.get_param_tag();
 
     for (i, param) in params.into_iter().enumerate() {
         offset += Tlv::write_as(
             &mut key_data[offset..],
-            param_tag + i as u8,
+            param_tag + (i as u8),
             elem_len,
             |buf| {
                 let padding = elem_len - param.len();
@@ -724,6 +708,127 @@ pub fn import(
         StatusWords::SecurityStatusError => Err(Error::AuthenticationError),
         _ => Err(Error::GenericError),
     }
+}
+
+/// The key data that makes up an RSA key.
+#[cfg(feature = "untested")]
+pub struct RsaKeyData {
+    /// The secret prime `p`.
+    p: Buffer,
+    /// The secret prime, `q`.
+    q: Buffer,
+    /// D mod (P-1)
+    dp: Buffer,
+    /// D mod (Q-1)
+    dq: Buffer,
+    /// Q^-1 mod P
+    qinv: Buffer,
+}
+
+#[cfg(feature = "untested")]
+impl RsaKeyData {
+    /// Generates a new RSA key data set from two randomly generated, secret, primes.
+    ///
+    /// Panics if `secret_p` or `secret_q` are invalid primes.
+    pub fn new(secret_p: &[u8], secret_q: &[u8]) -> Self {
+        let p = BigUint::from_bytes_be(secret_p);
+        let q = BigUint::from_bytes_be(secret_q);
+
+        let totient = {
+            let p_t = &p - BigUint::one();
+            let q_t = &p - BigUint::one();
+
+            p_t.lcm(&q_t)
+        };
+
+        let exp = BigUint::from_u64(KEYDATA_RSA_EXP).unwrap();
+
+        let d = exp.mod_inverse(&totient).unwrap();
+        let d = d.to_biguint().unwrap();
+
+        // We calculate the optimization values ahead of time, instead of making the user
+        // do so.
+
+        let dp = &d % (&p - BigUint::one());
+        let dq = &d % (&q - BigUint::one());
+
+        let qinv = q.clone().mod_inverse(&p).unwrap();
+        let (_, qinv) = qinv.to_bytes_be();
+
+        RsaKeyData {
+            p: Zeroizing::new(p.to_bytes_be()),
+            q: Zeroizing::new(q.to_bytes_be()),
+            dp: Zeroizing::new(dp.to_bytes_be()),
+            dq: Zeroizing::new(dq.to_bytes_be()),
+            qinv: Zeroizing::new(qinv),
+        }
+    }
+
+    fn total_len(&self) -> usize {
+        self.p.len() + self.q.len() + self.dp.len() + self.qinv.len()
+    }
+}
+
+/// Imports a private RSA encryption or signing key into the YubiKey.
+///
+/// Errors if `algorithm` isn't `AlgorithmId::Rsa1024` or `AlgorithmId::Rsa2048`.
+#[cfg(feature = "untested")]
+pub fn import_rsa_key(
+    yubikey: &mut YubiKey,
+    slot: SlotId,
+    algorithm: AlgorithmId,
+    key_data: RsaKeyData,
+    touch_policy: TouchPolicy,
+    pin_policy: PinPolicy,
+) -> Result<(), Error> {
+    match algorithm {
+        AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => (),
+        _ => return Err(Error::AlgorithmError),
+    }
+
+    if key_data.total_len() > KEYDATA_LEN {
+        return Err(Error::SizeError);
+    }
+
+    let params = vec![
+        key_data.p.as_slice(),
+        key_data.q.as_slice(),
+        key_data.dp.as_slice(),
+        key_data.dq.as_slice(),
+        key_data.qinv.as_slice(),
+    ];
+
+    write_key(yubikey, slot, params, pin_policy, touch_policy, algorithm)?;
+
+    Ok(())
+}
+
+/// Imports a private ECC encryption or signing key into the YubiKey.
+///
+/// Errors if `algorithm` isn't `AlgorithmId::EccP256` or ` AlgorithmId::EccP384`.
+#[cfg(feature = "untested")]
+pub fn import_ecc_key(
+    yubikey: &mut YubiKey,
+    slot: SlotId,
+    algorithm: AlgorithmId,
+    key_data: &[u8],
+    touch_policy: TouchPolicy,
+    pin_policy: PinPolicy,
+) -> Result<(), Error> {
+    match algorithm {
+        AlgorithmId::EccP256 | AlgorithmId::EccP384 => (),
+        _ => return Err(Error::AlgorithmError),
+    }
+
+    if key_data.len() > KEYDATA_LEN {
+        return Err(Error::SizeError);
+    }
+
+    let params = vec![key_data];
+
+    write_key(yubikey, slot, params, pin_policy, touch_policy, algorithm)?;
+
+    Ok(())
 }
 
 /// Generate an attestation certificate for a stored key.
