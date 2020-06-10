@@ -94,7 +94,7 @@ dependencies = [
  "block-padding",
  "byte-tools",
  "byteorder",
- "generic-array",
+ "generic-array 0.12.3",
 ]
 
 [[package]]
@@ -103,7 +103,7 @@ version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c924d49bd09e7c06003acda26cd9742e796e34282ec6c1189404dee0c1f4774"
 dependencies = [
- "generic-array",
+ "generic-array 0.12.3",
 ]
 
 [[package]]
@@ -177,7 +177,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4434400df11d95d556bac068ddfedd482915eb18fe8bea89bc80b6e4b1c179e5"
 dependencies = [
- "generic-array",
+ "generic-array 0.12.3",
  "subtle 1.0.0",
 ]
 
@@ -209,7 +209,7 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3d0c8c8752312f9713efd397ff63acb9f85585afbf179282e720e7704954dd5"
 dependencies = [
- "generic-array",
+ "generic-array 0.12.3",
 ]
 
 [[package]]
@@ -218,10 +218,20 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01f69be7d1feb7a7a04f158aaf32c7deaa7604e9bd58145525e536438c4e5096"
 dependencies = [
- "generic-array",
+ "generic-array 0.12.3",
  "getrandom",
  "subtle 2.2.2",
  "zeroize",
+]
+
+[[package]]
+name = "elliptic-curve"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2298f66754d859f4c099b0e645cfd258d2dfdfd1bac9496fd514d603ff6a5c6b"
+dependencies = [
+ "generic-array 0.14.1",
+ "subtle 2.2.2",
 ]
 
 [[package]]
@@ -276,6 +286,15 @@ name = "generic-array"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c68f0274ae0e023facc3c97b2e00f076be70e254bc851d972503b328db79b2ec"
+dependencies = [
+ "typenum",
+]
+
+[[package]]
+name = "generic-array"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d2664c2cf08049036f31015b04c6ac3671379a1d86f52ed2416893f16022deb"
 dependencies = [
  "typenum",
 ]
@@ -489,11 +508,11 @@ checksum = "2839e79665f131bdb5782e51f2c6c9599c133c6098982a54c794358bf432529c"
 
 [[package]]
 name = "p256"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86640e33ca638ec215c74de317696bbca5daa7d52cf55b905bd20a6bd2cfd133"
+checksum = "a425ecb71515663b2735fd1e65bb638fd134c5ad23857eb197c2f157784476cf"
 dependencies = [
- "elliptic-curve",
+ "elliptic-curve 0.4.0",
  "subtle 2.2.2",
 ]
 
@@ -503,7 +522,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3aee0d9bdeedaea6cdd47f9281a9f8e1037d3037088b70e2af13c64ce65608ec"
 dependencies = [
- "elliptic-curve",
+ "elliptic-curve 0.3.0",
 ]
 
 [[package]]
@@ -1055,7 +1074,7 @@ dependencies = [
  "cookie-factory",
  "der-parser",
  "des",
- "elliptic-curve",
+ "elliptic-curve 0.3.0",
  "env_logger",
  "getrandom",
  "hmac",
