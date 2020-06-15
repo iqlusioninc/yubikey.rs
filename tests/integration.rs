@@ -6,7 +6,7 @@
 use getrandom::getrandom;
 use lazy_static::lazy_static;
 use log::trace;
-use rsa::{hash::Hashes::SHA2_256, PaddingScheme, PublicKey};
+use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
 use std::convert::TryInto;
 use std::{env, sync::Mutex};
@@ -169,7 +169,7 @@ fn generate_self_signed_rsa_cert() {
     let hash = Sha256::digest(msg);
 
     assert!(pubkey
-        .verify(PaddingScheme::PKCS1v15, Some(&SHA2_256), &hash, sig)
+        .verify(PaddingScheme::PKCS1v15Sign {hash: Some(SHA2_256)}, &hash, sig)
         .is_ok());
 }
 
