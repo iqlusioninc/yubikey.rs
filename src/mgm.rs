@@ -42,7 +42,7 @@ use crate::{
     TAG_ADMIN_SALT, TAG_PROTECTED, TAG_PROTECTED_MGM,
 };
 use des::{
-    block_cipher_trait::{generic_array::GenericArray, BlockCipher},
+    block_cipher::{generic_array::GenericArray, BlockCipher, NewBlockCipher},
     TdesEde3,
 };
 #[cfg(feature = "untested")]
@@ -70,7 +70,7 @@ pub(crate) const DES_LEN_3DES: usize = DES_LEN_DES * 3;
 
 /// Number of PBKDF2 iterations to use when deriving from a password
 #[cfg(feature = "untested")]
-const ITER_MGM_PBKDF2: usize = 10000;
+const ITER_MGM_PBKDF2: u32 = 10000;
 
 /// Management Key (MGM) key types (manual/derived/protected)
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

@@ -44,7 +44,7 @@ use log::error;
 use num_bigint::BigUint;
 use p256::NistP256;
 use p384::NistP384;
-use rsa::{PublicKey, RSAPublicKey};
+use rsa::{PublicKeyParts, RSAPublicKey};
 use sha2::{Digest, Sha256};
 use std::convert::TryFrom;
 use std::fmt;
@@ -648,7 +648,7 @@ mod read_pki {
 
 mod write_pki {
     use cookie_factory::{SerializeFn, WriteContext};
-    use rsa::{BigUint, PublicKey, RSAPublicKey};
+    use rsa::{BigUint, PublicKeyParts, RSAPublicKey};
     use std::io::Write;
     use x509::der::write::{der_integer, der_sequence};
 
