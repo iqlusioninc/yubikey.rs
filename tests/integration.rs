@@ -169,7 +169,13 @@ fn generate_self_signed_rsa_cert() {
     let hash = Sha256::digest(msg);
 
     assert!(pubkey
-        .verify(PaddingScheme::PKCS1v15Sign {hash: Some(SHA2_256)}, &hash, sig)
+        .verify(
+            PaddingScheme::PKCS1v15Sign {
+                hash: Some(SHA2_256)
+            },
+            &hash,
+            sig
+        )
         .is_ok());
 }
 
