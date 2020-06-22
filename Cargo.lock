@@ -156,6 +156,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "der-oid-macro"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74708de7d12618cef724cea09e925ab1ce7469b1e4b43834172bcb735db64bcd"
+dependencies = [
+ "nom",
+ "num-bigint",
+ "num-traits",
+ "proc-macro-hack",
+]
+
+[[package]]
 name = "der-parser"
 version = "3.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -163,6 +175,19 @@ checksum = "f51f64dcdf1cdc550d21d73dc959726c7dbeeab4a01481d08084a7736956464e"
 dependencies = [
  "nom",
  "num-bigint",
+ "rusticata-macros",
+]
+
+[[package]]
+name = "der-parser"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae822698fe2fa899ac2f33698d0b7b2c6d3f3d17167f3e5a3bda9d832e75103"
+dependencies = [
+ "der-oid-macro",
+ "nom",
+ "num-traits",
+ "proc-macro-hack",
  "rusticata-macros",
 ]
 
@@ -520,6 +545,12 @@ name = "ppv-lite86"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "237a5ed80e274dbc66f86bd59c1e25edc039660be53194b5fe0a482e0f2612ea"
+
+[[package]]
+name = "proc-macro-hack"
+version = "0.5.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e0456befd48169b9f13ef0f0ad46d492cf9d2dbb918bcf38e01eed4ce3ec5e4"
 
 [[package]]
 name = "proc-macro2"
@@ -964,7 +995,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6dba437c45e779568868b2c46ed1d1c57c98d9f868e47c9bcbfe9114d4cbd97d"
 dependencies = [
  "base64 0.11.0",
- "der-parser",
+ "der-parser 3.0.4",
  "nom",
  "num-bigint",
  "rusticata-macros",
@@ -992,7 +1023,7 @@ version = "0.0.3"
 dependencies = [
  "chrono",
  "cookie-factory",
- "der-parser",
+ "der-parser 4.0.0",
  "des",
  "elliptic-curve",
  "env_logger",

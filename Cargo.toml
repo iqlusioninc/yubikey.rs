@@ -24,7 +24,7 @@ maintenance = { status = "experimental" }
 [dependencies]
 chrono = "0.4"
 cookie-factory = "0.3"
-der-parser = "3"
+der-parser = "4"
 des = "0.4"
 elliptic-curve = { version = "0.4", features = ["weierstrass"] }
 getrandom = "0.1"
