@@ -234,6 +234,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "elliptic-curve"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9abe4578ed343c7a2c9d617cd2b1895ba0a87a6a4dee97bde156d65f608c7b2d"
+dependencies = [
+ "generic-array 0.14.2",
+ "subtle",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -477,17 +487,17 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a425ecb71515663b2735fd1e65bb638fd134c5ad23857eb197c2f157784476cf"
 dependencies = [
- "elliptic-curve",
+ "elliptic-curve 0.4.0",
  "subtle",
 ]
 
 [[package]]
 name = "p384"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ae962014118ae1621d13f011e14902223013b1b4151922c3a682a233a967ddb"
+checksum = "2a21dedbfa7a0603d7c9429b8b427edc4a113c3741e31610ba4a3cbfebe0ff08"
 dependencies = [
- "elliptic-curve",
+ "elliptic-curve 0.5.0",
 ]
 
 [[package]]
@@ -1042,7 +1052,7 @@ dependencies = [
  "cookie-factory",
  "der-parser 4.0.0",
  "des",
- "elliptic-curve",
+ "elliptic-curve 0.4.0",
  "env_logger",
  "getrandom",
  "hmac",
