@@ -137,6 +137,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "const-oid"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2d9162b7289a46e86208d6af2c686ca5bfde445878c41a458a9fac706252d0b"
+
+[[package]]
 name = "cookie-factory"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -236,6 +242,18 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9abe4578ed343c7a2c9d617cd2b1895ba0a87a6a4dee97bde156d65f608c7b2d"
 dependencies = [
+ "generic-array 0.14.4",
+ "rand_core",
+ "subtle",
+]
+
+[[package]]
+name = "elliptic-curve"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9cc9ec2c11b93118b4f8dc0665a3741bc90121d44dc0410f899274c5745454c"
+dependencies = [
+ "const-oid",
  "generic-array 0.14.4",
  "rand_core",
  "subtle",
@@ -502,16 +520,16 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9f8aff5e98a6a83e374418a0a510ae4d9d45d714b5b0767c2e23ea007d0ba54"
 dependencies = [
- "elliptic-curve",
+ "elliptic-curve 0.5.0",
 ]
 
 [[package]]
 name = "p384"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a21dedbfa7a0603d7c9429b8b427edc4a113c3741e31610ba4a3cbfebe0ff08"
+checksum = "51ce2b1182d022bfbe2af57aeca44fe7832356dd2d998e98e423cd9b94fae4f7"
 dependencies = [
- "elliptic-curve",
+ "elliptic-curve 0.6.0",
 ]
 
 [[package]]
@@ -807,9 +825,9 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "subtle"
-version = "2.2.3"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "502d53007c02d7605a05df1c1a73ee436952781653da5d0bf57ad608f66932c1"
+checksum = "343f3f510c2915908f155e94f17220b19ccfacf2a64a2a5d8004f2c3e311e7fd"
 
 [[package]]
 name = "subtle-encoding"
@@ -1088,7 +1106,7 @@ dependencies = [
  "cookie-factory",
  "der-parser 4.0.2",
  "des",
- "elliptic-curve",
+ "elliptic-curve 0.5.0",
  "env_logger",
  "getrandom",
  "hmac",
