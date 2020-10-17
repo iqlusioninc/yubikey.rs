@@ -35,7 +35,7 @@ jobs:
     strategy:
       matrix:
         toolchain:
-          - 1.41.0
+          - 1.44.0 # MSRV
           - stable
     runs-on: ubuntu-latest
     steps:
@@ -75,7 +75,7 @@ jobs:
           - macos-latest
           - windows-latest
         toolchain:
-          - 1.41.0
+          - 1.44.0 # MSRV
           - stable
     runs-on: ${{ matrix.platform }}
     steps:
@@ -136,7 +136,7 @@ jobs:
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: 1.44.0 # MSRV
           override: true
 
       - name: Install libpcsclite-dev

@@ -39,7 +39,7 @@ use crate::{
     Buffer,
 };
 use chrono::{DateTime, Utc};
-use elliptic_curve::weierstrass::PublicKey as EcPublicKey;
+use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
 use log::error;
 use num_bigint::BigUint;
 use p256::NistP256;
@@ -208,10 +208,10 @@ impl PublicKeyInfo {
                 match read_pki::ec_parameters(&subject_pki.algorithm.parameters)? {
                     AlgorithmId::EccP256 => EcPublicKey::from_bytes(key_bytes)
                         .map(PublicKeyInfo::EcP256)
-                        .ok_or(Error::InvalidObject),
+                        .map_err(|_| Error::InvalidObject),
                     AlgorithmId::EccP384 => EcPublicKey::from_bytes(key_bytes)
                         .map(PublicKeyInfo::EcP384)
-                        .ok_or(Error::InvalidObject),
+                        .map_err(|_| Error::InvalidObject),
                     _ => Err(Error::AlgorithmError),
                 }
             }

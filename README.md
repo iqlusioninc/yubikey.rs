@@ -36,7 +36,7 @@ endorsed by Yubico.
 
 ## Minimum Supported Rust Version
 
-- Rust **1.39+**
+- Rust **1.44** or newer
 
 ## Supported YubiKeys
 
@@ -194,7 +194,7 @@ or conditions.
 [docs-link]: https://docs.rs/yubikey-piv/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-link]: https://github.com/iqlusioninc/yubikey-piv.rs/blob/develop/COPYING
-[rustc-image]: https://img.shields.io/badge/rustc-1.39+-blue.svg
+[rustc-image]: https://img.shields.io/badge/rustc-1.44+-blue.svg
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
