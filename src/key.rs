@@ -56,7 +56,7 @@ use crate::{
     policy::{PinPolicy, TouchPolicy},
     Buffer,
 };
-use elliptic_curve::weierstrass::PublicKey as EcPublicKey;
+use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
 use log::{error, warn};
 #[cfg(feature = "untested")]
 use num_bigint::traits::ModInverse;
@@ -658,7 +658,7 @@ pub fn generate(
             } else {
                 EcPublicKey::from_bytes(point).map(PublicKeyInfo::EcP384)
             }
-            .ok_or(Error::InvalidObject)
+            .map_err(|_| Error::InvalidObject)
         }
     }
 }
