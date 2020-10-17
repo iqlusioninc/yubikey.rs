@@ -27,7 +27,7 @@ cookie-factory = "0.3"
 der-parser = "4"
 des = "0.5"
 elliptic-curve = { version = "0.5", features = ["weierstrass"] }
-getrandom = "0.1"
+getrandom = "0.2"
 hmac = "0.9"
 log = "0.4"
 nom = "5"
