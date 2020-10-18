@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  pull_request: {}
+  push:
+    branches: develop
+
+env:
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - run: sudo apt-get install libpcsclite-dev
+      - run: cargo check
+
+  test:
+    strategy:
+      matrix:
+        include:
+          - platform: ubuntu-latest
+            toolchain: stable
+            deps: sudo apt-get install libpcsclite-dev
+          - platform: windows-latest
+            toolchain: stable
+            deps: true
+          - platform: macos-latest
+            toolchain: stable
+            deps: true
+          - platform: ubuntu-latest
+            toolchain: 1.44.0 # MSRV
+            deps: sudo apt-get install libpcsclite-dev
+          - platform: windows-latest
+            toolchain: 1.44.0 # MSRV
+            deps: true
+          - platform: macos-latest
+            toolchain: 1.44.0 # MSRV
+            deps: true
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - run: ${{ matrix.deps }}
+      - run: cargo build --all --all-features --release
+      - run: cargo test --all --all-features --release
+
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v1
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: rustfmt
+
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: 1.44.0 # MSRV
+          components: clippy
+      - run: sudo apt-get install libpcsclite-dev
+      - run: cargo clippy --all --exclude crypto_box --all-features -- -D warnings

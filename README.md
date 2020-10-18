@@ -198,7 +198,7 @@ or conditions.
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
-[build-image]: https://github.com/iqlusioninc/yubikey-piv.rs/workflows/Rust/badge.svg?branch=develop&event=push
+[build-image]: https://github.com/iqlusioninc/yubikey-piv.rs/workflows/CI/badge.svg?branch=develop&event=push
 [build-link]: https://github.com/iqlusioninc/yubikey-piv.rs/actions
 [gitter-image]: https://badges.gitter.im/badge.svg
 [gitter-link]: https://gitter.im/iqlusioninc/community
