@@ -14,7 +14,7 @@
 //!
 //! ## Minimum Supported Rust Version
 //!
-//! Rust 1.39+
+//! Rust 1.44+
 //!
 //! ## Supported YubiKeys
 //!
@@ -123,7 +123,7 @@
 
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey-piv.rs/develop/img/logo.png",
-    html_root_url = "https://docs.rs/yubikey-piv/0.0.3"
+    html_root_url = "https://docs.rs/yubikey-piv/0.1.0"
 )]
 #![forbid(unsafe_code)]
 #![warn(
