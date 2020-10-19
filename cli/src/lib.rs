@@ -59,12 +59,12 @@ pub fn print_cert_info(
                 print_cert_attr(
                     stream,
                     "Not Before",
-                    cert.tbs_certificate.validity.not_before.asctime(),
+                    cert.tbs_certificate.validity.not_before.to_rfc2822(),
                 )?;
                 print_cert_attr(
                     stream,
                     "Not After",
-                    cert.tbs_certificate.validity.not_after.asctime(),
+                    cert.tbs_certificate.validity.not_after.to_rfc2822(),
                 )?;
             }
             _ => {
