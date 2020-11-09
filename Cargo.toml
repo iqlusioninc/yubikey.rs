@@ -30,7 +30,7 @@ elliptic-curve = "0.6"
 getrandom = "0.1"
 hmac = "0.10"
 log = "0.4"
-nom = "5"
+nom = "6"
 num-bigint = { version = "0.6", features = ["rand"], package = "num-bigint-dig" }
 num-traits = "0.2"
 num-integer = "0.1"
