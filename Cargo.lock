@@ -220,6 +220,7 @@ checksum = "cb4b1e27396f46037881c39d821660f2ff48797aaa7152a45ded7a93b368a819"
 dependencies = [
  "der-oid-macro 0.3.0",
  "nom 6.0.1",
+ "num-bigint 0.3.0",
  "num-traits",
  "proc-macro-hack",
  "rusticata-macros 3.0.1",
@@ -517,6 +518,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
 dependencies = [
  "autocfg 1.0.1",
+]
+
+[[package]]
+name = "oid-registry"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2508c8f170e55be68508b1113956a760a82684f42022f8834fb16ca198621211"
+dependencies = [
+ "der-parser 5.0.0",
 ]
 
 [[package]]
@@ -1103,6 +1113,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "x509-parser"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b22c80f083d860f8e77f44762e9df8c92de7defeb70219ec37f32968cab53e90"
+dependencies = [
+ "base64 0.13.0",
+ "chrono",
+ "data-encoding",
+ "der-oid-macro 0.3.0",
+ "der-parser 5.0.0",
+ "lazy_static",
+ "nom 6.0.1",
+ "num-bigint 0.3.0",
+ "oid-registry",
+ "rusticata-macros 3.0.1",
+ "rustversion",
+ "thiserror",
+]
+
+[[package]]
 name = "yubikey-cli"
 version = "0.1.0"
 dependencies = [
@@ -1113,7 +1143,7 @@ dependencies = [
  "sha2",
  "subtle-encoding",
  "termcolor",
- "x509-parser",
+ "x509-parser 0.8.2",
  "yubikey-piv",
 ]
 
@@ -1131,7 +1161,7 @@ dependencies = [
  "hmac",
  "lazy_static",
  "log",
- "nom 5.1.2",
+ "nom 6.0.1",
  "num-bigint-dig",
  "num-integer",
  "num-traits",
@@ -1147,7 +1177,7 @@ dependencies = [
  "subtle",
  "subtle-encoding",
  "x509",
- "x509-parser",
+ "x509-parser 0.9.0",
  "zeroize",
 ]
 
