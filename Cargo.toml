@@ -50,7 +50,7 @@ zeroize = "1"
 
 [dev-dependencies]
 env_logger = "0.8"
-ring = "0.16.15"
+ring = "0.16.18"
 lazy_static = "1"
 
 [features]
