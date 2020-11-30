@@ -49,7 +49,7 @@ use sha2::{Digest, Sha256};
 use std::convert::TryFrom;
 use std::fmt;
 use std::ops::DerefMut;
-use x509_parser::{parse_x509_der, x509::SubjectPublicKeyInfo};
+use x509_parser::{parse_x509_certificate, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
 
 use crate::CB_OBJ_MAX;
@@ -209,7 +209,7 @@ impl PublicKeyInfo {
                     .algorithm
                     .parameters
                     .as_ref()
-                    .ok_or_else(|| Error::InvalidObject)?;
+                    .ok_or(Error::InvalidObject)?;
 
                 match read_pki::ec_parameters(algorithm_parameters)? {
                     AlgorithmId::EccP256 => EcPublicKey::from_bytes(key_bytes)
@@ -477,7 +477,7 @@ impl Certificate {
             return Err(Error::SizeError);
         }
 
-        let parsed_cert = match parse_x509_der(&cert) {
+        let parsed_cert = match parse_x509_certificate(&cert) {
             Ok((_, cert)) => cert,
             _ => return Err(Error::InvalidObject),
         };
