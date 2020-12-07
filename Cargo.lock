@@ -142,9 +142,9 @@ dependencies = [
 
 [[package]]
 name = "const-oid"
-version = "0.1.0"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2d9162b7289a46e86208d6af2c686ca5bfde445878c41a458a9fac706252d0b"
+checksum = "81f31e8ecbfc556990ae313b64aedaa11d901616af2a886e8caf57883caa43f0"
 
 [[package]]
 name = "cookie-factory"
@@ -253,12 +253,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "396db09c483e7fca5d4fdb9112685632b3e76c9a607a2649c1bf904404a01366"
 dependencies = [
  "bitvec 0.18.4",
- "const-oid",
  "ff",
  "generic-array",
  "group",
  "rand_core",
  "subtle",
+]
+
+[[package]]
+name = "elliptic-curve"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64b8d753346ae41b448a0a97f5d5cbe787a05ee1bda63d629def34c679eaa0d6"
+dependencies = [
+ "generic-array",
+ "pkcs8",
+ "rand_core",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]
@@ -547,16 +559,16 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "280ed58e7e5f3052b6e2f596fa40c7eff4c27c4b6b6deecb5d685ba5c2080980"
 dependencies = [
- "elliptic-curve",
+ "elliptic-curve 0.6.6",
 ]
 
 [[package]]
 name = "p384"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06de0548166c258c22bb6bdcff3074eac4b07125040aa74db3f61db87fe5f275"
+checksum = "6d97796d16cdc6bca56f1177aecaefb62c057fd8a0faa8b861e24d77a9e8993a"
 dependencies = [
- "elliptic-curve",
+ "elliptic-curve 0.7.0",
 ]
 
 [[package]]
@@ -602,6 +614,15 @@ dependencies = [
  "base64 0.12.3",
  "once_cell",
  "regex",
+]
+
+[[package]]
+name = "pkcs8"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6529960a627342f19f68d43a07b268c98fd347e68668df3743a3cb9211c0975f"
+dependencies = [
+ "const-oid",
 ]
 
 [[package]]
@@ -1155,7 +1176,7 @@ dependencies = [
  "cookie-factory",
  "der-parser 5.0.0",
  "des",
- "elliptic-curve",
+ "elliptic-curve 0.6.6",
  "env_logger",
  "getrandom",
  "hmac",
