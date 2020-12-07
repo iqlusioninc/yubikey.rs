@@ -63,7 +63,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d2838fdd79e8776dbe07a106c784b0f8dda571a21b2750a092cc4cbaa653c8e"
 dependencies = [
  "funty",
- "radium",
+ "radium 0.4.1",
+ "wyz",
+]
+
+[[package]]
+name = "bitvec"
+version = "0.19.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7ba35e9565969edb811639dbebfe34edc0368e472c5018474c8eb2543397f81"
+dependencies = [
+ "funty",
+ "radium 0.5.3",
+ "tap",
  "wyz",
 ]
 
@@ -168,7 +180,19 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e66558629d772c3be040566b7be07be8c8f5aecee95e4a092dfe2efc313277ad"
 dependencies = [
- "nom",
+ "nom 5.1.2",
+ "num-bigint 0.3.0",
+ "num-traits",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "der-oid-macro"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd17d13ecf875e704369fdbde242483ac769fc18f6af21e43d5a692a079732fc"
+dependencies = [
+ "nom 6.0.1",
  "num-bigint 0.3.0",
  "num-traits",
  "proc-macro-hack",
@@ -180,12 +204,26 @@ version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "caca07c50eaae94d43e21f4d14eca5543b6f5f5ce64715e9b7665ac5f5185b4e"
 dependencies = [
- "der-oid-macro",
- "nom",
+ "der-oid-macro 0.2.0",
+ "nom 5.1.2",
  "num-bigint 0.3.0",
  "num-traits",
  "proc-macro-hack",
- "rusticata-macros",
+ "rusticata-macros 2.1.0",
+]
+
+[[package]]
+name = "der-parser"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb4b1e27396f46037881c39d821660f2ff48797aaa7152a45ded7a93b368a819"
+dependencies = [
+ "der-oid-macro 0.3.0",
+ "nom 6.0.1",
+ "num-bigint 0.3.0",
+ "num-traits",
+ "proc-macro-hack",
+ "rusticata-macros 3.0.1",
 ]
 
 [[package]]
@@ -214,7 +252,7 @@ version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "396db09c483e7fca5d4fdb9112685632b3e76c9a607a2649c1bf904404a01366"
 dependencies = [
- "bitvec",
+ "bitvec 0.18.4",
  "const-oid",
  "ff",
  "generic-array",
@@ -242,7 +280,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01646e077d4ebda82b73f1bca002ea1e91561a77df2431a9e79729bcc31950ef"
 dependencies = [
- "bitvec",
+ "bitvec 0.18.4",
  "rand_core",
  "subtle",
 ]
@@ -400,6 +438,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nom"
+version = "6.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88034cfd6b4a0d54dd14f4a507eceee36c0b70e5a02236c4e4df571102be17f0"
+dependencies = [
+ "bitvec 0.19.4",
+ "lexical-core",
+ "memchr",
+ "version_check",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -468,6 +518,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
 dependencies = [
  "autocfg 1.0.1",
+]
+
+[[package]]
+name = "oid-registry"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2508c8f170e55be68508b1113956a760a82684f42022f8834fb16ca198621211"
+dependencies = [
+ "der-parser 5.0.0",
 ]
 
 [[package]]
@@ -588,6 +647,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64de9a0c5361e034f1aefc9f71a86871ec870e766fe31a009734a989b329286a"
 
 [[package]]
+name = "radium"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "941ba9d78d8e2f7ce474c015eea4d9c6d25b6a3327f9832ee29a4de27f91bbb8"
+
+[[package]]
 name = "rand"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -689,7 +754,16 @@ version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8a9050636e8a1b487ba1fbe99114021cd7594dde3ce6ed95bfc1691e5b5367b"
 dependencies = [
- "nom",
+ "nom 5.1.2",
+]
+
+[[package]]
+name = "rusticata-macros"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7390af60e66c44130b4c5ea85f2555b7ace835d73b4b889c704dc3cb4c0468c8"
+dependencies = [
+ "nom 6.0.1",
 ]
 
 [[package]]
@@ -816,6 +890,12 @@ dependencies = [
  "syn",
  "unicode-xid",
 ]
+
+[[package]]
+name = "tap"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36474e732d1affd3a6ed582781b3683df3d0563714c59c39591e8ff707cf078e"
 
 [[package]]
 name = "termcolor"
@@ -1022,12 +1102,32 @@ dependencies = [
  "base64 0.13.0",
  "chrono",
  "data-encoding",
- "der-oid-macro",
- "der-parser",
+ "der-oid-macro 0.2.0",
+ "der-parser 4.1.0",
  "lazy_static",
- "nom",
+ "nom 5.1.2",
  "num-bigint 0.3.0",
- "rusticata-macros",
+ "rusticata-macros 2.1.0",
+ "rustversion",
+ "thiserror",
+]
+
+[[package]]
+name = "x509-parser"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b22c80f083d860f8e77f44762e9df8c92de7defeb70219ec37f32968cab53e90"
+dependencies = [
+ "base64 0.13.0",
+ "chrono",
+ "data-encoding",
+ "der-oid-macro 0.3.0",
+ "der-parser 5.0.0",
+ "lazy_static",
+ "nom 6.0.1",
+ "num-bigint 0.3.0",
+ "oid-registry",
+ "rusticata-macros 3.0.1",
  "rustversion",
  "thiserror",
 ]
@@ -1043,7 +1143,7 @@ dependencies = [
  "sha2",
  "subtle-encoding",
  "termcolor",
- "x509-parser",
+ "x509-parser 0.8.2",
  "yubikey-piv",
 ]
 
@@ -1053,7 +1153,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "cookie-factory",
- "der-parser",
+ "der-parser 5.0.0",
  "des",
  "elliptic-curve",
  "env_logger",
@@ -1061,7 +1161,7 @@ dependencies = [
  "hmac",
  "lazy_static",
  "log",
- "nom",
+ "nom 6.0.1",
  "num-bigint-dig",
  "num-integer",
  "num-traits",
@@ -1077,7 +1177,7 @@ dependencies = [
  "subtle",
  "subtle-encoding",
  "x509",
- "x509-parser",
+ "x509-parser 0.9.0",
  "zeroize",
 ]
 

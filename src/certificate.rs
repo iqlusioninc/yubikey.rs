@@ -49,7 +49,7 @@ use sha2::{Digest, Sha256};
 use std::convert::TryFrom;
 use std::fmt;
 use std::ops::DerefMut;
-use x509_parser::{parse_x509_der, x509::SubjectPublicKeyInfo};
+use x509_parser::{parse_x509_certificate, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
 
 use crate::CB_OBJ_MAX;
@@ -205,7 +205,13 @@ impl PublicKeyInfo {
             }
             OID_EC_PUBLIC_KEY => {
                 let key_bytes = &subject_pki.subject_public_key.data;
-                match read_pki::ec_parameters(&subject_pki.algorithm.parameters)? {
+                let algorithm_parameters = subject_pki
+                    .algorithm
+                    .parameters
+                    .as_ref()
+                    .ok_or(Error::InvalidObject)?;
+
+                match read_pki::ec_parameters(algorithm_parameters)? {
                     AlgorithmId::EccP256 => EcPublicKey::from_bytes(key_bytes)
                         .map(PublicKeyInfo::EcP256)
                         .map_err(|_| Error::InvalidObject),
@@ -471,7 +477,7 @@ impl Certificate {
             return Err(Error::SizeError);
         }
 
-        let parsed_cert = match parse_x509_der(&cert) {
+        let parsed_cert = match parse_x509_certificate(&cert) {
             Ok((_, cert)) => cert,
             _ => return Err(Error::InvalidObject),
         };
@@ -631,12 +637,7 @@ mod read_pki {
     /// }
     /// ```
     pub(super) fn ec_parameters(parameters: &DerObject<'_>) -> Result<AlgorithmId, Error> {
-        let curve_oid = match parameters.as_context_specific() {
-            Ok((_, Some(named_curve))) => {
-                named_curve.as_oid_val().map_err(|_| Error::InvalidObject)
-            }
-            _ => Err(Error::InvalidObject),
-        }?;
+        let curve_oid = parameters.as_oid_val().map_err(|_| Error::InvalidObject)?;
 
         match curve_oid.to_string().as_str() {
             OID_NIST_P256 => Ok(AlgorithmId::EccP256),
