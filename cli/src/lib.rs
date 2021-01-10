@@ -19,7 +19,7 @@ use std::io::{self, Write};
 use std::str;
 use subtle_encoding::hex;
 use termcolor::{ColorSpec, StandardStreamLock, WriteColor};
-use x509_parser::parse_x509_der;
+use x509_parser::parse_x509_certificate;
 use yubikey_piv::{certificate::Certificate, key::*, YubiKey};
 
 ///Write information about certificate found in slot a la yubico-piv-tool output.
@@ -41,7 +41,7 @@ pub fn print_cert_info(
         let fingerprint = Sha256::digest(&buf);
         let slot_id: u8 = slot.into();
         print_cert_attr(stream, "Slot", format!("{:x}", slot_id))?;
-        match parse_x509_der(&buf) {
+        match parse_x509_certificate(&buf) {
             Ok((_rem, cert)) => {
                 print_cert_attr(
                     stream,
