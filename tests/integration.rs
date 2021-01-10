@@ -10,6 +10,7 @@ use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
 use std::convert::TryInto;
 use std::{env, sync::Mutex};
+use x509::RelativeDistinguishedName;
 use yubikey_piv::{
     certificate::{Certificate, PublicKeyInfo},
     key::{self, AlgorithmId, Key, RetiredSlotId, SlotId},
@@ -132,13 +133,15 @@ fn generate_self_signed_cert(algorithm: AlgorithmId) -> Certificate {
     getrandom(&mut serial).unwrap();
 
     // Generate a self-signed certificate for the new key.
+    let extensions: &[x509::Extension<'_, &[u64]>] = &[];
     let cert_result = Certificate::generate_self_signed(
         &mut yubikey,
         slot,
         serial,
         None,
-        "testSubject".to_owned(),
+        &[RelativeDistinguishedName::common_name("testSubject")],
         generated,
+        extensions,
     );
 
     assert!(cert_result.is_ok());
