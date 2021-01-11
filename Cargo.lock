@@ -1047,9 +1047,9 @@ checksum = "85e60b0d1b5f99db2556934e21937020776a5d31520bf169e851ac44e6420214"
 
 [[package]]
 name = "x509"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9335b8ff50b6a0de184b3eeb11fdce74224e3af90ca7265012512e73fc999d1a"
+checksum = "ca3cec94c3999f31341553f358ef55f65fc031291a022cd42ec0ce7219560c76"
 dependencies = [
  "chrono",
  "cookie-factory",
