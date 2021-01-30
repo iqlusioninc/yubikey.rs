@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.2.0 (2021-01-30)
+### Changed
+- Bump `der-parser` to v5.0 ([#194])
+- Improve self-signed certificates ([#207])
+- Bump `x509-parser` to v0.9 ([#208])
+- Bump elliptic-curve to 0.8. Also requires bumping p256 and p384 ([#208])
+- Bump MSRV to 1.46+ ([#208])
+- Bump `pbkdf2` dependency to v0.7 ([#219])
+
+[#194]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/194
+[#207]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/207
+[#208]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/208
+[#219]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/219
+
 ## 0.1.0 (2020-10-19)
 ### Added
 - `Certificate::generate_self_signed` ([#80])
