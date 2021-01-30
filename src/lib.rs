@@ -83,12 +83,12 @@
 //! [YubiKey NEO]: https://support.yubico.com/support/solutions/articles/15000006494-yubikey-neo
 //! [YubiKey 4]: https://support.yubico.com/support/solutions/articles/15000006486-yubikey-4
 //! [YubiKey 5]: https://www.yubico.com/products/yubikey-5-overview/
-//! [status]: https://github.com/tarcieri/yubikey-piv.rs#status
+//! [status]: https://github.com/iqlusioninc/yubikey-piv.rs#status
 //! [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/
 //! [Corrode]: https://github.com/jameysharp/corrode
 //! [piv-tool-guide]: https://www.yubico.com/wp-content/uploads/2016/05/Yubico_PIV_Tool_Command_Line_Guide_en.pdf
 //! [cc-web]: https://contributor-covenant.org/
-//! [cc-md]: https://github.com/tarcieri/yubikey-piv.rs/blob/develop/CODE_OF_CONDUCT.md
+//! [cc-md]: https://github.com/iqlusioninc/yubikey-piv.rs/blob/main/CODE_OF_CONDUCT.md
 //! [BSDL]: https://opensource.org/licenses/BSD-2-Clause
 
 // Adapted from yubico-piv-tool:
@@ -122,7 +122,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey-piv.rs/develop/img/logo.png",
+    html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey-piv.rs/main/img/logo.png",
     html_root_url = "https://docs.rs/yubikey-piv/0.1.0"
 )]
 #![forbid(unsafe_code)]
