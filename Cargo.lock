@@ -84,9 +84,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.4.0"
+version = "3.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e8c087f005730276d1096a652e92a8bacee2e2472bcc9715a74d2bec38b5820"
+checksum = "099e596ef14349721d9016f6b80dd3419ea1bf289ab9b44df8e4dfd3a005d5d9"
 
 [[package]]
 name = "byteorder"
@@ -142,9 +142,9 @@ checksum = "c5d82796b70971fbb603900a5edc797a4d9be0f9ec1257f83a1dba0aa374e3e9"
 
 [[package]]
 name = "cookie-factory"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41f21b581d2f0cb891554812435667bb9610d74feb1a4c6415bf09c28ff0381d"
+checksum = "396de984970346b0d9e93d1415082923c679e5ae5c3ee3dcbd104f5610af126b"
 
 [[package]]
 name = "cpuid-bool"
@@ -164,9 +164,9 @@ dependencies = [
 
 [[package]]
 name = "data-encoding"
-version = "2.3.1"
+version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "993a608597367c6377b258c25d7120740f00ed23a2252b729b1932dd7866f908"
+checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
 name = "der"
@@ -221,6 +221,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "ecdsa"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41fbdb4ff710acb4db8ca29f93b897529ea6d6a45626d5183b47e012aa6ae7e4"
+dependencies = [
+ "elliptic-curve",
+ "signature",
 ]
 
 [[package]]
@@ -323,9 +333,9 @@ dependencies = [
 
 [[package]]
 name = "hermit-abi"
-version = "0.1.17"
+version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aca5565f760fb5b220e499d72710ed156fdb74e631659e99377d9ebfbd13ae8"
+checksum = "322f4de77956e22ed0e5032c359a0f1273f1f7f0d79bfa3b8ffbc730d7fbcc5c"
 dependencies = [
  "libc",
 ]
@@ -342,15 +352,15 @@ dependencies = [
 
 [[package]]
 name = "humantime"
-version = "2.0.1"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c1ad908cc71012b7bea4d0c53ba96a8cba9962f048fa68d143376143d863b7a"
+checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "js-sys"
-version = "0.3.46"
+version = "0.3.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf3d7383929f7c9c7c2d0fa596f325832df98c3704f2c60553080f7127a58175"
+checksum = "5cfb73131c35423a367daf8cbd24100af0d077668c8c2943f0e7dd775fef0f65"
 dependencies = [
  "wasm-bindgen",
 ]
@@ -379,9 +389,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.82"
+version = "0.2.84"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89203f3fba0a3795506acaad8ebce3c80c0af93f994d5a1d7a0b1eeb23271929"
+checksum = "1cca32fa0182e8c0989459524dc356b8f2b5c10f1b9eb521b7d182c03cf8c5ff"
 
 [[package]]
 name = "libm"
@@ -391,11 +401,11 @@ checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
 
 [[package]]
 name = "log"
-version = "0.4.11"
+version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
+checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
 ]
 
 [[package]]
@@ -406,9 +416,9 @@ checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
 
 [[package]]
 name = "nom"
-version = "6.0.1"
+version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88034cfd6b4a0d54dd14f4a507eceee36c0b70e5a02236c4e4df571102be17f0"
+checksum = "ab6f70b46d6325aa300f1c7bb3d470127dfc27806d8ea6bf294ee0ce643ce2b1"
 dependencies = [
  "bitvec 0.19.4",
  "lexical-core",
@@ -510,10 +520,11 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "p256"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39f37a291d378ba3291c1fa4e925edb6729c8593d4c6064be79e4a4c12fa2d97"
+checksum = "7ca0196a204bb3f33305ba4a48b38f6e6e621cba8603a4e0650e6532e0949de4"
 dependencies = [
+ "ecdsa",
  "elliptic-curve",
 ]
 
@@ -756,9 +767,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.118"
+version = "1.0.123"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06c64263859d87aa2eb554587e2d23183398d617427327cf2b3d0ed8c69e4800"
+checksum = "92d5161132722baa40d802cc70b15262b98258453e85e5d1d365c757c73869ae"
 
 [[package]]
 name = "sha-1"
@@ -784,6 +795,15 @@ dependencies = [
  "cpuid-bool",
  "digest",
  "opaque-debug",
+]
+
+[[package]]
+name = "signature"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29f060a7d147e33490ec10da418795238fd7545bba241504d6b31a409f2e6210"
+dependencies = [
+ "rand_core",
 ]
 
 [[package]]
@@ -832,9 +852,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.58"
+version = "1.0.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc60a3d73ea6594cd712d830cc1f0390fd71542d8c8cd24e70cc54cdfd5e05d5"
+checksum = "c700597eca8a5a762beb35753ef6b94df201c81cca676604f547495a0d7f0081"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -890,11 +910,11 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.1.0"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb9bc092d0d51e76b2b19d9d85534ffc9ec2db959a2523cdae0697e2972cd447"
+checksum = "d8208a331e1cb318dd5bd76951d2b8fc48ca38a69f5f4e4af1b6a9f8c6236915"
 dependencies = [
- "lazy_static",
+ "once_cell",
 ]
 
 [[package]]
@@ -946,9 +966,9 @@ checksum = "1a143597ca7c7793eff794def352d41792a93c481eb1042423ff7ff72ba2c31f"
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.69"
+version = "0.2.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cd364751395ca0f68cafb17666eee36b63077fb5ecd972bbcd74c90c4bf736e"
+checksum = "55c0f7123de74f0dab9b7d00fd614e7b19349cd1e2f5252bbe9b1754b59433be"
 dependencies = [
  "cfg-if 1.0.0",
  "wasm-bindgen-macro",
@@ -956,9 +976,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-backend"
-version = "0.2.69"
+version = "0.2.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1114f89ab1f4106e5b55e688b828c0ab0ea593a1ea7c094b141b14cbaaec2d62"
+checksum = "7bc45447f0d4573f3d65720f636bbcc3dd6ce920ed704670118650bcd47764c7"
 dependencies = [
  "bumpalo",
  "lazy_static",
@@ -971,9 +991,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.69"
+version = "0.2.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a6ac8995ead1f084a8dea1e65f194d0973800c7f571f6edd70adf06ecf77084"
+checksum = "3b8853882eef39593ad4174dd26fc9865a64e84026d223f63bb2c42affcbba2c"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -981,9 +1001,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.69"
+version = "0.2.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5a48c72f299d80557c7c62e37e7225369ecc0c963964059509fbafe917c7549"
+checksum = "4133b5e7f2a531fa413b3a1695e925038a05a71cf67e87dafa295cb645a01385"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -994,15 +1014,15 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.69"
+version = "0.2.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e7811dd7f9398f14cc76efd356f98f03aa30419dea46aa810d71e819fc97158"
+checksum = "dd4945e4943ae02d15c13962b38a5b1e81eadd4b71214eee75af64a4d6a4fd64"
 
 [[package]]
 name = "web-sys"
-version = "0.3.46"
+version = "0.3.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "222b1ef9334f92a21d3fb53dc3fd80f30836959a90f9274a626d7e06315ba3c3"
+checksum = "c40dc691fc48003eba817c38da7113c15698142da971298003cac3ef175680b3"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
