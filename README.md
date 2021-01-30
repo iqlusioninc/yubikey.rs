@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/iqlusioninc/yubikey-piv.rs/develop/img/logo.png" width="150" height="110">
+<img src="https://raw.githubusercontent.com/iqlusioninc/yubikey-piv.rs/main/img/logo.png" width="150" height="110">
 
 # yubikey-piv.rs
 
@@ -193,12 +193,12 @@ or conditions.
 [docs-image]: https://docs.rs/yubikey-piv/badge.svg
 [docs-link]: https://docs.rs/yubikey-piv/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
-[license-link]: https://github.com/iqlusioninc/yubikey-piv.rs/blob/develop/COPYING
+[license-link]: https://github.com/iqlusioninc/yubikey-piv.rs/blob/main/COPYING
 [rustc-image]: https://img.shields.io/badge/rustc-1.46+-blue.svg
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
-[build-image]: https://github.com/iqlusioninc/yubikey-piv.rs/workflows/CI/badge.svg?branch=develop&event=push
+[build-image]: https://github.com/iqlusioninc/yubikey-piv.rs/workflows/CI/badge.svg?branch=main&event=push
 [build-link]: https://github.com/iqlusioninc/yubikey-piv.rs/actions
 [gitter-image]: https://badges.gitter.im/badge.svg
 [gitter-link]: https://gitter.im/iqlusioninc/community
@@ -214,7 +214,7 @@ or conditions.
 [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/
 [Corrode]: https://github.com/jameysharp/corrode
 [cc-web]: https://contributor-covenant.org/
-[cc-md]: https://github.com/iqlusioninc/yubikey-piv.rs/blob/develop/CODE_OF_CONDUCT.md
+[cc-md]: https://github.com/iqlusioninc/yubikey-piv.rs/blob/main/CODE_OF_CONDUCT.md
 [BSDL]: https://opensource.org/licenses/BSD-2-Clause
 
 [//]: # (github issues)
