@@ -185,9 +185,9 @@ impl MgmKey {
 
     /// Set the management key (MGM)
     #[cfg(feature = "untested")]
-    pub fn set(&self, yubikey: &mut YubiKey, touch: Option<u8>) -> Result<(), Error> {
+    pub fn set(&self, yubikey: &mut YubiKey, require_touch: bool) -> Result<(), Error> {
         let txn = yubikey.begin_transaction()?;
-        txn.set_mgm_key(&self, touch)
+        txn.set_mgm_key(&self, require_touch)
     }
 
     /// Resets the management key for the given YubiKey to the default value.
@@ -197,7 +197,7 @@ impl MgmKey {
     pub fn set_default(yubikey: &mut YubiKey) -> Result<(), Error> {
         let txn = yubikey.begin_transaction()?;
 
-        txn.set_mgm_key(&MgmKey::default(), None).map_err(|e| {
+        txn.set_mgm_key(&MgmKey::default(), false).map_err(|e| {
             // Log a warning, since the device mgm key is corrupt or we're in a state
             // where we can't set the mgm key.
             error!("could not set new derived mgm key, err = {}", e);
@@ -254,7 +254,7 @@ impl MgmKey {
     pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
         let txn = yubikey.begin_transaction()?;
 
-        txn.set_mgm_key(self, None).map_err(|e| {
+        txn.set_mgm_key(self, false).map_err(|e| {
             // log a warning, since the device mgm key is corrupt or we're in
             // a state where we can't set the mgm key
             error!("could not set new derived mgm key, err = {}", e);
