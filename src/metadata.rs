@@ -30,153 +30,187 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{
-    error::Error, serialization::*, transaction::Transaction, Buffer, TAG_ADMIN, TAG_PROTECTED,
-};
+use std::marker::PhantomData;
+use zeroize::Zeroizing;
+
+use crate::{error::Error, serialization::*, transaction::Transaction, Buffer};
 
 #[cfg(feature = "untested")]
 use crate::{CB_OBJ_MAX, CB_OBJ_TAG_MAX};
 
 #[cfg(feature = "untested")]
-use zeroize::Zeroizing;
+use std::iter;
 
+const TAG_ADMIN: u8 = 0x80;
+const TAG_PROTECTED: u8 = 0x88;
 pub const OBJ_ADMIN_DATA: u32 = 0x005f_ff00;
 pub const OBJ_PRINTED: u32 = 0x005f_c109;
 
-/// Get metadata item
-pub(crate) fn get_item(mut data: &[u8], tag: u8) -> Result<&[u8], Error> {
-    while !data.is_empty() {
-        let (remaining, tlv) = Tlv::parse(data)?;
-        data = remaining;
+pub(crate) trait MetadataType: private::Sealed {}
 
-        if tlv.tag == tag {
-            // found tag
-            return Ok(tlv.value);
-        }
-    }
+/// A type variable corresponding to PIN-protected metadata.
+pub(crate) enum Protected {}
+impl MetadataType for Protected {}
 
-    Err(Error::GenericError)
+/// A type variable corresponding to administrative metadata.
+pub(crate) enum Admin {}
+impl MetadataType for Admin {}
+
+/// Metadata stored in a YubiKey.
+pub(crate) struct Metadata<T: MetadataType> {
+    inner: Buffer,
+    _marker: PhantomData<T>,
 }
 
-/// Set metadata item
-#[cfg(feature = "untested")]
-pub(crate) fn set_item(
-    data: &mut [u8],
-    pcb_data: &mut usize,
-    cb_data_max: usize,
-    tag: u8,
-    p_item: &[u8],
-) -> Result<(), Error> {
-    let mut cb_temp: usize = 0;
-    let mut tag_temp: u8 = 0;
-    let mut cb_len: usize = 0;
-    let cb_item = p_item.len();
+/// PIN-protected metadata stored in a YubiKey.
+pub(crate) type ProtectedData = Metadata<Protected>;
+/// Administrative metadata stored in a YubiKey.
+pub(crate) type AdminData = Metadata<Admin>;
 
-    let mut offset = 0;
-
-    while offset < *pcb_data {
-        tag_temp = data[offset];
-        offset += 1;
-
-        cb_len = get_length(&data[offset..], &mut cb_temp);
-        offset += cb_len;
-
-        if tag_temp == tag {
-            break;
+impl<T: MetadataType> Default for Metadata<T> {
+    fn default() -> Self {
+        Metadata {
+            inner: Zeroizing::new(vec![]),
+            _marker: PhantomData::default(),
         }
+    }
+}
 
-        offset += cb_temp;
+impl<T: MetadataType> Metadata<T> {
+    /// Read metadata
+    pub(crate) fn read(txn: &Transaction<'_>) -> Result<Self, Error> {
+        let data = txn.fetch_object(T::obj_id())?;
+        Ok(Metadata {
+            inner: Tlv::parse_single(data, T::tag())?,
+            _marker: PhantomData::default(),
+        })
     }
 
-    if tag_temp != tag {
-        if cb_item == 0 {
-            // We've been asked to delete an existing item that isn't in the blob
+    /// Write metadata
+    #[cfg(feature = "untested")]
+    pub(crate) fn write(&self, txn: &Transaction<'_>) -> Result<(), Error> {
+        if self.inner.len() > CB_OBJ_MAX - CB_OBJ_TAG_MAX {
+            return Err(Error::GenericError);
+        }
+
+        if self.inner.is_empty() {
+            return Self::delete(txn);
+        }
+
+        let mut buf = Zeroizing::new(vec![0u8; CB_OBJ_MAX]);
+        let len = Tlv::write(&mut buf, T::tag(), &self.inner)?;
+
+        txn.save_object(T::obj_id(), &buf[..len])
+    }
+
+    /// Delete metadata
+    #[cfg(feature = "untested")]
+    pub(crate) fn delete(txn: &Transaction<'_>) -> Result<(), Error> {
+        txn.save_object(T::obj_id(), &[])
+    }
+
+    /// Get metadata item
+    pub(crate) fn get_item(&self, tag: u8) -> Result<&[u8], Error> {
+        let mut data = &self.inner[..];
+
+        while !data.is_empty() {
+            let (remaining, tlv) = Tlv::parse(data)?;
+            data = remaining;
+
+            if tlv.tag == tag {
+                // found tag
+                return Ok(tlv.value);
+            }
+        }
+
+        Err(Error::GenericError)
+    }
+
+    /// Set metadata item
+    #[cfg(feature = "untested")]
+    pub(crate) fn set_item(&mut self, tag: u8, item: &[u8]) -> Result<(), Error> {
+        let mut cb_temp: usize = 0;
+        let mut tag_temp: u8 = 0;
+        let mut cb_len: usize = 0;
+
+        let mut offset = 0;
+
+        while offset < self.inner.len() {
+            tag_temp = self.inner[offset];
+            offset += 1;
+
+            cb_len = get_length(&self.inner[offset..], &mut cb_temp);
+            offset += cb_len;
+
+            if tag_temp == tag {
+                break;
+            }
+
+            offset += cb_temp;
+        }
+
+        if tag_temp != tag {
+            if item.is_empty() {
+                // We've been asked to delete an existing item that isn't in the blob
+                return Ok(());
+            }
+
+            // We did not find an existing tag, append
+            assert_eq!(offset, self.inner.len());
+            self.inner
+                .extend(iter::repeat(0).take(1 + get_length_size(item.len()) + item.len()));
+            Tlv::write(&mut self.inner[offset..], tag, item)?;
+
             return Ok(());
         }
 
-        // We did not find an existing tag, append
-        *pcb_data += Tlv::write(&mut data[*pcb_data..], tag, p_item)?;
+        // Found tag
 
-        return Ok(());
-    }
-
-    // Found tag
-
-    // Check length, if it matches, overwrite
-    if cb_temp == cb_item {
-        data[offset..offset + cb_item].copy_from_slice(p_item);
-        return Ok(());
-    }
-
-    // Length doesn't match, expand/shrink to fit
-    let next_offset = offset + cb_temp;
-    // Must be signed to have negative offsets
-    let cb_moved: isize = (cb_item as isize - cb_temp as isize)
-        + if cb_item != 0 {
-            get_length_size(cb_item) as isize
-        } else {
-            // For tag, if deleting
-            -1
+        // Check length, if it matches, overwrite
+        if cb_temp == item.len() {
+            self.inner[offset..offset + item.len()].copy_from_slice(item);
+            return Ok(());
         }
-        // Accounts for different length encoding
-        - cb_len as isize;
 
-    // If length would cause buffer overflow, return error
-    if (*pcb_data as isize + cb_moved) as usize > cb_data_max {
-        return Err(Error::GenericError);
+        // Length doesn't match, expand/shrink to fit
+        let next_offset = offset + cb_temp;
+        // Must be signed to have negative offsets
+        let cb_moved: isize = (item.len() as isize - cb_temp as isize)
+            + if item.is_empty() {
+                // For tag, if deleting
+                -1
+            } else {
+                get_length_size(item.len()) as isize
+            }
+            // Accounts for different length encoding
+            - cb_len as isize;
+
+        // If length would cause buffer overflow, return error
+        if (self.inner.len() as isize + cb_moved) as usize > CB_OBJ_MAX {
+            return Err(Error::GenericError);
+        }
+
+        // Move remaining data
+        let orig_len = self.inner.len();
+        if cb_moved > 0 {
+            self.inner.extend(iter::repeat(0).take(cb_moved as usize));
+        }
+        self.inner.copy_within(
+            next_offset..orig_len,
+            (next_offset as isize + cb_moved) as usize,
+        );
+        self.inner
+            .resize((orig_len as isize + cb_moved) as usize, 0);
+
+        // Re-encode item and insert
+        if !item.is_empty() {
+            offset -= cb_len;
+            offset += set_length(&mut self.inner[offset..], item.len())?;
+            self.inner[offset..offset + item.len()].copy_from_slice(item);
+        }
+
+        Ok(())
     }
-
-    // Move remaining data
-    data.copy_within(
-        next_offset..*pcb_data,
-        (next_offset as isize + cb_moved) as usize,
-    );
-    *pcb_data = (*pcb_data as isize + cb_moved) as usize;
-
-    // Re-encode item and insert
-    if cb_item != 0 {
-        offset -= cb_len;
-        offset += set_length(&mut data[offset..], cb_item)?;
-        data[offset..offset + cb_item].copy_from_slice(p_item);
-    }
-
-    Ok(())
-}
-
-/// Read metadata
-pub(crate) fn read(txn: &Transaction<'_>, tag: u8) -> Result<Buffer, Error> {
-    let obj_id = match tag {
-        TAG_ADMIN => OBJ_ADMIN_DATA,
-        TAG_PROTECTED => OBJ_PRINTED,
-        _ => return Err(Error::InvalidObject),
-    };
-
-    let data = txn.fetch_object(obj_id)?;
-    Tlv::parse_single(data, tag)
-}
-
-/// Write metadata
-#[cfg(feature = "untested")]
-pub(crate) fn write(txn: &Transaction<'_>, tag: u8, data: &[u8]) -> Result<(), Error> {
-    if data.len() > CB_OBJ_MAX - CB_OBJ_TAG_MAX {
-        return Err(Error::GenericError);
-    }
-
-    let obj_id = match tag {
-        TAG_ADMIN => OBJ_ADMIN_DATA,
-        TAG_PROTECTED => OBJ_PRINTED,
-        _ => return Err(Error::InvalidObject),
-    };
-
-    if data.is_empty() {
-        // Deleting metadata
-        return txn.save_object(obj_id, &[]);
-    }
-
-    let mut buf = Zeroizing::new(vec![0u8; CB_OBJ_MAX]);
-    let len = Tlv::write(&mut buf, tag, data)?;
-
-    txn.save_object(obj_id, &buf[..len])
 }
 
 /// Get the size of a length tag for the given length
@@ -188,5 +222,29 @@ fn get_length_size(length: usize) -> usize {
         2
     } else {
         3
+    }
+}
+
+mod private {
+    use super::*;
+    pub trait Sealed {
+        fn tag() -> u8;
+        fn obj_id() -> u32;
+    }
+    impl Sealed for Protected {
+        fn tag() -> u8 {
+            TAG_PROTECTED
+        }
+        fn obj_id() -> u32 {
+            OBJ_PRINTED
+        }
+    }
+    impl Sealed for Admin {
+        fn tag() -> u8 {
+            TAG_ADMIN
+        }
+        fn obj_id() -> u32 {
+            OBJ_ADMIN_DATA
+        }
     }
 }

@@ -38,8 +38,9 @@ use zeroize::{Zeroize, Zeroizing};
 
 #[cfg(feature = "untested")]
 use crate::{
-    metadata, yubikey::YubiKey, CB_BUF_MAX, CB_OBJ_MAX, TAG_ADMIN, TAG_ADMIN_FLAGS_1,
-    TAG_ADMIN_SALT, TAG_PROTECTED, TAG_PROTECTED_MGM,
+    metadata::{AdminData, ProtectedData},
+    yubikey::YubiKey,
+    TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_PROTECTED_MGM,
 };
 use des::{
     cipher::{generic_array::GenericArray, BlockCipher, NewBlockCipher},
@@ -135,8 +136,8 @@ impl MgmKey {
         let txn = yubikey.begin_transaction()?;
 
         // recover management key
-        let data = metadata::read(&txn, TAG_ADMIN)?;
-        let salt = metadata::get_item(&data, TAG_ADMIN_SALT)?;
+        let admin_data = AdminData::read(&txn)?;
+        let salt = admin_data.get_item(TAG_ADMIN_SALT)?;
 
         if salt.len() != CB_ADMIN_SALT {
             error!(
@@ -159,12 +160,12 @@ impl MgmKey {
     pub fn get_protected(yubikey: &mut YubiKey) -> Result<Self, Error> {
         let txn = yubikey.begin_transaction()?;
 
-        let data = metadata::read(&txn, TAG_PROTECTED).map_err(|e| {
+        let protected_data = ProtectedData::read(&txn).map_err(|e| {
             error!("could not read protected data (err: {:?})", e);
             e
         })?;
 
-        let item = metadata::get_item(&data, TAG_PROTECTED_MGM).map_err(|e| {
+        let item = protected_data.get_item(TAG_PROTECTED_MGM).map_err(|e| {
             error!("could not read protected MGM from metadata (err: {:?})", e);
             e
         })?;
@@ -192,8 +193,6 @@ impl MgmKey {
     /// Set protected management key (MGM)
     #[cfg(feature = "untested")]
     pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
-        let mut data = Zeroizing::new(vec![0u8; CB_BUF_MAX]);
-
         let txn = yubikey.begin_transaction()?;
 
         txn.set_mgm_key(self, None).map_err(|e| {
@@ -206,39 +205,25 @@ impl MgmKey {
         // after this point, we've set the mgm key, so the function should
         // succeed, regardless of being able to set the metadata
 
-        // set the new mgm key in protected data
-        let buffer = match metadata::read(&txn, TAG_PROTECTED) {
-            Ok(b) => b,
-            Err(_) => {
-                // set current metadata blob size to zero, we'll add to the blank blob
-                Zeroizing::new(vec![])
-            }
-        };
-        let mut cb_data = buffer.len();
-        data[..cb_data].copy_from_slice(&buffer);
+        // Fetch the current protected data, or start a blank metadata blob.
+        let mut protected_data = ProtectedData::read(&txn).unwrap_or_default();
 
-        if let Err(e) = metadata::set_item(
-            data.as_mut_slice(),
-            &mut cb_data,
-            CB_OBJ_MAX,
-            TAG_PROTECTED_MGM,
-            self.as_ref(),
-        ) {
+        // Set the new mgm key in protected data.
+        if let Err(e) = protected_data.set_item(TAG_PROTECTED_MGM, self.as_ref()) {
             error!("could not set protected mgm item, err = {:?}", e);
         } else {
-            metadata::write(&txn, TAG_PROTECTED, &data).map_err(|e| {
+            protected_data.write(&txn).map_err(|e| {
                 error!("could not write protected data, err = {:?}", e);
                 e
             })?;
         }
 
         // set the protected mgm flag in admin data
-        cb_data = data.len();
 
         let mut flags_1 = [0u8; 1];
 
-        if let Ok(buffer) = metadata::read(&txn, TAG_ADMIN) {
-            if let Ok(item) = metadata::get_item(&buffer, TAG_ADMIN_FLAGS_1) {
+        let mut admin_data = if let Ok(mut admin_data) = AdminData::read(&txn) {
+            if let Ok(item) = admin_data.get_item(TAG_ADMIN_FLAGS_1) {
                 if item.len() == flags_1.len() {
                     flags_1.copy_from_slice(item);
                 } else {
@@ -254,26 +239,20 @@ impl MgmKey {
             }
 
             // remove any existing salt
-            if let Err(e) =
-                metadata::set_item(&mut data, &mut cb_data, CB_OBJ_MAX, TAG_ADMIN_SALT, &[])
-            {
+            if let Err(e) = admin_data.set_item(TAG_ADMIN_SALT, &[]) {
                 error!("could not unset derived mgm salt (err = {})", e)
             }
+
+            admin_data
         } else {
-            cb_data = 0;
-        }
+            AdminData::default()
+        };
 
         flags_1[0] |= ADMIN_FLAGS_1_PROTECTED_MGM;
 
-        if let Err(e) = metadata::set_item(
-            data.as_mut_slice(),
-            &mut cb_data,
-            CB_OBJ_MAX,
-            TAG_ADMIN_FLAGS_1,
-            &flags_1,
-        ) {
+        if let Err(e) = admin_data.set_item(TAG_ADMIN_FLAGS_1, &flags_1) {
             error!("could not set admin flags item, err = {}", e);
-        } else if let Err(e) = metadata::write(&txn, TAG_ADMIN, &data[..cb_data]) {
+        } else if let Err(e) = admin_data.write(&txn) {
             error!("could not write admin data, err = {}", e);
         }
 
