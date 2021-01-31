@@ -32,11 +32,11 @@
 
 use crate::{
     error::Error,
-    metadata,
+    metadata::{AdminData, ProtectedData},
     mgm::{MgmType, ADMIN_FLAGS_1_PROTECTED_MGM},
     yubikey::{YubiKey, ADMIN_FLAGS_1_PUK_BLOCKED},
-    TAG_ADMIN, TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_ADMIN_TIMESTAMP, TAG_PROTECTED,
-    TAG_PROTECTED_FLAGS_1, TAG_PROTECTED_MGM,
+    TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_ADMIN_TIMESTAMP, TAG_PROTECTED_FLAGS_1,
+    TAG_PROTECTED_MGM,
 };
 use log::error;
 use std::{
@@ -79,8 +79,8 @@ impl Config {
 
         let txn = yubikey.begin_transaction()?;
 
-        if let Ok(data) = metadata::read(&txn, TAG_ADMIN) {
-            if let Ok(item) = metadata::get_item(&data, TAG_ADMIN_FLAGS_1) {
+        if let Ok(admin_data) = AdminData::read(&txn) {
+            if let Ok(item) = admin_data.get_item(TAG_ADMIN_FLAGS_1) {
                 if item.is_empty() {
                     error!("empty response for admin flags metadata item! ignoring");
                 } else {
@@ -94,7 +94,7 @@ impl Config {
                 }
             }
 
-            if metadata::get_item(&data, TAG_ADMIN_SALT).is_ok() {
+            if admin_data.get_item(TAG_ADMIN_SALT).is_ok() {
                 if config.mgm_type != MgmType::Manual {
                     error!("conflicting types of MGM key administration configured");
                 } else {
@@ -102,7 +102,7 @@ impl Config {
                 }
             }
 
-            if let Ok(item) = metadata::get_item(&data, TAG_ADMIN_TIMESTAMP) {
+            if let Ok(item) = admin_data.get_item(TAG_ADMIN_TIMESTAMP) {
                 if item.len() != CB_ADMIN_TIMESTAMP {
                     error!("pin timestamp in admin metadata is an invalid size");
                 } else {
@@ -117,10 +117,10 @@ impl Config {
             }
         }
 
-        if let Ok(data) = metadata::read(&txn, TAG_PROTECTED) {
+        if let Ok(protected_data) = ProtectedData::read(&txn) {
             config.protected_data_available = true;
 
-            if let Ok(item) = metadata::get_item(&data, TAG_PROTECTED_FLAGS_1) {
+            if let Ok(item) = protected_data.get_item(TAG_PROTECTED_FLAGS_1) {
                 if item.is_empty() {
                     error!("empty response for protected flags metadata item! ignoring");
                 } else if item[0] & PROTECTED_FLAGS_1_PUK_NOBLOCK != 0 {
@@ -128,7 +128,7 @@ impl Config {
                 }
             }
 
-            if metadata::get_item(&data, TAG_PROTECTED_MGM).is_ok() {
+            if protected_data.get_item(TAG_PROTECTED_MGM).is_ok() {
                 if config.mgm_type != MgmType::Protected {
                     error!(
                         "conflicting types of mgm key administration configured: protected MGM exists"

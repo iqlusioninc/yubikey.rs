@@ -50,8 +50,8 @@ use std::{
 
 #[cfg(feature = "untested")]
 use crate::{
-    apdu::StatusWords, metadata, transaction::ChangeRefAction, Buffer, ObjectId, CB_BUF_MAX,
-    CB_OBJ_MAX, MGMT_AID, TAG_ADMIN, TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP,
+    apdu::StatusWords, metadata::AdminData, transaction::ChangeRefAction, Buffer, ObjectId,
+    MGMT_AID, TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP,
 };
 use getrandom::getrandom;
 #[cfg(feature = "untested")]
@@ -417,12 +417,9 @@ impl YubiKey {
     /// Set PIN last changed
     #[cfg(feature = "untested")]
     pub fn set_pin_last_changed(yubikey: &mut YubiKey) -> Result<(), Error> {
-        let mut data = [0u8; CB_BUF_MAX];
         let txn = yubikey.begin_transaction()?;
 
-        let buffer = metadata::read(&txn, TAG_ADMIN)?;
-        let mut cb_data = buffer.len();
-        data[..cb_data].copy_from_slice(&buffer);
+        let mut admin_data = AdminData::read(&txn)?;
 
         // TODO(tarcieri): double check this is little endian
         let tnow = SystemTime::now()
@@ -431,19 +428,14 @@ impl YubiKey {
             .as_secs()
             .to_le_bytes();
 
-        metadata::set_item(
-            &mut data,
-            &mut cb_data,
-            CB_OBJ_MAX,
-            TAG_ADMIN_TIMESTAMP,
-            &tnow,
-        )
-        .map_err(|e| {
-            error!("could not set pin timestamp, err = {}", e);
-            e
-        })?;
+        admin_data
+            .set_item(TAG_ADMIN_TIMESTAMP, &tnow)
+            .map_err(|e| {
+                error!("could not set pin timestamp, err = {}", e);
+                e
+            })?;
 
-        metadata::write(&txn, TAG_ADMIN, &data).map_err(|e| {
+        admin_data.write(&txn).map_err(|e| {
             error!("could not write admin data, err = {}", e);
             e
         })?;
@@ -494,8 +486,10 @@ impl YubiKey {
             }
         }
 
-        if let Ok(data) = metadata::read(&txn, TAG_ADMIN) {
-            if let Ok(item) = metadata::get_item(&data, TAG_ADMIN_FLAGS_1) {
+        // Attempt to set the "PUK blocked" flag in admin data.
+
+        let mut admin_data = if let Ok(admin_data) = AdminData::read(&txn) {
+            if let Ok(item) = admin_data.get_item(TAG_ADMIN_FLAGS_1) {
                 if item.len() == flags.len() {
                     flags.copy_from_slice(item)
                 } else {
@@ -506,22 +500,16 @@ impl YubiKey {
                     );
                 }
             }
-        }
+
+            admin_data
+        } else {
+            AdminData::default()
+        };
 
         flags[0] |= ADMIN_FLAGS_1_PUK_BLOCKED;
-        let mut data = [0u8; CB_BUF_MAX];
-        let mut cb_data: usize = data.len();
 
-        if metadata::set_item(
-            &mut data,
-            &mut cb_data,
-            CB_OBJ_MAX,
-            TAG_ADMIN_FLAGS_1,
-            &flags,
-        )
-        .is_ok()
-        {
-            if metadata::write(&txn, TAG_ADMIN, &data[..cb_data]).is_err() {
+        if admin_data.set_item(TAG_ADMIN_FLAGS_1, &flags).is_ok() {
+            if admin_data.write(&txn).is_err() {
                 error!("could not write admin metadata");
             }
         } else {
