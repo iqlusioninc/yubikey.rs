@@ -114,7 +114,7 @@ fn test_verify_pin() {
 #[cfg(feature = "untested")]
 #[test]
 #[ignore]
-fn test_protected_mgmkey() {
+fn test_set_mgmkey() {
     let mut yubikey = YUBIKEY.lock().unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
@@ -130,10 +130,19 @@ fn test_protected_mgmkey() {
     assert!(yubikey.authenticate(MgmKey::default()).is_err());
     assert!(yubikey.authenticate(protected.clone()).is_ok());
 
+    // Set a manual management key.
+    let manual = MgmKey::generate().unwrap();
+    assert!(manual.set_manual(&mut yubikey, false).is_ok());
+    assert!(MgmKey::get_protected(&mut yubikey).is_err());
+    assert!(yubikey.authenticate(MgmKey::default()).is_err());
+    assert!(yubikey.authenticate(protected.clone()).is_err());
+    assert!(yubikey.authenticate(manual.clone()).is_ok());
+
     // Set back to the default management key.
     assert!(MgmKey::set_default(&mut yubikey).is_ok());
     assert!(MgmKey::get_protected(&mut yubikey).is_err());
     assert!(yubikey.authenticate(protected).is_err());
+    assert!(yubikey.authenticate(manual).is_err());
     assert!(yubikey.authenticate(MgmKey::default()).is_ok());
 }
 

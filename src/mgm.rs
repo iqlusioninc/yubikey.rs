@@ -183,21 +183,25 @@ impl MgmKey {
         MgmKey::from_bytes(item)
     }
 
-    /// Set the management key (MGM)
-    #[cfg(feature = "untested")]
-    pub fn set(&self, yubikey: &mut YubiKey, require_touch: bool) -> Result<(), Error> {
-        let txn = yubikey.begin_transaction()?;
-        txn.set_mgm_key(&self, require_touch)
-    }
-
     /// Resets the management key for the given YubiKey to the default value.
     ///
     /// This will wipe any metadata related to derived and PIN-protected management keys.
     #[cfg(feature = "untested")]
     pub fn set_default(yubikey: &mut YubiKey) -> Result<(), Error> {
+        MgmKey::default().set_manual(yubikey, false)
+    }
+
+    /// Configures the given YubiKey to use this management key.
+    ///
+    /// The management key must be stored by the user, and provided when performing key
+    /// management operations.
+    ///
+    /// This will wipe any metadata related to derived and PIN-protected management keys.
+    #[cfg(feature = "untested")]
+    pub fn set_manual(&self, yubikey: &mut YubiKey, require_touch: bool) -> Result<(), Error> {
         let txn = yubikey.begin_transaction()?;
 
-        txn.set_mgm_key(&MgmKey::default(), false).map_err(|e| {
+        txn.set_mgm_key(&self, require_touch).map_err(|e| {
             // Log a warning, since the device mgm key is corrupt or we're in a state
             // where we can't set the mgm key.
             error!("could not set new derived mgm key, err = {}", e);
@@ -249,7 +253,9 @@ impl MgmKey {
         Ok(())
     }
 
-    /// Set protected management key (MGM)
+    /// Configures the given YubiKey to use this as a PIN-protected management key.
+    ///
+    /// This enables key management operations to be performed with access to the PIN.
     #[cfg(feature = "untested")]
     pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
         let txn = yubikey.begin_transaction()?;
