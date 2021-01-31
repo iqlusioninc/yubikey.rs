@@ -118,6 +118,7 @@ fn test_protected_mgmkey() {
     let mut yubikey = YUBIKEY.lock().unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
+    assert!(MgmKey::get_protected(&mut yubikey).is_err());
     assert!(yubikey.authenticate(MgmKey::default()).is_ok());
 
     // Set a protected management key.
@@ -130,8 +131,8 @@ fn test_protected_mgmkey() {
     assert!(yubikey.authenticate(protected.clone()).is_ok());
 
     // Set back to the default management key.
-    // TODO: This does not clear the previous key from the protected metadata.
-    assert!(MgmKey::default().set(&mut yubikey, None).is_ok());
+    assert!(MgmKey::set_default(&mut yubikey).is_ok());
+    assert!(MgmKey::get_protected(&mut yubikey).is_err());
     assert!(yubikey.authenticate(protected).is_err());
     assert!(yubikey.authenticate(MgmKey::default()).is_ok());
 }
