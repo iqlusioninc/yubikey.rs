@@ -229,14 +229,8 @@ impl<'tx> Transaction<'tx> {
 
     /// Set the management key (MGM).
     #[cfg(feature = "untested")]
-    pub fn set_mgm_key(&self, new_key: &MgmKey, touch: Option<u8>) -> Result<(), Error> {
-        let p2 = match touch.unwrap_or_default() {
-            0 => 0xff,
-            1 => 0xfe,
-            _ => {
-                return Err(Error::GenericError);
-            }
-        };
+    pub fn set_mgm_key(&self, new_key: &MgmKey, require_touch: bool) -> Result<(), Error> {
+        let p2 = if require_touch { 0xfe } else { 0xff };
 
         let mut data = [0u8; DES_LEN_3DES + 3];
         data[0] = ALGO_3DES;

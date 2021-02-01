@@ -183,19 +183,84 @@ impl MgmKey {
         MgmKey::from_bytes(item)
     }
 
-    /// Set the management key (MGM)
+    /// Resets the management key for the given YubiKey to the default value.
+    ///
+    /// This will wipe any metadata related to derived and PIN-protected management keys.
     #[cfg(feature = "untested")]
-    pub fn set(&self, yubikey: &mut YubiKey, touch: Option<u8>) -> Result<(), Error> {
-        let txn = yubikey.begin_transaction()?;
-        txn.set_mgm_key(&self, touch)
+    pub fn set_default(yubikey: &mut YubiKey) -> Result<(), Error> {
+        MgmKey::default().set_manual(yubikey, false)
     }
 
-    /// Set protected management key (MGM)
+    /// Configures the given YubiKey to use this management key.
+    ///
+    /// The management key must be stored by the user, and provided when performing key
+    /// management operations.
+    ///
+    /// This will wipe any metadata related to derived and PIN-protected management keys.
+    #[cfg(feature = "untested")]
+    pub fn set_manual(&self, yubikey: &mut YubiKey, require_touch: bool) -> Result<(), Error> {
+        let txn = yubikey.begin_transaction()?;
+
+        txn.set_mgm_key(&self, require_touch).map_err(|e| {
+            // Log a warning, since the device mgm key is corrupt or we're in a state
+            // where we can't set the mgm key.
+            error!("could not set new derived mgm key, err = {}", e);
+            e
+        })?;
+
+        // After this point, we've set the mgm key, so the function should succeed,
+        // regardless of being able to set the metadata.
+
+        if let Ok(mut admin_data) = AdminData::read(&txn) {
+            // Clear the protected mgm key bit.
+            if let Ok(item) = admin_data.get_item(TAG_ADMIN_FLAGS_1) {
+                let mut flags_1 = [0u8; 1];
+                if item.len() == flags_1.len() {
+                    flags_1.copy_from_slice(item);
+                    flags_1[0] &= !ADMIN_FLAGS_1_PROTECTED_MGM;
+
+                    if let Err(e) = admin_data.set_item(TAG_ADMIN_FLAGS_1, &flags_1) {
+                        error!("could not set admin flags item, err = {}", e);
+                    }
+                } else {
+                    error!(
+                        "admin data flags are an incorrect size: {} (expected {})",
+                        item.len(),
+                        flags_1.len()
+                    );
+                }
+            }
+
+            // Remove any existing salt for a derived mgm key.
+            if let Err(e) = admin_data.set_item(TAG_ADMIN_SALT, &[]) {
+                error!("could not unset derived mgm salt (err = {})", e)
+            }
+
+            if let Err(e) = admin_data.write(&txn) {
+                error!("could not write admin data, err = {}", e);
+            }
+        }
+
+        // Clear any prior mgm key from protected data.
+        if let Ok(mut protected_data) = ProtectedData::read(&txn) {
+            if let Err(e) = protected_data.set_item(TAG_PROTECTED_MGM, &[]) {
+                error!("could not clear protected mgm item, err = {:?}", e);
+            } else if let Err(e) = protected_data.write(&txn) {
+                error!("could not write protected data, err = {:?}", e);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Configures the given YubiKey to use this as a PIN-protected management key.
+    ///
+    /// This enables key management operations to be performed with access to the PIN.
     #[cfg(feature = "untested")]
     pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
         let txn = yubikey.begin_transaction()?;
 
-        txn.set_mgm_key(self, None).map_err(|e| {
+        txn.set_mgm_key(self, false).map_err(|e| {
             // log a warning, since the device mgm key is corrupt or we're in
             // a state where we can't set the mgm key
             error!("could not set new derived mgm key, err = {}", e);
