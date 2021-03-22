@@ -4,10 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.0 (2021-03-22)
+### Changed
+- Bump `yubikey-piv` dependency to v0.3 ([#240])
+
+[#240]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/240
+
 ## 0.2.0 (2021-01-30)
 ### Changed
 - Bump MSRV to 1.46+ ([#208])
-- Bump `yubikey-piv` dependency to v0.2.0 ([#220])
+- Bump `yubikey-piv` dependency to v0.2 ([#220])
 
 [#208]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/208
 [#220]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/220
