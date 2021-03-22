@@ -123,7 +123,7 @@
 
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey-piv.rs/main/img/logo.png",
-    html_root_url = "https://docs.rs/yubikey-piv/0.1.0"
+    html_root_url = "https://docs.rs/yubikey-piv/0.3.0"
 )]
 #![forbid(unsafe_code)]
 #![warn(
