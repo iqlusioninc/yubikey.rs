@@ -42,4 +42,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: audit
-          args: --deny-warnings --ignore RUSTSEC-2019-0031 # spin
+          args: --deny warnings --ignore RUSTSEC-2019-0031 # spin

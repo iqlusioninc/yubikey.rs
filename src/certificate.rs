@@ -41,7 +41,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
 use log::error;
-use num_bigint::BigUint;
+use num_bigint_dig::BigUint;
 use p256::NistP256;
 use p384::NistP384;
 use rsa::{PublicKeyParts, RSAPublicKey};
