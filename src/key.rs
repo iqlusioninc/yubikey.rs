@@ -59,7 +59,7 @@ use crate::{
 use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
 use log::{error, warn};
 #[cfg(feature = "untested")]
-use num_bigint::traits::ModInverse;
+use num_bigint_dig::traits::ModInverse;
 #[cfg(feature = "untested")]
 use num_integer::Integer;
 #[cfg(feature = "untested")]

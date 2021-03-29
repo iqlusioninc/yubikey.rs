@@ -31,14 +31,14 @@ getrandom = "0.1"
 hmac = "0.10"
 log = "0.4"
 nom = "6"
-num-bigint = { version = "0.6", features = ["rand"], package = "num-bigint-dig" }
+num-bigint-dig = { version = "0.7", features = ["rand"], package = "num-bigint-dig" }
 num-traits = "0.2"
 num-integer = "0.1"
 pbkdf2 = { version = "0.7", default-features = false }
 p256 = "0.7"
 p384 = "0.6"
 pcsc = "2"
-rsa = "0.3"
+rsa = "0.4"
 secrecy = "0.7"
 sha-1 = "0.9"
 sha2 = "0.9"
