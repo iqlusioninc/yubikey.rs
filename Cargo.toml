@@ -38,7 +38,7 @@ pbkdf2 = { version = "0.7", default-features = false }
 p256 = "0.7"
 p384 = "0.6"
 pcsc = "2"
-rsa = "0.3"
+rsa = "0.4"
 secrecy = "0.7"
 sha-1 = "0.9"
 sha2 = "0.9"
