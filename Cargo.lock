@@ -186,16 +186,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "der-parser"
-version = "5.0.1"
+name = "der-oid-macro"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13e6cad1223a7b98b59275a56516ed8c40508d21284a32e404ed3fe2ae9a809a"
+checksum = "a4cccf60bb98c0fca115a581f894aed0e43fa55bf289fdac5599bec440bb4fd6"
 dependencies = [
- "der-oid-macro",
  "nom",
- "num-bigint 0.3.2",
+ "num-bigint 0.4.0",
  "num-traits",
- "proc-macro-hack",
+ "syn",
+]
+
+[[package]]
+name = "der-parser"
+version = "5.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "120842c2385dea19347e2f6e31caa5dced5ba8afdfacaac16c59465fdd1168f2"
+dependencies = [
+ "der-oid-macro 0.4.0",
+ "nom",
+ "num-bigint 0.4.0",
+ "num-traits",
  "rusticata-macros",
 ]
 
@@ -440,6 +451,17 @@ name = "num-bigint"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d0a3d5e207573f948a9e5376662aa743a2ea13f7c50a554d7af443a73fbfeba"
+dependencies = [
+ "autocfg 1.0.1",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e0d047c1062aa51e256408c560894e5251f08925980e53cf1aa5bd00eec6512"
 dependencies = [
  "autocfg 1.0.1",
  "num-integer",
@@ -1066,7 +1088,7 @@ dependencies = [
  "base64",
  "chrono",
  "data-encoding",
- "der-oid-macro",
+ "der-oid-macro 0.3.0",
  "der-parser",
  "lazy_static",
  "nom",
