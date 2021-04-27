@@ -76,6 +76,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bitvec"
+version = "0.20.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7774144344a4faa177370406a7ff5f1da24303817368584c6206c8303eb07848"
+dependencies = [
+ "funty",
+ "radium 0.6.2",
+ "tap",
+ "wyz",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -224,7 +236,7 @@ version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41fbdb4ff710acb4db8ca29f93b897529ea6d6a45626d5183b47e012aa6ae7e4"
 dependencies = [
- "elliptic-curve",
+ "elliptic-curve 0.8.5",
  "hmac",
  "signature",
 ]
@@ -237,14 +249,28 @@ checksum = "f2db227e61a43a34915680bdda462ec0e212095518020a88a1f91acd16092c39"
 dependencies = [
  "bitvec 0.18.5",
  "digest",
- "ff",
+ "ff 0.8.0",
  "funty",
  "generic-array",
- "group",
+ "group 0.8.0",
  "pkcs8",
  "rand_core 0.5.1",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "elliptic-curve"
+version = "0.9.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee681bf25de1aad7cd02ccc7525d7b4bfab7be2493dbe3ee18d93f86eb3dcf3e"
+dependencies = [
+ "bitvec 0.20.4",
+ "ff 0.9.0",
+ "generic-array",
+ "group 0.9.0",
+ "rand_core 0.6.2",
+ "subtle",
 ]
 
 [[package]]
@@ -268,6 +294,17 @@ checksum = "01646e077d4ebda82b73f1bca002ea1e91561a77df2431a9e79729bcc31950ef"
 dependencies = [
  "bitvec 0.18.5",
  "rand_core 0.5.1",
+ "subtle",
+]
+
+[[package]]
+name = "ff"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72a4d941a5b7c2a75222e2d44fcdf634a67133d9db31e177ae5ff6ecda852bfe"
+dependencies = [
+ "bitvec 0.20.4",
+ "rand_core 0.6.2",
  "subtle",
 ]
 
@@ -315,8 +352,19 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc11f9f5fbf1943b48ae7c2bf6846e7d827a512d1be4f23af708f5ca5d01dde1"
 dependencies = [
- "ff",
+ "ff 0.8.0",
  "rand_core 0.5.1",
+ "subtle",
+]
+
+[[package]]
+name = "group"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61b3c1e8b4f1ca07e6605ea1be903a5f6956aec5c8a67fd44d56076631675ed8"
+dependencies = [
+ "ff 0.9.0",
+ "rand_core 0.6.2",
  "subtle",
 ]
 
@@ -525,7 +573,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8adcc06fe90ec8fb2d2ad46746d2cbd639b158d4240364aa832da7e263dbee91"
 dependencies = [
  "ecdsa",
- "elliptic-curve",
+ "elliptic-curve 0.8.5",
  "sha2",
 ]
 
@@ -535,7 +583,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea33960aac2200d19a5c9ab06a11ebd48a37a23144496632c358182e6765d80b"
 dependencies = [
- "elliptic-curve",
+ "elliptic-curve 0.8.5",
 ]
 
 [[package]]
@@ -627,6 +675,12 @@ name = "radium"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "941ba9d78d8e2f7ce474c015eea4d9c6d25b6a3327f9832ee29a4de27f91bbb8"
+
+[[package]]
+name = "radium"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "643f8f41a8ebc4c5dc4515c82bb8abd397b527fc20fd681b7c011c2aee5d44fb"
 
 [[package]]
 name = "rand"
@@ -1099,7 +1153,7 @@ dependencies = [
  "cookie-factory",
  "der-parser",
  "des",
- "elliptic-curve",
+ "elliptic-curve 0.9.11",
  "env_logger",
  "getrandom 0.1.16",
  "hmac",
