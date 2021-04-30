@@ -43,7 +43,7 @@ use crate::{
     TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_PROTECTED_MGM,
 };
 use des::{
-    cipher::{generic_array::GenericArray, BlockCipher, NewBlockCipher},
+    cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, NewBlockCipher},
     TdesEde3,
 };
 #[cfg(feature = "untested")]
