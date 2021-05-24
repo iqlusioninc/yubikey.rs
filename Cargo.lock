@@ -553,9 +553,9 @@ dependencies = [
 
 [[package]]
 name = "pcsc"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88e09a8d8705a2c9b1ffe1f9dd9580efe3f8e80c19fc9f99038fe99b7bb56c83"
+checksum = "d4c82dbce82470474aa850ad01eb104c1b4b06d89ba831ab369f884a8610db18"
 dependencies = [
  "bitflags",
  "pcsc-sys",
