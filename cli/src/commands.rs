@@ -12,7 +12,7 @@ use std::{
     process::exit,
 };
 use termcolor::{ColorChoice, ColorSpec, WriteColor};
-use yubikey_piv::{Serial, YubiKey};
+use yubikey::{Serial, YubiKey};
 
 /// The `yubikey` CLI utility
 #[derive(Debug, Options)]

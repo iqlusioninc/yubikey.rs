@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 use std::convert::TryInto;
 use std::{env, sync::Mutex};
 use x509::RelativeDistinguishedName;
-use yubikey_piv::{
+use yubikey::{
     certificate::{Certificate, PublicKeyInfo},
     key::{self, AlgorithmId, Key, RetiredSlotId, SlotId},
     policy::{PinPolicy, TouchPolicy},

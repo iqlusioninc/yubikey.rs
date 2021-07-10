@@ -1,6 +1,6 @@
 [package]
-name    = "yubikey-piv"
-version = "0.3.0" # Also update html_root_url in lib.rs when bumping this
+name    = "yubikey"
+version = "0.4.0-pre" # Also update html_root_url in lib.rs when bumping this
 description = """
 Pure Rust host-side driver for the YubiKey Personal Identity Verification (PIV)
 application providing general-purpose public-key signing and encryption
@@ -10,7 +10,7 @@ algorithms (e.g, PKCS#1v1.5, ECDSA)
 authors    = ["Tony Arcieri <tony@iqlusion.io>", "Yubico AB"]
 edition    = "2018"
 license    = "BSD-2-Clause"
-repository = "https://github.com/iqlusioninc/yubikey-piv.rs"
+repository = "https://github.com/iqlusioninc/yubikey.rs"
 readme     = "README.md"
 categories = ["api-bindings", "cryptography", "hardware-support"]
 keywords   = ["ecdsa", "rsa", "piv", "pcsc", "yubikey"]
