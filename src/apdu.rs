@@ -41,7 +41,7 @@ const APDU_DATA_MAX: usize = 0xFF;
 ///
 /// These messages are packets used to communicate with the YubiKey.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct APDU {
+pub(crate) struct Apdu {
     /// Instruction class: indicates the type of command (e.g. inter-industry or proprietary)
     cla: u8,
 
@@ -58,7 +58,7 @@ pub(crate) struct APDU {
     data: Vec<u8>,
 }
 
-impl APDU {
+impl Apdu {
     /// Create a new APDU with the given instruction code
     pub fn new(ins: impl Into<Ins>) -> Self {
         Self {
@@ -129,13 +129,13 @@ impl APDU {
     }
 }
 
-impl Drop for APDU {
+impl Drop for Apdu {
     fn drop(&mut self) {
         self.zeroize();
     }
 }
 
-impl Zeroize for APDU {
+impl Zeroize for Apdu {
     fn zeroize(&mut self) {
         // Only `data` may contain secrets
         self.data.zeroize();

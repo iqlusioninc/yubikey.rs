@@ -125,7 +125,6 @@
     html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey.rs/main/img/logo.png",
     html_root_url = "https://docs.rs/yubikey/0.4.0-pre"
 )]
-#![allow(clippy::upper_case_acronyms)]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
 

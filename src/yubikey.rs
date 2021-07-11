@@ -31,9 +31,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    apdu::{Ins, APDU},
-    cccid::CCC,
-    chuid::CHUID,
+    apdu::{Apdu, Ins},
+    cccid::Ccc,
+    chuid::ChuId,
     config::Config,
     error::Error,
     mgm::MgmKey,
@@ -155,7 +155,8 @@ impl YubiKey {
     ///
     /// If you need to operate in environments with more than one YubiKey
     /// attached to the same system, use [`YubiKey::open_by_serial`] or
-    ///[`yubikey_piv::Readers`] to select from the available PC/SC readers.
+    /// [`yubikey::Readers`][`Readers`] to select from the available
+    /// PC/SC readers.
     pub fn open() -> Result<Self, Error> {
         let mut readers = Readers::open().map_err(|e| match e {
             Error::PcscError {
@@ -259,13 +260,13 @@ impl YubiKey {
     }
 
     /// Get CHUID
-    pub fn chuid(&mut self) -> Result<CHUID, Error> {
-        CHUID::get(self)
+    pub fn chuid(&mut self) -> Result<ChuId, Error> {
+        ChuId::get(self)
     }
 
     /// Get CCCID
-    pub fn cccid(&mut self) -> Result<CCC, Error> {
-        CCC::get(self)
+    pub fn cccid(&mut self) -> Result<Ccc, Error> {
+        Ccc::get(self)
     }
 
     /// Authenticate to the card using the provided management key (MGM).
@@ -273,7 +274,7 @@ impl YubiKey {
         let txn = self.begin_transaction()?;
 
         // get a challenge from the card
-        let challenge = APDU::new(Ins::Authenticate)
+        let challenge = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
             .data(&[TAG_DYN_AUTH, 0x02, 0x80, 0x00])
             .transmit(&txn, 261)?;
@@ -302,7 +303,7 @@ impl YubiKey {
         let mut challenge = [0u8; 8];
         challenge.copy_from_slice(&data[14..22]);
 
-        let authentication = APDU::new(Ins::Authenticate)
+        let authentication = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
             .data(&data)
             .transmit(&txn, 261)?;
@@ -327,7 +328,7 @@ impl YubiKey {
     pub fn deauthenticate(&mut self) -> Result<(), Error> {
         let txn = self.begin_transaction()?;
 
-        let status_words = APDU::new(Ins::SelectApplication)
+        let status_words = Apdu::new(Ins::SelectApplication)
             .p1(0x04)
             .data(MGMT_AID)
             .transmit(&txn, 255)?
@@ -546,7 +547,7 @@ impl YubiKey {
     pub fn get_auth_challenge(&mut self) -> Result<[u8; 8], Error> {
         let txn = self.begin_transaction()?;
 
-        let response = APDU::new(Ins::Authenticate)
+        let response = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
             .data(&[0x7c, 0x02, 0x81, 0x00])
             .transmit(&txn, 261)?;
@@ -571,7 +572,7 @@ impl YubiKey {
         let txn = self.begin_transaction()?;
 
         // send the response to the card and a challenge of our own.
-        let status_words = APDU::new(Ins::Authenticate)
+        let status_words = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
             .data(&data)
             .transmit(&txn, 261)?

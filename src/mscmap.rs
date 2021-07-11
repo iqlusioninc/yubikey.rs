@@ -35,10 +35,7 @@
 
 use crate::{error::Error, key::SlotId, serialization::*, yubikey::YubiKey, CB_OBJ_MAX};
 use log::error;
-use std::{
-    convert::{TryFrom, TryInto},
-    fmt::{self, Debug},
-};
+use std::convert::{TryFrom, TryInto};
 
 /// Container name length
 const CONTAINER_NAME_LEN: usize = 40;
@@ -51,7 +48,7 @@ const OBJ_MSCMAP: u32 = 0x005f_ff10;
 const TAG_MSCMAP: u8 = 0x81;
 
 /// MS Container Map(?) Records
-#[derive(Copy, Clone)]
+#[derive(Clone, Debug)]
 pub struct Container {
     /// Container name
     pub name: [u16; CONTAINER_NAME_LEN],
@@ -170,6 +167,7 @@ impl Container {
 
     /// Serialize a container record as a byte size
     pub fn to_bytes(&self) -> [u8; CONTAINER_REC_LEN] {
+        // TODO(tarcieri): use array instead of `Vec`
         let mut bytes = Vec::with_capacity(CONTAINER_REC_LEN);
 
         for i in 0..CONTAINER_NAME_LEN {
@@ -183,29 +181,7 @@ impl Container {
         bytes.push(self.pin_id);
         bytes.push(self.associated_echd_container);
         bytes.extend_from_slice(&self.cert_fingerprint);
-
-        // TODO(tarcieri): use TryInto here when const generics are available
-        let mut result = [0u8; CONTAINER_REC_LEN];
-        result.copy_from_slice(&bytes);
-        result
-    }
-}
-
-impl Debug for Container {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "PivContainer {{ name: {:?}, slot: {:?}, key_spec: {}, key_size_bits: {}, \
-             flags: {}, pin_id: {}, associated_echd_container: {}, cert_fingerprint: {:?} }}",
-            &self.name[..],
-            self.slot,
-            self.key_spec,
-            self.key_size_bits,
-            self.flags,
-            self.pin_id,
-            self.associated_echd_container,
-            &self.cert_fingerprint[..]
-        )
+        bytes.as_slice().try_into().unwrap()
     }
 }
 
