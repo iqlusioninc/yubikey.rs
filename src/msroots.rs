@@ -37,7 +37,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{error::Error, serialization::*, yubikey::YubiKey};
+use crate::{serialization::*, Error, Result, YubiKey};
 use crate::{CB_OBJ_MAX, CB_OBJ_TAG_MAX};
 use log::error;
 
@@ -58,12 +58,12 @@ pub struct MsRoots(Vec<u8>);
 
 impl MsRoots {
     /// Initialize a local certificate struct from the given bytebuffer
-    pub fn new(msroots: impl AsRef<[u8]>) -> Result<Self, Error> {
+    pub fn new(msroots: impl AsRef<[u8]>) -> Result<Self> {
         Ok(MsRoots(msroots.as_ref().into()))
     }
 
     /// Read `msroots` file from YubiKey
-    pub fn read(yubikey: &mut YubiKey) -> Result<Option<Self>, Error> {
+    pub fn read(yubikey: &mut YubiKey) -> Result<Option<Self>> {
         let txn = yubikey.begin_transaction()?;
 
         // allocate first page
@@ -100,7 +100,7 @@ impl MsRoots {
     }
 
     /// Write `msroots` file to YubiKey
-    pub fn write(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
+    pub fn write(&self, yubikey: &mut YubiKey) -> Result<()> {
         let mut buf = [0u8; CB_OBJ_MAX];
         let mut offset: usize;
         let mut data_offset: usize = 0;

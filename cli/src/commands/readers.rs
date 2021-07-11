@@ -53,7 +53,7 @@ impl ReadersCmd {
         index: usize,
         name: &str,
         serial: Serial,
-    ) -> Result<(), io::Error> {
+    ) -> io::Result<()> {
         stream.set_color(ColorSpec::new().set_bold(true))?;
         write!(stream, "{:>3}:", index)?;
         stream.reset()?;

@@ -1,6 +1,6 @@
 //! Enums representing key policies.
 
-use crate::{error::Error, serialization::Tlv};
+use crate::{serialization::Tlv, Result};
 
 /// Specifies how often the PIN needs to be entered for access to the credential in a
 /// given slot. This policy must be set upon key generation or importation, and cannot be
@@ -37,7 +37,7 @@ impl From<PinPolicy> for u8 {
 impl PinPolicy {
     /// Writes the `PinPolicy` in the format the YubiKey expects during key generation or
     /// importation.
-    pub(crate) fn write(self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub(crate) fn write(self, buf: &mut [u8]) -> Result<usize> {
         match self {
             PinPolicy::Default => Ok(0),
             _ => Tlv::write(buf, 0xaa, &[self.into()]),
@@ -81,7 +81,7 @@ impl From<TouchPolicy> for u8 {
 impl TouchPolicy {
     /// Writes the `TouchPolicy` in the format the YubiKey expects during key generation
     /// or importation.
-    pub(crate) fn write(self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub(crate) fn write(self, buf: &mut [u8]) -> Result<usize> {
         match self {
             TouchPolicy::Default => Ok(0),
             _ => Tlv::write(buf, 0xab, &[self.into()]),

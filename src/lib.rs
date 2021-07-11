@@ -149,7 +149,7 @@ mod transaction;
 pub mod yubikey;
 
 pub use self::{
-    error::Error,
+    error::{Error, Result},
     key::Key,
     mgm::MgmKey,
     readers::Readers,

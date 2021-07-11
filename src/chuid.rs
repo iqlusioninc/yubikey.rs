@@ -30,7 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{error::Error, yubikey::YubiKey};
+use crate::{Error, Result, YubiKey};
 use getrandom::getrandom;
 use std::fmt::{self, Debug, Display};
 use subtle_encoding::hex;
@@ -87,7 +87,7 @@ pub struct Uuid(pub [u8; CARDID_SIZE]);
 
 impl Uuid {
     /// Generate a random Cardholder Unique Identifier (CHUID) UUID
-    pub fn generate() -> Result<Self, Error> {
+    pub fn generate() -> Result<Self> {
         let mut id = [0u8; CARDID_SIZE];
         getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
         Ok(Self(id))
@@ -100,14 +100,14 @@ pub struct ChuId(pub [u8; CHUID_SIZE]);
 
 impl ChuId {
     /// Return FASC-N component of CHUID
-    pub fn fascn(&self) -> Result<[u8; FASCN_SIZE], Error> {
+    pub fn fascn(&self) -> Result<[u8; FASCN_SIZE]> {
         let mut fascn = [0u8; FASCN_SIZE];
         fascn.copy_from_slice(&self.0[CHUID_FASCN_OFFS..(CHUID_FASCN_OFFS + FASCN_SIZE)]);
         Ok(fascn)
     }
 
     /// Return Card UUID/GUID component of CHUID
-    pub fn uuid(&self) -> Result<[u8; CARDID_SIZE], Error> {
+    pub fn uuid(&self) -> Result<[u8; CARDID_SIZE]> {
         let mut uuid = [0u8; CARDID_SIZE];
         uuid.copy_from_slice(&self.0[CHUID_GUID_OFFS..(CHUID_GUID_OFFS + CARDID_SIZE)]);
         Ok(uuid)
@@ -115,7 +115,7 @@ impl ChuId {
 
     /// Return expiration date component of CHUID
     // TODO(tarcieri): parse expiration?
-    pub fn expiration(&self) -> Result<[u8; EXPIRATION_SIZE], Error> {
+    pub fn expiration(&self) -> Result<[u8; EXPIRATION_SIZE]> {
         let mut expiration = [0u8; EXPIRATION_SIZE];
         expiration.copy_from_slice(
             &self.0[CHUID_EXPIRATION_OFFS..(CHUID_EXPIRATION_OFFS + EXPIRATION_SIZE)],
@@ -124,7 +124,7 @@ impl ChuId {
     }
 
     /// Get Cardholder Unique Identifier (CHUID)
-    pub fn get(yubikey: &mut YubiKey) -> Result<ChuId, Error> {
+    pub fn get(yubikey: &mut YubiKey) -> Result<ChuId> {
         let txn = yubikey.begin_transaction()?;
         let response = txn.fetch_object(OBJ_CHUID)?;
 
@@ -140,7 +140,7 @@ impl ChuId {
 
     /// Set Cardholder Unique Identifier (CHUID)
     #[cfg(feature = "untested")]
-    pub fn set(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
+    pub fn set(&self, yubikey: &mut YubiKey) -> Result<()> {
         let mut buf = CHUID_TMPL.to_vec();
         buf[0..self.0.len()].copy_from_slice(&self.0);
 

@@ -30,7 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::error::Error;
+use crate::{Error, Result};
 use getrandom::getrandom;
 use log::error;
 use std::convert::{TryFrom, TryInto};
@@ -97,7 +97,7 @@ pub struct MgmKey([u8; DES_LEN_3DES]);
 
 impl MgmKey {
     /// Generate a random MGM key
-    pub fn generate() -> Result<Self, Error> {
+    pub fn generate() -> Result<Self> {
         let mut key_bytes = [0u8; DES_LEN_3DES];
 
         if getrandom(&mut key_bytes).is_err() {
@@ -110,14 +110,14 @@ impl MgmKey {
     /// Create an MGM key from byte slice.
     ///
     /// Returns an error if the slice is the wrong size or the key is weak.
-    pub fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self> {
         bytes.as_ref().try_into()
     }
 
     /// Create an MGM key from the given byte array.
     ///
     /// Returns an error if the key is weak.
-    pub fn new(key_bytes: [u8; DES_LEN_3DES]) -> Result<Self, Error> {
+    pub fn new(key_bytes: [u8; DES_LEN_3DES]) -> Result<Self> {
         if is_weak_key(&key_bytes) {
             error!(
                 "blacklisting key '{:?}' since it's weak (with odd parity)",
@@ -132,7 +132,7 @@ impl MgmKey {
 
     /// Get derived management key (MGM)
     #[cfg(feature = "untested")]
-    pub fn get_derived(yubikey: &mut YubiKey, pin: &[u8]) -> Result<Self, Error> {
+    pub fn get_derived(yubikey: &mut YubiKey, pin: &[u8]) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
 
         // recover management key
@@ -157,7 +157,7 @@ impl MgmKey {
 
     /// Get protected management key (MGM)
     #[cfg(feature = "untested")]
-    pub fn get_protected(yubikey: &mut YubiKey) -> Result<Self, Error> {
+    pub fn get_protected(yubikey: &mut YubiKey) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
 
         let protected_data = ProtectedData::read(&txn).map_err(|e| {
@@ -187,7 +187,7 @@ impl MgmKey {
     ///
     /// This will wipe any metadata related to derived and PIN-protected management keys.
     #[cfg(feature = "untested")]
-    pub fn set_default(yubikey: &mut YubiKey) -> Result<(), Error> {
+    pub fn set_default(yubikey: &mut YubiKey) -> Result<()> {
         MgmKey::default().set_manual(yubikey, false)
     }
 
@@ -198,7 +198,7 @@ impl MgmKey {
     ///
     /// This will wipe any metadata related to derived and PIN-protected management keys.
     #[cfg(feature = "untested")]
-    pub fn set_manual(&self, yubikey: &mut YubiKey, require_touch: bool) -> Result<(), Error> {
+    pub fn set_manual(&self, yubikey: &mut YubiKey, require_touch: bool) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 
         txn.set_mgm_key(&self, require_touch).map_err(|e| {
@@ -257,7 +257,7 @@ impl MgmKey {
     ///
     /// This enables key management operations to be performed with access to the PIN.
     #[cfg(feature = "untested")]
-    pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
+    pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 
         txn.set_mgm_key(self, false).map_err(|e| {
@@ -364,7 +364,7 @@ impl Drop for MgmKey {
 impl<'a> TryFrom<&'a [u8]> for MgmKey {
     type Error = Error;
 
-    fn try_from(key_bytes: &'a [u8]) -> Result<Self, Error> {
+    fn try_from(key_bytes: &'a [u8]) -> Result<Self> {
         Self::new(key_bytes.try_into().map_err(|_| Error::SizeError)?)
     }
 }

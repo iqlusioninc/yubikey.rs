@@ -35,7 +35,7 @@ use crate::{
     cccid::Ccc,
     chuid::ChuId,
     config::Config,
-    error::Error,
+    error::{Error, Result},
     mgm::MgmKey,
     readers::{Reader, Readers},
     transaction::Transaction,
@@ -92,7 +92,7 @@ impl From<Serial> for u32 {
 impl FromStr for Serial {
     type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self, Error> {
+    fn from_str(s: &str) -> Result<Self> {
         u32::from_str(s).map(Serial).map_err(|_| Error::ParseError)
     }
 }
@@ -157,7 +157,7 @@ impl YubiKey {
     /// attached to the same system, use [`YubiKey::open_by_serial`] or
     /// [`yubikey::Readers`][`Readers`] to select from the available
     /// PC/SC readers.
-    pub fn open() -> Result<Self, Error> {
+    pub fn open() -> Result<Self> {
         let mut readers = Readers::open().map_err(|e| match e {
             Error::PcscError {
                 inner: Some(pcsc::Error::NoReadersAvailable),
@@ -180,7 +180,7 @@ impl YubiKey {
     }
 
     /// Open a YubiKey with a specific serial number.
-    pub fn open_by_serial(serial: Serial) -> Result<Self, Error> {
+    pub fn open_by_serial(serial: Serial) -> Result<Self> {
         let mut readers = Readers::open().map_err(|e| match e {
             Error::PcscError {
                 inner: Some(pcsc::Error::NoReadersAvailable),
@@ -205,7 +205,7 @@ impl YubiKey {
 
     /// Reconnect to a YubiKey
     #[cfg(feature = "untested")]
-    pub fn reconnect(&mut self) -> Result<(), Error> {
+    pub fn reconnect(&mut self) -> Result<()> {
         info!("trying to reconnect to current reader");
 
         self.card.reconnect(
@@ -230,7 +230,7 @@ impl YubiKey {
     }
 
     /// Begin a transaction.
-    pub(crate) fn begin_transaction(&mut self) -> Result<Transaction<'_>, Error> {
+    pub(crate) fn begin_transaction(&mut self) -> Result<Transaction<'_>> {
         // TODO(tarcieri): reconnect support
         Transaction::new(&mut self.card)
     }
@@ -255,22 +255,22 @@ impl YubiKey {
     }
 
     /// Get device configuration.
-    pub fn config(&mut self) -> Result<Config, Error> {
+    pub fn config(&mut self) -> Result<Config> {
         Config::get(self)
     }
 
     /// Get CHUID
-    pub fn chuid(&mut self) -> Result<ChuId, Error> {
+    pub fn chuid(&mut self) -> Result<ChuId> {
         ChuId::get(self)
     }
 
     /// Get CCCID
-    pub fn cccid(&mut self) -> Result<Ccc, Error> {
+    pub fn cccid(&mut self) -> Result<Ccc> {
         Ccc::get(self)
     }
 
     /// Authenticate to the card using the provided management key (MGM).
-    pub fn authenticate(&mut self, mgm_key: MgmKey) -> Result<(), Error> {
+    pub fn authenticate(&mut self, mgm_key: MgmKey) -> Result<()> {
         let txn = self.begin_transaction()?;
 
         // get a challenge from the card
@@ -325,7 +325,7 @@ impl YubiKey {
 
     /// Deauthenticate
     #[cfg(feature = "untested")]
-    pub fn deauthenticate(&mut self) -> Result<(), Error> {
+    pub fn deauthenticate(&mut self) -> Result<()> {
         let txn = self.begin_transaction()?;
 
         let status_words = Apdu::new(Ins::SelectApplication)
@@ -346,7 +346,7 @@ impl YubiKey {
     }
 
     /// Verify device PIN.
-    pub fn verify_pin(&mut self, pin: &[u8]) -> Result<(), Error> {
+    pub fn verify_pin(&mut self, pin: &[u8]) -> Result<()> {
         {
             let txn = self.begin_transaction()?;
             txn.verify_pin(pin)?;
@@ -360,7 +360,7 @@ impl YubiKey {
     }
 
     /// Get the number of PIN retries
-    pub fn get_pin_retries(&mut self) -> Result<u8, Error> {
+    pub fn get_pin_retries(&mut self) -> Result<u8> {
         let txn = self.begin_transaction()?;
 
         // Force a re-select to unverify, because once verified the spec dictates that
@@ -378,7 +378,7 @@ impl YubiKey {
 
     /// Set the number of PIN retries
     #[cfg(feature = "untested")]
-    pub fn set_pin_retries(&mut self, pin_tries: u8, puk_tries: u8) -> Result<(), Error> {
+    pub fn set_pin_retries(&mut self, pin_tries: u8, puk_tries: u8) -> Result<()> {
         // Special case: if either retry count is 0, it's a successful no-op
         if pin_tries == 0 || puk_tries == 0 {
             return Ok(());
@@ -402,7 +402,7 @@ impl YubiKey {
     ///
     /// The default PIN code is 123456
     #[cfg(feature = "untested")]
-    pub fn change_pin(&mut self, current_pin: &[u8], new_pin: &[u8]) -> Result<(), Error> {
+    pub fn change_pin(&mut self, current_pin: &[u8], new_pin: &[u8]) -> Result<()> {
         {
             let txn = self.begin_transaction()?;
             txn.change_ref(ChangeRefAction::ChangePin, current_pin, new_pin)?;
@@ -417,7 +417,7 @@ impl YubiKey {
 
     /// Set PIN last changed
     #[cfg(feature = "untested")]
-    pub fn set_pin_last_changed(yubikey: &mut YubiKey) -> Result<(), Error> {
+    pub fn set_pin_last_changed(yubikey: &mut YubiKey) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 
         let mut admin_data = AdminData::read(&txn)?;
@@ -452,14 +452,14 @@ impl YubiKey {
     ///
     /// The default PUK code is 12345678.
     #[cfg(feature = "untested")]
-    pub fn change_puk(&mut self, current_puk: &[u8], new_puk: &[u8]) -> Result<(), Error> {
+    pub fn change_puk(&mut self, current_puk: &[u8], new_puk: &[u8]) -> Result<()> {
         let txn = self.begin_transaction()?;
         txn.change_ref(ChangeRefAction::ChangePuk, current_puk, new_puk)
     }
 
     /// Block PUK: permanently prevent the PIN from becoming unblocked
     #[cfg(feature = "untested")]
-    pub fn block_puk(yubikey: &mut YubiKey) -> Result<(), Error> {
+    pub fn block_puk(yubikey: &mut YubiKey) -> Result<()> {
         let mut puk = [0x30, 0x42, 0x41, 0x44, 0x46, 0x30, 0x30, 0x44];
         let mut tries_remaining: i32 = -1;
         let mut flags = [0];
@@ -523,28 +523,28 @@ impl YubiKey {
     /// Unblock a Personal Identification Number (PIN) using a previously
     /// configured PIN Unblocking Key (PUK).
     #[cfg(feature = "untested")]
-    pub fn unblock_pin(&mut self, puk: &[u8], new_pin: &[u8]) -> Result<(), Error> {
+    pub fn unblock_pin(&mut self, puk: &[u8], new_pin: &[u8]) -> Result<()> {
         let txn = self.begin_transaction()?;
         txn.change_ref(ChangeRefAction::UnblockPin, puk, new_pin)
     }
 
     /// Fetch an object from the YubiKey
     #[cfg(feature = "untested")]
-    pub fn fetch_object(&mut self, object_id: ObjectId) -> Result<Buffer, Error> {
+    pub fn fetch_object(&mut self, object_id: ObjectId) -> Result<Buffer> {
         let txn = self.begin_transaction()?;
         txn.fetch_object(object_id)
     }
 
     /// Save an object
     #[cfg(feature = "untested")]
-    pub fn save_object(&mut self, object_id: ObjectId, indata: &mut [u8]) -> Result<(), Error> {
+    pub fn save_object(&mut self, object_id: ObjectId, indata: &mut [u8]) -> Result<()> {
         let txn = self.begin_transaction()?;
         txn.save_object(object_id, indata)
     }
 
     /// Get an auth challenge
     #[cfg(feature = "untested")]
-    pub fn get_auth_challenge(&mut self) -> Result<[u8; 8], Error> {
+    pub fn get_auth_challenge(&mut self) -> Result<[u8; 8]> {
         let txn = self.begin_transaction()?;
 
         let response = Apdu::new(Ins::Authenticate)
@@ -561,7 +561,7 @@ impl YubiKey {
 
     /// Verify an auth response
     #[cfg(feature = "untested")]
-    pub fn verify_auth_response(&mut self, response: [u8; 8]) -> Result<(), Error> {
+    pub fn verify_auth_response(&mut self, response: [u8; 8]) -> Result<()> {
         let mut data = [0u8; 12];
         data[0] = 0x7c;
         data[1] = 0x0a;
@@ -591,7 +591,7 @@ impl YubiKey {
     ///
     /// The reset function is only available when both pins are blocked.
     #[cfg(feature = "untested")]
-    pub fn reset_device(&mut self) -> Result<(), Error> {
+    pub fn reset_device(&mut self) -> Result<()> {
         let templ = [0, Ins::Reset.code(), 0, 0];
         let txn = self.begin_transaction()?;
         let status_words = txn.transfer_data(&templ, &[], 255)?.status_words();
@@ -607,7 +607,7 @@ impl YubiKey {
 impl<'a> TryFrom<&'a Reader<'_>> for YubiKey {
     type Error = Error;
 
-    fn try_from(reader: &'a Reader<'_>) -> Result<Self, Error> {
+    fn try_from(reader: &'a Reader<'_>) -> Result<Self> {
         let mut card = reader.connect().map_err(|e| {
             error!("error connecting to reader '{}': {}", reader.name(), e);
             e

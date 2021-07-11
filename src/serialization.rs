@@ -30,7 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{error::Error, Buffer, ObjectId, CB_OBJ_TAG_MIN};
+use crate::{Buffer, Error, ObjectId, Result, CB_OBJ_TAG_MIN};
 
 pub const OBJ_DISCOVERY: u32 = 0x7e;
 
@@ -44,7 +44,7 @@ pub(crate) struct Tlv<'a> {
 
 impl<'a> Tlv<'a> {
     /// Parses a `Tlv` from a buffer, returning the remainder of the buffer.
-    pub(crate) fn parse(buffer: &'a [u8]) -> Result<(&'a [u8], Self), Error> {
+    pub(crate) fn parse(buffer: &'a [u8]) -> Result<(&'a [u8], Self)> {
         if buffer.len() < CB_OBJ_TAG_MIN || !has_valid_length(&buffer[1..], buffer.len() - 1) {
             return Err(Error::SizeError);
         }
@@ -61,7 +61,7 @@ impl<'a> Tlv<'a> {
 
     /// Takes a [`Buffer`] containing a single `Tlv` with the given tag, and returns a
     /// `Buffer` containing only the value part of the `Tlv`.
-    pub(crate) fn parse_single(mut buffer: Buffer, tag: u8) -> Result<Buffer, Error> {
+    pub(crate) fn parse_single(mut buffer: Buffer, tag: u8) -> Result<Buffer> {
         if buffer.len() < CB_OBJ_TAG_MIN || !has_valid_length(&buffer[1..], buffer.len() - 1) {
             return Err(Error::SizeError);
         }
@@ -79,7 +79,7 @@ impl<'a> Tlv<'a> {
     }
 
     /// Writes a TLV to the given buffer.
-    pub(crate) fn write(buffer: &mut [u8], tag: u8, value: &[u8]) -> Result<usize, Error> {
+    pub(crate) fn write(buffer: &mut [u8], tag: u8, value: &[u8]) -> Result<usize> {
         if buffer.len() < CB_OBJ_TAG_MIN {
             return Err(Error::SizeError);
         }
@@ -103,7 +103,7 @@ impl<'a> Tlv<'a> {
         tag: u8,
         length: usize,
         value: Gen,
-    ) -> Result<usize, Error>
+    ) -> Result<usize>
     where
         Gen: FnOnce(&mut [u8]),
     {
@@ -124,7 +124,7 @@ impl<'a> Tlv<'a> {
 }
 
 /// Set length
-pub(crate) fn set_length(buffer: &mut [u8], length: usize) -> Result<usize, Error> {
+pub(crate) fn set_length(buffer: &mut [u8], length: usize) -> Result<usize> {
     if length < 0x80 {
         if buffer.is_empty() {
             Err(Error::SizeError)

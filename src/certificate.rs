@@ -31,7 +31,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    error::Error,
+    error::{Error, Result},
     key::{sign_data, AlgorithmId, SlotId},
     serialization::*,
     transaction::Transaction,
@@ -82,13 +82,13 @@ impl From<[u8; 20]> for Serial {
 }
 
 impl TryFrom<&[u8]> for Serial {
-    type Error = ();
+    type Error = Error;
 
-    fn try_from(bytes: &[u8]) -> Result<Serial, ()> {
+    fn try_from(bytes: &[u8]) -> Result<Serial> {
         if bytes.len() <= 20 {
             Ok(Serial(BigUint::from_bytes_be(&bytes)))
         } else {
-            Err(())
+            Err(Error::ParseError)
         }
     }
 }
@@ -112,7 +112,7 @@ pub enum CertInfo {
 impl TryFrom<u8> for CertInfo {
     type Error = Error;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
+    fn try_from(value: u8) -> Result<Self> {
         match value {
             0x00 => Ok(CertInfo::Uncompressed),
             0x01 => Ok(CertInfo::Gzip),
@@ -190,7 +190,7 @@ impl fmt::Debug for PublicKeyInfo {
 }
 
 impl PublicKeyInfo {
-    fn parse(subject_pki: &SubjectPublicKeyInfo<'_>) -> Result<Self, Error> {
+    fn parse(subject_pki: &SubjectPublicKeyInfo<'_>) -> Result<Self> {
         match subject_pki.algorithm.algorithm.to_string().as_str() {
             OID_RSA_ENCRYPTION => {
                 let pubkey = read_pki::rsa_pubkey(subject_pki.subject_public_key.data)?;
@@ -330,7 +330,7 @@ pub struct Certificate {
 impl<'a> TryFrom<&'a [u8]> for Certificate {
     type Error = Error;
 
-    fn try_from(bytes: &'a [u8]) -> Result<Self, Error> {
+    fn try_from(bytes: &'a [u8]) -> Result<Self> {
         Self::from_bytes(bytes.to_vec())
     }
 }
@@ -350,7 +350,7 @@ impl Certificate {
         subject: &[RelativeDistinguishedName<'_>],
         subject_pki: PublicKeyInfo,
         extensions: &[x509::Extension<'_, O>],
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let serial = serial.into();
 
         let mut tbs_cert = Buffer::new(Vec::with_capacity(CB_OBJ_MAX));
@@ -453,7 +453,7 @@ impl Certificate {
     }
 
     /// Read a certificate from the given slot in the YubiKey
-    pub fn read(yubikey: &mut YubiKey, slot: SlotId) -> Result<Self, Error> {
+    pub fn read(yubikey: &mut YubiKey, slot: SlotId) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
         let buf = read_certificate(&txn, slot)?;
 
@@ -465,25 +465,20 @@ impl Certificate {
     }
 
     /// Write this certificate into the YubiKey in the given slot
-    pub fn write(
-        &self,
-        yubikey: &mut YubiKey,
-        slot: SlotId,
-        certinfo: CertInfo,
-    ) -> Result<(), Error> {
+    pub fn write(&self, yubikey: &mut YubiKey, slot: SlotId, certinfo: CertInfo) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
         write_certificate(&txn, slot, Some(&self.data), certinfo)
     }
 
     /// Delete a certificate located at the given slot of the given YubiKey
     #[cfg(feature = "untested")]
-    pub fn delete(yubikey: &mut YubiKey, slot: SlotId) -> Result<(), Error> {
+    pub fn delete(yubikey: &mut YubiKey, slot: SlotId) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
         write_certificate(&txn, slot, None, CertInfo::Uncompressed)
     }
 
     /// Initialize a local certificate struct from the given bytebuffer
-    pub fn from_bytes(cert: impl Into<Buffer>) -> Result<Self, Error> {
+    pub fn from_bytes(cert: impl Into<Buffer>) -> Result<Self> {
         let cert = cert.into();
 
         if cert.is_empty() {
@@ -544,7 +539,7 @@ impl AsRef<[u8]> for Certificate {
 }
 
 /// Read certificate
-pub(crate) fn read_certificate(txn: &Transaction<'_>, slot: SlotId) -> Result<Buffer, Error> {
+pub(crate) fn read_certificate(txn: &Transaction<'_>, slot: SlotId) -> Result<Buffer> {
     let object_id = slot.object_id();
 
     let buf = match txn.fetch_object(object_id) {
@@ -572,7 +567,7 @@ pub(crate) fn write_certificate(
     slot: SlotId,
     data: Option<&[u8]>,
     certinfo: CertInfo,
-) -> Result<(), Error> {
+) -> Result<()> {
     let object_id = slot.object_id();
 
     if data.is_none() {
@@ -602,7 +597,7 @@ mod read_pki {
     use rsa::{BigUint, RSAPublicKey};
 
     use super::{OID_NIST_P256, OID_NIST_P384};
-    use crate::{error::Error, key::AlgorithmId};
+    use crate::{key::AlgorithmId, Error, Result};
 
     /// From [RFC 8017](https://tools.ietf.org/html/rfc8017#appendix-A.1.1):
     /// ```text
@@ -611,7 +606,7 @@ mod read_pki {
     ///     publicExponent    INTEGER   -- e
     /// }
     /// ```
-    pub(super) fn rsa_pubkey(encoded: &[u8]) -> Result<RSAPublicKey, Error> {
+    pub(super) fn rsa_pubkey(encoded: &[u8]) -> Result<RSAPublicKey> {
         fn parse_rsa_pubkey(i: &[u8]) -> IResult<&[u8], DerObject<'_>, BerError> {
             parse_der_sequence_defined!(i, parse_der_integer >> parse_der_integer)
         }
@@ -650,7 +645,7 @@ mod read_pki {
     ///   -- specifiedCurve  SpecifiedECDomain
     /// }
     /// ```
-    pub(super) fn ec_parameters(parameters: &DerObject<'_>) -> Result<AlgorithmId, Error> {
+    pub(super) fn ec_parameters(parameters: &DerObject<'_>) -> Result<AlgorithmId> {
         let curve_oid = parameters.as_oid_val().map_err(|_| Error::InvalidObject)?;
 
         match curve_oid.to_string().as_str() {

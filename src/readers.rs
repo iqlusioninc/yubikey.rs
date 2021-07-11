@@ -1,6 +1,6 @@
 //! Support for enumerating available readers
 
-use crate::{error::Error, yubikey::YubiKey};
+use crate::{Result, YubiKey};
 use std::{
     borrow::Cow,
     convert::TryInto,
@@ -23,7 +23,7 @@ pub struct Readers {
 impl Readers {
     /// Open a PC/SC context, which can be used to enumerate available PC/SC
     /// readers (which can be used to connect to YubiKeys).
-    pub fn open() -> Result<Self, Error> {
+    pub fn open() -> Result<Self> {
         let ctx = pcsc::Context::establish(pcsc::Scope::System)?;
         let reader_names = vec![0u8; ctx.list_readers_len()?];
         Ok(Self {
@@ -33,7 +33,7 @@ impl Readers {
     }
 
     /// Iterate over the available readers
-    pub fn iter(&mut self) -> Result<Iter<'_>, Error> {
+    pub fn iter(&mut self) -> Result<Iter<'_>> {
         let Self { ctx, reader_names } = self;
 
         let reader_cstrs: Vec<_> = {
@@ -77,12 +77,12 @@ impl<'ctx> Reader<'ctx> {
     }
 
     /// Open a connection to this reader, returning a `YubiKey` if successful
-    pub fn open(&self) -> Result<YubiKey, Error> {
+    pub fn open(&self) -> Result<YubiKey> {
         self.try_into()
     }
 
     /// Connect to this reader, returning its `pcsc::Card`
-    pub(crate) fn connect(&self) -> Result<pcsc::Card, Error> {
+    pub(crate) fn connect(&self) -> Result<pcsc::Card> {
         let ctx = self.ctx.lock().unwrap();
         Ok(ctx.connect(self.name, pcsc::ShareMode::Shared, pcsc::Protocols::T1)?)
     }
