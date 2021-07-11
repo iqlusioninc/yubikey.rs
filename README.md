@@ -1,6 +1,6 @@
-<img src="https://raw.githubusercontent.com/iqlusioninc/yubikey-piv.rs/main/img/logo.png" width="150" height="110">
+<img src="https://raw.githubusercontent.com/iqlusioninc/yubikey.rs/main/img/logo.png" width="150" height="110">
 
-# yubikey-piv.rs
+# yubikey.rs
 
 [![crate][crate-image]][crate-link]
 [![Docs][docs-image]][docs-link]
@@ -147,7 +147,7 @@ For more information, please see [CODE_OF_CONDUCT.md][cc-md].
 
 ## License
 
-**yubikey-piv.rs** is a fork of and originally a mechanical translation from
+**yubikey.rs** is a fork of and originally a mechanical translation from
 Yubico's [yubico-piv-tool], a C library/CLI program. The original library
 was licensed under a [2-Clause BSD License][BSDL], which this library inherits
 as a derived work.
@@ -188,18 +188,18 @@ or conditions.
 
 [//]: # (badges)
 
-[crate-image]: https://img.shields.io/crates/v/yubikey-piv.svg
-[crate-link]: https://crates.io/crates/yubikey-piv
-[docs-image]: https://docs.rs/yubikey-piv/badge.svg
-[docs-link]: https://docs.rs/yubikey-piv/
+[crate-image]: https://img.shields.io/crates/v/yubikey.svg
+[crate-link]: https://crates.io/crates/yubikey
+[docs-image]: https://docs.rs/yubikey/badge.svg
+[docs-link]: https://docs.rs/yubikey/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
-[license-link]: https://github.com/iqlusioninc/yubikey-piv.rs/blob/main/COPYING
+[license-link]: https://github.com/iqlusioninc/yubikey.rs/blob/main/COPYING
 [rustc-image]: https://img.shields.io/badge/rustc-1.46+-blue.svg
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
-[build-image]: https://github.com/iqlusioninc/yubikey-piv.rs/workflows/CI/badge.svg?branch=main&event=push
-[build-link]: https://github.com/iqlusioninc/yubikey-piv.rs/actions
+[build-image]: https://github.com/iqlusioninc/yubikey.rs/workflows/CI/badge.svg?branch=main&event=push
+[build-link]: https://github.com/iqlusioninc/yubikey.rs/actions
 [gitter-image]: https://badges.gitter.im/badge.svg
 [gitter-link]: https://gitter.im/iqlusioninc/community
 
@@ -214,18 +214,18 @@ or conditions.
 [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/
 [Corrode]: https://github.com/jameysharp/corrode
 [cc-web]: https://contributor-covenant.org/
-[cc-md]: https://github.com/iqlusioninc/yubikey-piv.rs/blob/main/CODE_OF_CONDUCT.md
+[cc-md]: https://github.com/iqlusioninc/yubikey.rs/blob/main/CODE_OF_CONDUCT.md
 [BSDL]: https://opensource.org/licenses/BSD-2-Clause
 
 [//]: # (github issues)
 
-[#18]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/18
-[#20]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/20
-[#21]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/21
-[#22]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/22
-[#23]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/23
-[#24]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/24
-[#25]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/25
-[#26]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/26
-[#27]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/27
-[#28]: https://github.com/iqlusioninc/yubikey-piv.rs/issues/28
+[#18]: https://github.com/iqlusioninc/yubikey.rs/issues/18
+[#20]: https://github.com/iqlusioninc/yubikey.rs/issues/20
+[#21]: https://github.com/iqlusioninc/yubikey.rs/issues/21
+[#22]: https://github.com/iqlusioninc/yubikey.rs/issues/22
+[#23]: https://github.com/iqlusioninc/yubikey.rs/issues/23
+[#24]: https://github.com/iqlusioninc/yubikey.rs/issues/24
+[#25]: https://github.com/iqlusioninc/yubikey.rs/issues/25
+[#26]: https://github.com/iqlusioninc/yubikey.rs/issues/26
+[#27]: https://github.com/iqlusioninc/yubikey.rs/issues/27
+[#28]: https://github.com/iqlusioninc/yubikey.rs/issues/28

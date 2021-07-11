@@ -68,7 +68,7 @@
 //!
 //! ## License
 //!
-//! **yubikey-piv.rs** is a fork of and originally a mechanical translation from
+//! **yubikey.rs** is a fork of and originally a mechanical translation from
 //! Yubico's [yubico-piv-tool], a C library/CLI program. The original library
 //! was licensed under a [2-Clause BSD License][BSDL], which this library inherits
 //! as a derived work.
@@ -83,12 +83,12 @@
 //! [YubiKey NEO]: https://support.yubico.com/support/solutions/articles/15000006494-yubikey-neo
 //! [YubiKey 4]: https://support.yubico.com/support/solutions/articles/15000006486-yubikey-4
 //! [YubiKey 5]: https://www.yubico.com/products/yubikey-5-overview/
-//! [status]: https://github.com/iqlusioninc/yubikey-piv.rs#status
+//! [status]: https://github.com/iqlusioninc/yubikey.rs#status
 //! [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/
 //! [Corrode]: https://github.com/jameysharp/corrode
 //! [piv-tool-guide]: https://www.yubico.com/wp-content/uploads/2016/05/Yubico_PIV_Tool_Command_Line_Guide_en.pdf
 //! [cc-web]: https://contributor-covenant.org/
-//! [cc-md]: https://github.com/iqlusioninc/yubikey-piv.rs/blob/main/CODE_OF_CONDUCT.md
+//! [cc-md]: https://github.com/iqlusioninc/yubikey.rs/blob/main/CODE_OF_CONDUCT.md
 //! [BSDL]: https://opensource.org/licenses/BSD-2-Clause
 
 // Adapted from yubico-piv-tool:
@@ -122,8 +122,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey-piv.rs/main/img/logo.png",
-    html_root_url = "https://docs.rs/yubikey-piv/0.3.0"
+    html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey.rs/main/img/logo.png",
+    html_root_url = "https://docs.rs/yubikey/0.4.0-pre"
 )]
 #![forbid(unsafe_code)]
 #![warn(

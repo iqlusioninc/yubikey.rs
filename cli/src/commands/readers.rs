@@ -7,7 +7,7 @@ use std::{
     process::exit,
 };
 use termcolor::{ColorSpec, StandardStreamLock, WriteColor};
-use yubikey_piv::{Readers, Serial};
+use yubikey::{Readers, Serial};
 
 /// The `readers` subcommand
 #[derive(Debug, Options)]

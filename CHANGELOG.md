@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - `MgmKey::set` method ([#224])
 
-[#223]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/223
-[#224]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/224
+[#223]: https://github.com/iqlusioninc/yubikey.rs/pull/223
+[#224]: https://github.com/iqlusioninc/yubikey.rs/pull/224
 
 ## 0.2.0 (2021-01-30)
 ### Changed
@@ -27,10 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump MSRV to 1.46+ ([#208])
 - Bump `pbkdf2` dependency to v0.7 ([#219])
 
-[#194]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/194
-[#207]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/207
-[#208]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/208
-[#219]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/219
+[#194]: https://github.com/iqlusioninc/yubikey.rs/pull/194
+[#207]: https://github.com/iqlusioninc/yubikey.rs/pull/207
+[#208]: https://github.com/iqlusioninc/yubikey.rs/pull/208
+[#219]: https://github.com/iqlusioninc/yubikey.rs/pull/219
 
 ## 0.1.0 (2020-10-19)
 ### Added
@@ -57,22 +57,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - YubiKey NEO support ([#63])
 
-[#177]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/177
-[#175]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/175
-[#128]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/128
-[#82]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/82
-[#73]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/73
-[#88]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/88
-[#80]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/80
-[#69]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/69
-[#68]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/68
-[#67]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/67
-[#65]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/65
-[#64]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/64
-[#63]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/63
-[#62]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/62
-[#61]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/61
-[#60]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/60
+[#177]: https://github.com/iqlusioninc/yubikey.rs/pull/177
+[#175]: https://github.com/iqlusioninc/yubikey.rs/pull/175
+[#128]: https://github.com/iqlusioninc/yubikey.rs/pull/128
+[#82]: https://github.com/iqlusioninc/yubikey.rs/pull/82
+[#73]: https://github.com/iqlusioninc/yubikey.rs/pull/73
+[#88]: https://github.com/iqlusioninc/yubikey.rs/pull/88
+[#80]: https://github.com/iqlusioninc/yubikey.rs/pull/80
+[#69]: https://github.com/iqlusioninc/yubikey.rs/pull/69
+[#68]: https://github.com/iqlusioninc/yubikey.rs/pull/68
+[#67]: https://github.com/iqlusioninc/yubikey.rs/pull/67
+[#65]: https://github.com/iqlusioninc/yubikey.rs/pull/65
+[#64]: https://github.com/iqlusioninc/yubikey.rs/pull/64
+[#63]: https://github.com/iqlusioninc/yubikey.rs/pull/63
+[#62]: https://github.com/iqlusioninc/yubikey.rs/pull/62
+[#61]: https://github.com/iqlusioninc/yubikey.rs/pull/61
+[#60]: https://github.com/iqlusioninc/yubikey.rs/pull/60
 
 ## 0.0.3 (2019-12-02)
 ### Added
@@ -90,17 +90,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ins` (APDU instruction codes) enum ([#33])
 - Factor `Response` into `apdu` module; improved debugging ([#32])
 
-[#51]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/51
-[#45]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/45
-[#44]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/44
-[#43]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/43
-[#42]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/42
-[#39]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/39
-[#37]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/37
-[#36]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/36
-[#34]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/34
-[#33]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/33
-[#32]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/32
+[#51]: https://github.com/iqlusioninc/yubikey.rs/pull/51
+[#45]: https://github.com/iqlusioninc/yubikey.rs/pull/45
+[#44]: https://github.com/iqlusioninc/yubikey.rs/pull/44
+[#43]: https://github.com/iqlusioninc/yubikey.rs/pull/43
+[#42]: https://github.com/iqlusioninc/yubikey.rs/pull/42
+[#39]: https://github.com/iqlusioninc/yubikey.rs/pull/39
+[#37]: https://github.com/iqlusioninc/yubikey.rs/pull/37
+[#36]: https://github.com/iqlusioninc/yubikey.rs/pull/36
+[#34]: https://github.com/iqlusioninc/yubikey.rs/pull/34
+[#33]: https://github.com/iqlusioninc/yubikey.rs/pull/33
+[#32]: https://github.com/iqlusioninc/yubikey.rs/pull/32
 
 ## 0.0.2 (2019-11-25)
 ### Added
@@ -117,16 +117,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use `log` crate for logging ([#7])
 - Replace `ErrorKind::Ok` with `Result` ([#6])
 
-[#30]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/30
-[#19]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/19
-[#17]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/17
-[#15]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/15
-[#13]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/13
-[#10]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/10
-[#9]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/9
-[#8]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/8
-[#7]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/7
-[#6]: https://github.com/iqlusioninc/yubikey-piv.rs/pull/6
+[#30]: https://github.com/iqlusioninc/yubikey.rs/pull/30
+[#19]: https://github.com/iqlusioninc/yubikey.rs/pull/19
+[#17]: https://github.com/iqlusioninc/yubikey.rs/pull/17
+[#15]: https://github.com/iqlusioninc/yubikey.rs/pull/15
+[#13]: https://github.com/iqlusioninc/yubikey.rs/pull/13
+[#10]: https://github.com/iqlusioninc/yubikey.rs/pull/10
+[#9]: https://github.com/iqlusioninc/yubikey.rs/pull/9
+[#8]: https://github.com/iqlusioninc/yubikey.rs/pull/8
+[#7]: https://github.com/iqlusioninc/yubikey.rs/pull/7
+[#6]: https://github.com/iqlusioninc/yubikey.rs/pull/6
 
 ## 0.0.1 (2019-11-18)
 - Initial release

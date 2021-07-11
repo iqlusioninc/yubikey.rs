@@ -20,7 +20,7 @@ use std::str;
 use subtle_encoding::hex;
 use termcolor::{ColorSpec, StandardStreamLock, WriteColor};
 use x509_parser::parse_x509_certificate;
-use yubikey_piv::{certificate::Certificate, key::*, YubiKey};
+use yubikey::{certificate::Certificate, key::*, YubiKey};
 
 ///Write information about certificate found in slot a la yubico-piv-tool output.
 pub fn print_cert_info(

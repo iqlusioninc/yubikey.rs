@@ -4,7 +4,7 @@ use crate::terminal::STDOUT;
 use gumdrop::Options;
 use std::io::{self, Write};
 use termcolor::{ColorSpec, StandardStreamLock, WriteColor};
-use yubikey_piv::{key::*, YubiKey};
+use yubikey::{key::*, YubiKey};
 
 use crate::print_cert_info;
 
