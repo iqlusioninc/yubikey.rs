@@ -3,7 +3,7 @@
 use crate::{
     apdu::Response,
     apdu::{Apdu, Ins, StatusWords},
-    error::Error,
+    error::{Error, Result},
     key::{AlgorithmId, SlotId},
     serialization::*,
     yubikey::*,
@@ -32,7 +32,7 @@ pub(crate) struct Transaction<'tx> {
 
 impl<'tx> Transaction<'tx> {
     /// Create a new transaction with the given card.
-    pub fn new(card: &'tx mut pcsc::Card) -> Result<Self, Error> {
+    pub fn new(card: &'tx mut pcsc::Card) -> Result<Self> {
         Ok(Transaction {
             inner: card.transaction()?,
         })
@@ -45,7 +45,7 @@ impl<'tx> Transaction<'tx> {
     /// single APDU messages at a time. For larger messages that need to be
     /// split into multiple APDUs, use the [`Transaction::transfer_data`]
     /// method instead.
-    pub fn transmit(&self, send_buffer: &[u8], recv_len: usize) -> Result<Vec<u8>, Error> {
+    pub fn transmit(&self, send_buffer: &[u8], recv_len: usize) -> Result<Vec<u8>> {
         trace!(">>> {:?}", send_buffer);
 
         let mut recv_buffer = vec![0u8; recv_len];
@@ -60,7 +60,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Select application.
-    pub fn select_application(&self) -> Result<(), Error> {
+    pub fn select_application(&self) -> Result<()> {
         let response = Apdu::new(Ins::SelectApplication)
             .p1(0x04)
             .data(&PIV_AID)
@@ -82,7 +82,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Get the version of the PIV application installed on the YubiKey.
-    pub fn get_version(&self) -> Result<Version, Error> {
+    pub fn get_version(&self) -> Result<Version> {
         // get version from device
         let response = Apdu::new(Ins::GetVersion).transmit(self, 261)?;
 
@@ -98,7 +98,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Get YubiKey device serial number.
-    pub fn get_serial(&self, version: Version) -> Result<Serial, Error> {
+    pub fn get_serial(&self, version: Version) -> Result<Serial> {
         let response = if version.major < 5 {
             // YK4 requires switching to the yk applet to retrieve the serial
             let sw = Apdu::new(Ins::SelectApplication)
@@ -157,7 +157,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Verify device PIN.
-    pub fn verify_pin(&self, pin: &[u8]) -> Result<(), Error> {
+    pub fn verify_pin(&self, pin: &[u8]) -> Result<()> {
         if pin.len() > CB_PIN_MAX {
             return Err(Error::SizeError);
         }
@@ -191,7 +191,7 @@ impl<'tx> Transaction<'tx> {
         action: ChangeRefAction,
         current_pin: &[u8],
         new_pin: &[u8],
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if current_pin.len() > CB_PIN_MAX || new_pin.len() > CB_PIN_MAX {
             return Err(Error::SizeError);
         }
@@ -229,7 +229,7 @@ impl<'tx> Transaction<'tx> {
 
     /// Set the management key (MGM).
     #[cfg(feature = "untested")]
-    pub fn set_mgm_key(&self, new_key: &MgmKey, require_touch: bool) -> Result<(), Error> {
+    pub fn set_mgm_key(&self, new_key: &MgmKey, require_touch: bool) -> Result<()> {
         let p2 = if require_touch { 0xfe } else { 0xff };
 
         let mut data = [0u8; DES_LEN_3DES + 3];
@@ -263,7 +263,7 @@ impl<'tx> Transaction<'tx> {
         algorithm: AlgorithmId,
         key: SlotId,
         decipher: bool,
-    ) -> Result<Buffer, Error> {
+    ) -> Result<Buffer> {
         let in_len = sign_in.len();
         let mut indata = [0u8; 1024];
         let templ = [0, Ins::Authenticate.code(), algorithm.into(), key.into()];
@@ -358,12 +358,7 @@ impl<'tx> Transaction<'tx> {
     /// messages into smaller APDU-sized messages (using the provided APDU
     /// template to construct them), and then sending those via
     /// [`Transaction::transmit`].
-    pub fn transfer_data(
-        &self,
-        templ: &[u8],
-        in_data: &[u8],
-        max_out: usize,
-    ) -> Result<Response, Error> {
+    pub fn transfer_data(&self, templ: &[u8], in_data: &[u8], max_out: usize) -> Result<Response> {
         let mut in_offset = 0;
         let mut out_data = vec![];
         let mut sw;
@@ -441,7 +436,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Fetch an object.
-    pub fn fetch_object(&self, object_id: ObjectId) -> Result<Buffer, Error> {
+    pub fn fetch_object(&self, object_id: ObjectId) -> Result<Buffer> {
         let mut indata = [0u8; 5];
         let templ = [0, Ins::GetData.code(), 0x3f, 0xff];
 
@@ -475,7 +470,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Save an object.
-    pub fn save_object(&self, object_id: ObjectId, indata: &[u8]) -> Result<(), Error> {
+    pub fn save_object(&self, object_id: ObjectId, indata: &[u8]) -> Result<()> {
         let templ = [0, Ins::PutData.code(), 0x3f, 0xff];
 
         // TODO(tarcieri): replace with vector

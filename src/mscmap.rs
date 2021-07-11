@@ -33,7 +33,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{error::Error, key::SlotId, serialization::*, yubikey::YubiKey, CB_OBJ_MAX};
+use crate::{key::SlotId, serialization::*, Error, Result, YubiKey, CB_OBJ_MAX};
 use log::error;
 use std::convert::{TryFrom, TryInto};
 
@@ -77,7 +77,7 @@ pub struct Container {
 
 impl Container {
     /// Read MS Container Map records
-    pub fn read_mscmap(yubikey: &mut YubiKey) -> Result<Vec<Self>, Error> {
+    pub fn read_mscmap(yubikey: &mut YubiKey) -> Result<Vec<Self>> {
         let txn = yubikey.begin_transaction()?;
         let response = txn.fetch_object(OBJ_MSCMAP)?;
         let mut containers = vec![];
@@ -103,7 +103,7 @@ impl Container {
     }
 
     /// Write MS Container Map records.
-    pub fn write_mscmap(yubikey: &mut YubiKey, containers: &[Self]) -> Result<(), Error> {
+    pub fn write_mscmap(yubikey: &mut YubiKey, containers: &[Self]) -> Result<()> {
         let n_containers = containers.len();
         let data_len = n_containers * CONTAINER_REC_LEN;
 
@@ -124,7 +124,7 @@ impl Container {
     }
 
     /// Parse a container record from a byte slice
-    pub fn new(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn new(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != CONTAINER_REC_LEN {
             error!(
                 "couldn't parse PIV container: expected {}-bytes, got {}-bytes",
@@ -161,7 +161,7 @@ impl Container {
     }
 
     /// Parse the container name as a UTF-16 string
-    pub fn parse_name(&self) -> Result<String, Error> {
+    pub fn parse_name(&self) -> Result<String> {
         String::from_utf16(&self.name).map_err(|_| Error::ParseError)
     }
 
@@ -188,7 +188,7 @@ impl Container {
 impl<'a> TryFrom<&'a [u8]> for Container {
     type Error = Error;
 
-    fn try_from(bytes: &'a [u8]) -> Result<Self, Error> {
+    fn try_from(bytes: &'a [u8]) -> Result<Self> {
         Self::new(bytes)
     }
 }

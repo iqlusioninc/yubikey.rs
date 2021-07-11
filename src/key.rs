@@ -39,23 +39,19 @@
 
 use crate::{
     apdu::{Ins, StatusWords},
-    certificate::{self, Certificate},
-    error::Error,
+    certificate::{self, Certificate, PublicKeyInfo},
+    error::{Error, Result},
+    policy::{PinPolicy, TouchPolicy},
     serialization::*,
     settings,
     yubikey::YubiKey,
-    ObjectId,
+    Buffer, ObjectId,
 };
 use log::debug;
 use std::convert::TryFrom;
 
 #[cfg(feature = "untested")]
 use crate::CB_OBJ_MAX;
-use crate::{
-    certificate::PublicKeyInfo,
-    policy::{PinPolicy, TouchPolicy},
-    Buffer,
-};
 use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
 use log::{error, warn};
 #[cfg(feature = "untested")]
@@ -126,7 +122,7 @@ pub enum SlotId {
 impl TryFrom<u8> for SlotId {
     type Error = Error;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
+    fn try_from(value: u8) -> Result<Self> {
         match value {
             0x9a => Ok(SlotId::Authentication),
             0x9c => Ok(SlotId::Signature),
@@ -154,7 +150,7 @@ impl From<SlotId> for u8 {
 impl TryFrom<String> for SlotId {
     type Error = Error;
 
-    fn try_from(s: String) -> Result<SlotId, Error> {
+    fn try_from(s: String) -> Result<SlotId> {
         match s.as_ref() {
             "9a" => Ok(SlotId::Authentication),
             "9c" => Ok(SlotId::Signature),
@@ -209,7 +205,7 @@ pub enum RetiredSlotId {
 impl TryFrom<u8> for RetiredSlotId {
     type Error = Error;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
+    fn try_from(value: u8) -> Result<Self> {
         match value {
             0x82 => Ok(RetiredSlotId::R1),
             0x83 => Ok(RetiredSlotId::R2),
@@ -239,7 +235,7 @@ impl TryFrom<u8> for RetiredSlotId {
 impl TryFrom<String> for RetiredSlotId {
     type Error = Error;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+    fn try_from(value: String) -> Result<Self> {
         match value.as_ref() {
             "82" => Ok(RetiredSlotId::R1),
             "83" => Ok(RetiredSlotId::R2),
@@ -365,7 +361,7 @@ pub enum AlgorithmId {
 impl TryFrom<u8> for AlgorithmId {
     type Error = Error;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
+    fn try_from(value: u8) -> Result<Self> {
         match value {
             0x06 => Ok(AlgorithmId::Rsa1024),
             0x07 => Ok(AlgorithmId::Rsa2048),
@@ -389,7 +385,7 @@ impl From<AlgorithmId> for u8 {
 
 impl AlgorithmId {
     /// Writes the `AlgorithmId` in the format the YubiKey expects during key generation.
-    pub(crate) fn write(self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub(crate) fn write(self, buf: &mut [u8]) -> Result<usize> {
         Tlv::write(buf, 0x80, &[self.into()])
     }
 
@@ -424,7 +420,7 @@ pub struct Key {
 
 impl Key {
     /// List Personal Identity Verification (PIV) keys stored in a YubiKey
-    pub fn list(yubikey: &mut YubiKey) -> Result<Vec<Self>, Error> {
+    pub fn list(yubikey: &mut YubiKey) -> Result<Vec<Self>> {
         let mut keys = vec![];
         let txn = yubikey.begin_transaction()?;
 
@@ -465,7 +461,7 @@ pub fn generate(
     algorithm: AlgorithmId,
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
-) -> Result<PublicKeyInfo, Error> {
+) -> Result<PublicKeyInfo> {
     // Keygen messages
     // TODO(tarcieri): extract these into an I18N-handling type?
     const SZ_SETTING_ROCA: &str = "Enable_Unsafe_Keygen_ROCA";
@@ -671,7 +667,7 @@ fn write_key(
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
     algorithm: AlgorithmId,
-) -> Result<(), Error> {
+) -> Result<()> {
     let mut key_data = Buffer::new(vec![0u8; KEYDATA_LEN]);
     let templ = [0, Ins::ImportKey.code(), algorithm.into(), slot.into()];
     let mut offset = 0;
@@ -780,7 +776,7 @@ pub fn import_rsa_key(
     key_data: RsaKeyData,
     touch_policy: TouchPolicy,
     pin_policy: PinPolicy,
-) -> Result<(), Error> {
+) -> Result<()> {
     match algorithm {
         AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => (),
         _ => return Err(Error::AlgorithmError),
@@ -814,7 +810,7 @@ pub fn import_ecc_key(
     key_data: &[u8],
     touch_policy: TouchPolicy,
     pin_policy: PinPolicy,
-) -> Result<(), Error> {
+) -> Result<()> {
     match algorithm {
         AlgorithmId::EccP256 | AlgorithmId::EccP384 => (),
         _ => return Err(Error::AlgorithmError),
@@ -834,7 +830,7 @@ pub fn import_ecc_key(
 /// Generate an attestation certificate for a stored key.
 /// <https://developers.yubico.com/PIV/Introduction/PIV_attestation.html>
 #[cfg(feature = "untested")]
-pub fn attest(yubikey: &mut YubiKey, key: SlotId) -> Result<Buffer, Error> {
+pub fn attest(yubikey: &mut YubiKey, key: SlotId) -> Result<Buffer> {
     let templ = [0, Ins::Attest.code(), key.into(), 0];
     let txn = yubikey.begin_transaction()?;
     let response = txn.transfer_data(&templ, &[], CB_OBJ_MAX)?;
@@ -860,7 +856,7 @@ pub fn sign_data(
     raw_in: &[u8],
     algorithm: AlgorithmId,
     key: SlotId,
-) -> Result<Buffer, Error> {
+) -> Result<Buffer> {
     let txn = yubikey.begin_transaction()?;
 
     // don't attempt to reselect in crypt operations to avoid problems with PIN_ALWAYS
@@ -874,7 +870,7 @@ pub fn decrypt_data(
     input: &[u8],
     algorithm: AlgorithmId,
     key: SlotId,
-) -> Result<Buffer, Error> {
+) -> Result<Buffer> {
     let txn = yubikey.begin_transaction()?;
 
     // don't attempt to reselect in crypt operations to avoid problems with PIN_ALWAYS

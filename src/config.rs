@@ -31,11 +31,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    error::Error,
     metadata::{AdminData, ProtectedData},
     mgm::{MgmType, ADMIN_FLAGS_1_PROTECTED_MGM},
     yubikey::{YubiKey, ADMIN_FLAGS_1_PUK_BLOCKED},
-    TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_ADMIN_TIMESTAMP, TAG_PROTECTED_FLAGS_1,
+    Result, TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_ADMIN_TIMESTAMP, TAG_PROTECTED_FLAGS_1,
     TAG_PROTECTED_MGM,
 };
 use log::error;
@@ -68,7 +67,7 @@ pub struct Config {
 
 impl Config {
     /// Get YubiKey config
-    pub fn get(yubikey: &mut YubiKey) -> Result<Config, Error> {
+    pub fn get(yubikey: &mut YubiKey) -> Result<Config> {
         let mut config = Config {
             protected_data_available: false,
             puk_blocked: false,

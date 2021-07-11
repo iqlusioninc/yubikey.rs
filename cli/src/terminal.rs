@@ -143,7 +143,7 @@ impl Status {
     }
 
     /// Print the given message
-    fn print(self, stream: &StandardStream, msg: impl AsRef<str>) -> Result<(), io::Error> {
+    fn print(self, stream: &StandardStream, msg: impl AsRef<str>) -> io::Result<()> {
         let mut s = stream.lock();
         s.reset()?;
         s.set_color(ColorSpec::new().set_fg(self.color).set_bold(self.bold))?;

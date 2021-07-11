@@ -30,7 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{error::Error, transaction::Transaction, Buffer};
+use crate::{transaction::Transaction, Buffer, Result};
 use log::trace;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -109,7 +109,7 @@ impl Apdu {
     }
 
     /// Transmit this APDU using the given card transaction
-    pub fn transmit(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response, Error> {
+    pub fn transmit(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response> {
         trace!(">>> {:?}", self);
         let response = Response::from(txn.transmit(&self.to_bytes(), recv_len)?);
         trace!("<<< {:?}", &response);

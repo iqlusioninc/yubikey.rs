@@ -27,7 +27,7 @@ pub fn print_cert_info(
     yubikey: &mut YubiKey,
     slot: SlotId,
     stream: &mut StandardStreamLock<'_>,
-) -> Result<(), io::Error> {
+) -> io::Result<()> {
     let cert = match Certificate::read(yubikey, slot) {
         Ok(c) => c,
         Err(e) => {
@@ -82,7 +82,7 @@ fn print_cert_attr(
     stream: &mut StandardStreamLock<'_>,
     name: &str,
     value: impl ToString,
-) -> Result<(), io::Error> {
+) -> io::Result<()> {
     stream.set_color(ColorSpec::new().set_bold(true))?;
     write!(stream, "{:>12}:", name)?;
     stream.reset()?;

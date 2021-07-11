@@ -32,11 +32,45 @@
 
 use std::fmt::{self, Display};
 
+/// Result type with [`Error`].
+pub type Result<T> = core::result::Result<T, Error>;
+
 /// Kinds of errors
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
+    /// Algorithm error
+    AlgorithmError,
+
+    /// Applet error
+    AppletError,
+
+    /// Argument error
+    ArgumentError,
+
+    /// Authentication error
+    AuthenticationError,
+
+    /// Generic error
+    GenericError,
+
+    /// Invalid object
+    InvalidObject,
+
+    /// Key error
+    KeyError,
+
     /// Memory error
     MemoryError,
+
+    /// Not supported
+    NotSupported,
+
+    /// Not found
+    NotFound,
+
+    /// Parse error
+    ParseError,
 
     /// PCSC error
     PcscError {
@@ -44,53 +78,23 @@ pub enum Error {
         inner: Option<pcsc::Error>,
     },
 
-    /// Size error
-    SizeError,
-
-    /// Applet error
-    AppletError,
-
-    /// Authentication error
-    AuthenticationError,
+    /// PIN locked
+    PinLocked,
 
     /// Randomness error
     RandomnessError,
 
-    /// Generic error
-    GenericError,
+    /// Range error
+    RangeError,
 
-    /// Key error
-    KeyError,
-
-    /// Parse error
-    ParseError,
+    /// Size error
+    SizeError,
 
     /// Wrong PIN
     WrongPin {
         /// Number of tries remaining
         tries: u8,
     },
-
-    /// Invalid object
-    InvalidObject,
-
-    /// Algorithm error
-    AlgorithmError,
-
-    /// PIN locked
-    PinLocked,
-
-    /// Argument error
-    ArgumentError,
-
-    /// Range error
-    RangeError,
-
-    /// Not supported
-    NotSupported,
-
-    /// Not found
-    NotFound,
 }
 
 impl Error {
@@ -98,48 +102,48 @@ impl Error {
     ///
     /// These names map to the legacy names from the Yubico C library, to
     /// assist in web searches for relevant information for these errors.
-    pub fn name(self) -> &'static str {
-        match self {
-            Error::MemoryError => "YKPIV_MEMORY_ERROR",
-            Error::PcscError { .. } => "YKPIV_PCSC_ERROR",
-            Error::SizeError => "YKPIV_SIZE_ERROR",
-            Error::AppletError => "YKPIV_APPLET_ERROR",
-            Error::AuthenticationError => "YKPIV_AUTHENTICATION_ERROR",
-            Error::RandomnessError => "YKPIV_RANDOMNESS_ERROR",
-            Error::GenericError => "YKPIV_GENERIC_ERROR",
-            Error::KeyError => "YKPIV_KEY_ERROR",
-            Error::ParseError => "YKPIV_PARSE_ERROR",
-            Error::WrongPin { .. } => "YKPIV_WRONG_PIN",
-            Error::InvalidObject => "YKPIV_INVALID_OBJECT",
+    pub fn name(self) -> Option<&'static str> {
+        Some(match self {
             Error::AlgorithmError => "YKPIV_ALGORITHM_ERROR",
-            Error::PinLocked => "YKPIV_PIN_LOCKED",
+            Error::AppletError => "YKPIV_APPLET_ERROR",
             Error::ArgumentError => "YKPIV_ARGUMENT_ERROR",
-            Error::RangeError => "YKPIV_RANGE_ERROR",
+            Error::AuthenticationError => "YKPIV_AUTHENTICATION_ERROR",
+            Error::GenericError => "YKPIV_GENERIC_ERROR",
+            Error::InvalidObject => "YKPIV_INVALID_OBJECT",
+            Error::KeyError => "YKPIV_KEY_ERROR",
+            Error::MemoryError => "YKPIV_MEMORY_ERROR",
             Error::NotSupported => "YKPIV_NOT_SUPPORTED",
-            Error::NotFound => "<not found>",
-        }
+            Error::ParseError => "YKPIV_PARSE_ERROR",
+            Error::PcscError { .. } => "YKPIV_PCSC_ERROR",
+            Error::PinLocked => "YKPIV_PIN_LOCKED",
+            Error::RandomnessError => "YKPIV_RANDOMNESS_ERROR",
+            Error::RangeError => "YKPIV_RANGE_ERROR",
+            Error::SizeError => "YKPIV_SIZE_ERROR",
+            Error::WrongPin { .. } => "YKPIV_WRONG_PIN",
+            _ => return None,
+        })
     }
 
     /// Error message
     pub fn msg(self) -> &'static str {
         match self {
-            Error::MemoryError => "memory error",
-            Error::PcscError { .. } => "PCSC error",
-            Error::SizeError => "size error",
-            Error::AppletError => "applet error",
-            Error::AuthenticationError => "authentication error",
-            Error::RandomnessError => "randomness error",
-            Error::GenericError => "generic error",
-            Error::KeyError => "key error",
-            Error::ParseError => "parse error",
-            Error::WrongPin { .. } => "wrong pin",
-            Error::InvalidObject => "invalid object",
             Error::AlgorithmError => "algorithm error",
-            Error::PinLocked => "PIN locked",
+            Error::AppletError => "applet error",
             Error::ArgumentError => "argument error",
-            Error::RangeError => "range error",
+            Error::AuthenticationError => "authentication error",
+            Error::GenericError => "generic error",
+            Error::InvalidObject => "invalid object",
+            Error::KeyError => "key error",
+            Error::MemoryError => "memory error",
             Error::NotSupported => "not supported",
             Error::NotFound => "not found",
+            Error::ParseError => "parse error",
+            Error::PcscError { .. } => "PC/SC error",
+            Error::PinLocked => "PIN locked",
+            Error::RandomnessError => "randomness error",
+            Error::RangeError => "range error",
+            Error::SizeError => "size error",
+            Error::WrongPin { .. } => "wrong pin",
         }
     }
 }
@@ -159,10 +163,8 @@ impl From<pcsc::Error> for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            #[allow(trivial_casts)] // why doesn't this work without the cast???
-            Error::PcscError { inner } => inner
-                .as_ref()
-                .map(|err| err as &(dyn std::error::Error + 'static)),
+            #[allow(trivial_casts)]
+            Error::PcscError { inner } => inner.as_ref().map(|err| err as &_),
             _ => None,
         }
     }

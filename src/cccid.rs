@@ -30,7 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{error::Error, yubikey::YubiKey};
+use crate::{Error, Result, YubiKey};
 use getrandom::getrandom;
 use std::fmt::{self, Debug, Display};
 use subtle_encoding::hex;
@@ -68,7 +68,7 @@ pub struct CardId(pub [u8; CCCID_SIZE]);
 
 impl CardId {
     /// Generate a random CCC Card ID
-    pub fn generate() -> Result<Self, Error> {
+    pub fn generate() -> Result<Self> {
         let mut id = [0u8; CCCID_SIZE];
         getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
         Ok(Self(id))
@@ -81,14 +81,14 @@ pub struct Ccc(pub [u8; CCC_SIZE]);
 
 impl Ccc {
     /// Return CardId component of CCC
-    pub fn card_id(&self) -> Result<CardId, Error> {
+    pub fn card_id(&self) -> Result<CardId> {
         let mut cccid = [0u8; CCCID_SIZE];
         cccid.copy_from_slice(&self.0[CCC_ID_OFFS..(CCC_ID_OFFS + CCCID_SIZE)]);
         Ok(CardId(cccid))
     }
 
     /// Get Cardholder Capability Container (CCC) ID
-    pub fn get(yubikey: &mut YubiKey) -> Result<Self, Error> {
+    pub fn get(yubikey: &mut YubiKey) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
         let response = txn.fetch_object(OBJ_CAPABILITY)?;
 
@@ -103,7 +103,7 @@ impl Ccc {
 
     /// Set Cardholder Capability Container (CCC) ID
     #[cfg(feature = "untested")]
-    pub fn set(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
+    pub fn set(&self, yubikey: &mut YubiKey) -> Result<()> {
         let mut buf = CCC_TMPL.to_vec();
         buf[0..self.0.len()].copy_from_slice(&self.0);
 

@@ -51,7 +51,7 @@ impl StatusCmd {
         stream: &mut StandardStreamLock<'_>,
         name: &str,
         value: impl ToString,
-    ) -> Result<(), io::Error> {
+    ) -> io::Result<()> {
         stream.set_color(ColorSpec::new().set_bold(true))?;
         write!(stream, "{:>12}:", name)?;
         stream.reset()?;

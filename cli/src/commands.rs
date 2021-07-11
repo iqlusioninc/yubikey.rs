@@ -36,7 +36,7 @@ pub struct YubiKeyCli {
 
 impl YubiKeyCli {
     /// Print usage information
-    pub fn print_usage() -> Result<(), io::Error> {
+    pub fn print_usage() -> io::Result<()> {
         let mut stdout = STDOUT.lock();
         stdout.reset()?;
 
