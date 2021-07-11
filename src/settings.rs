@@ -53,86 +53,84 @@ pub enum Source {
     Default,
 }
 
+impl Default for Source {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
 /// Setting booleans
 #[derive(Copy, Clone, Debug)]
-pub struct BoolValue {
+pub struct ConfigValue {
     /// Boolean value
     pub value: bool,
 
-    /// Source of the configuration setting (user/admin/default)
+    /// Source of the configuration setting (user, admin, or default)
     pub source: Source,
 }
 
-impl BoolValue {
-    /// Get a [`BoolValue`] value
-    pub fn get(key: &str, def: bool) -> Self {
-        let mut setting = get_setting_from_file(key);
-
-        if setting.source == Source::Default {
-            setting = get_setting_from_env(key);
-        }
-
-        if setting.source == Source::Default {
-            setting.value = def;
-        }
-
-        setting
+impl ConfigValue {
+    /// Get a [`BoolValue`] value by name.
+    pub fn get(key: &str, default: bool) -> Self {
+        Self::from_file(key)
+            .or_else(|| Self::from_env(key))
+            .unwrap_or(Self {
+                value: default,
+                source: Source::Default,
+            })
     }
-}
 
-/// Get a boolean config value
-fn get_setting_from_file(key: &str) -> BoolValue {
-    let mut setting: BoolValue = BoolValue {
-        value: false,
-        source: Source::Default,
-    };
+    /// Get a boolean config value from the provided config file
+    fn from_file(key: &str) -> Option<Self> {
+        if let Ok(file) = File::open(DEFAULT_CONFIG_FILE) {
+            for line in BufReader::new(file).lines() {
+                let line = match line {
+                    Ok(line) => line,
+                    _ => continue,
+                };
 
-    let file = match File::open(DEFAULT_CONFIG_FILE) {
-        Ok(f) => f,
-        Err(_) => return setting,
-    };
+                if line.starts_with('#') || line.starts_with('\r') || line.starts_with('\n') {
+                    continue;
+                }
 
-    for line in BufReader::new(file).lines() {
-        let line = match line {
-            Ok(line) => line,
-            _ => continue,
-        };
+                let (name, value) = {
+                    let mut parts = line.splitn(1, '=');
+                    let name = parts.next();
+                    let value = parts.next();
+                    match (name, value, parts.next()) {
+                        (Some(name), Some(value), None) => (name.trim(), value.trim()),
+                        _ => continue,
+                    }
+                };
 
-        if line.starts_with('#') || line.starts_with('\r') || line.starts_with('\n') {
-            continue;
-        }
-
-        let (name, value) = {
-            let mut parts = line.splitn(1, '=');
-            let name = parts.next();
-            let value = parts.next();
-            match (name, value, parts.next()) {
-                (Some(name), Some(value), None) => (name.trim(), value.trim()),
-                _ => continue,
+                if name == key {
+                    return Some(ConfigValue {
+                        source: Source::Admin,
+                        value: value == "1" || value == "true",
+                    });
+                }
             }
-        };
-
-        if name == key {
-            setting.source = Source::Admin;
-            setting.value = value == "1" || value == "true";
-            break;
         }
+
+        None
     }
 
-    setting
+    /// Get a setting boolean from an environment variable
+    fn from_env(key: &str) -> Option<Self> {
+        env::var(format!("YUBIKEY_PIV_{}", key))
+            .ok()
+            .map(|value| ConfigValue {
+                source: Source::User,
+                value: value == "1" || value == "true",
+            })
+    }
 }
 
-/// Get a setting boolean from an environment variable
-fn get_setting_from_env(key: &str) -> BoolValue {
-    let mut setting: BoolValue = BoolValue {
-        value: false,
-        source: Source::Default,
-    };
-
-    if let Ok(value) = env::var(format!("YUBIKEY_PIV_{}", key)) {
-        setting.source = Source::User;
-        setting.value = value == "1" || value == "true";
+impl Default for ConfigValue {
+    fn default() -> Self {
+        Self {
+            value: false,
+            source: Source::default(),
+        }
     }
-
-    setting
 }
