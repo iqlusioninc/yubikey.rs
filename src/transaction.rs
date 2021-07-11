@@ -2,7 +2,7 @@
 
 use crate::{
     apdu::Response,
-    apdu::{Ins, StatusWords, APDU},
+    apdu::{Apdu, Ins, StatusWords},
     error::Error,
     key::{AlgorithmId, SlotId},
     serialization::*,
@@ -61,7 +61,7 @@ impl<'tx> Transaction<'tx> {
 
     /// Select application.
     pub fn select_application(&self) -> Result<(), Error> {
-        let response = APDU::new(Ins::SelectApplication)
+        let response = Apdu::new(Ins::SelectApplication)
             .p1(0x04)
             .data(&PIV_AID)
             .transmit(self, 0xFF)
@@ -84,7 +84,7 @@ impl<'tx> Transaction<'tx> {
     /// Get the version of the PIV application installed on the YubiKey.
     pub fn get_version(&self) -> Result<Version, Error> {
         // get version from device
-        let response = APDU::new(Ins::GetVersion).transmit(self, 261)?;
+        let response = Apdu::new(Ins::GetVersion).transmit(self, 261)?;
 
         if !response.is_success() {
             return Err(Error::GenericError);
@@ -101,7 +101,7 @@ impl<'tx> Transaction<'tx> {
     pub fn get_serial(&self, version: Version) -> Result<Serial, Error> {
         let response = if version.major < 5 {
             // YK4 requires switching to the yk applet to retrieve the serial
-            let sw = APDU::new(Ins::SelectApplication)
+            let sw = Apdu::new(Ins::SelectApplication)
                 .p1(0x04)
                 .data(&YK_AID)
                 .transmit(self, 0xFF)?
@@ -112,7 +112,7 @@ impl<'tx> Transaction<'tx> {
                 return Err(Error::GenericError);
             }
 
-            let resp = APDU::new(0x01).p1(0x10).transmit(self, 0xFF)?;
+            let resp = Apdu::new(0x01).p1(0x10).transmit(self, 0xFF)?;
 
             if !resp.is_success() {
                 error!(
@@ -123,7 +123,7 @@ impl<'tx> Transaction<'tx> {
             }
 
             // reselect the PIV applet
-            let sw = APDU::new(Ins::SelectApplication)
+            let sw = Apdu::new(Ins::SelectApplication)
                 .p1(0x04)
                 .data(&PIV_AID)
                 .transmit(self, 0xFF)?
@@ -137,7 +137,7 @@ impl<'tx> Transaction<'tx> {
             resp
         } else {
             // YK5 implements getting the serial as a PIV applet command (0xf8)
-            let resp = APDU::new(Ins::GetSerial).transmit(self, 0xFF)?;
+            let resp = Apdu::new(Ins::GetSerial).transmit(self, 0xFF)?;
 
             if !resp.is_success() {
                 error!(
@@ -162,7 +162,7 @@ impl<'tx> Transaction<'tx> {
             return Err(Error::SizeError);
         }
 
-        let mut query = APDU::new(Ins::Verify);
+        let mut query = Apdu::new(Ins::Verify);
         query.params(0x00, 0x80);
 
         // Empty pin means we are querying the number of retries. We set no data in this
@@ -238,7 +238,7 @@ impl<'tx> Transaction<'tx> {
         data[2] = DES_LEN_3DES as u8;
         data[3..3 + DES_LEN_3DES].copy_from_slice(new_key.as_ref());
 
-        let status_words = APDU::new(Ins::SetMgmKey)
+        let status_words = Apdu::new(Ins::SetMgmKey)
             .params(0xff, p2)
             .data(&data)
             .transmit(self, 261)?
@@ -380,7 +380,7 @@ impl<'tx> Transaction<'tx> {
 
             trace!("going to send {} bytes in this go", this_size);
 
-            let response = APDU::new(templ[1])
+            let response = Apdu::new(templ[1])
                 .cla(cla)
                 .params(templ[2], templ[3])
                 .data(&in_data[in_offset..(in_offset + this_size)])
@@ -417,7 +417,7 @@ impl<'tx> Transaction<'tx> {
                 sw & 0xff
             );
 
-            let response = APDU::new(Ins::GetResponseApdu).transmit(self, 261)?;
+            let response = Apdu::new(Ins::GetResponseApdu).transmit(self, 261)?;
             sw = response.status_words().code();
 
             if sw != StatusWords::Success.code() && (sw >> 8 != 0x61) {

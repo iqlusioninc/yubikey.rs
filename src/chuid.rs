@@ -96,9 +96,9 @@ impl Uuid {
 
 /// Cardholder Unique Identifier (CHUID)
 #[derive(Copy, Clone)]
-pub struct CHUID(pub [u8; CHUID_SIZE]);
+pub struct ChuId(pub [u8; CHUID_SIZE]);
 
-impl CHUID {
+impl ChuId {
     /// Return FASC-N component of CHUID
     pub fn fascn(&self) -> Result<[u8; FASCN_SIZE], Error> {
         let mut fascn = [0u8; FASCN_SIZE];
@@ -124,7 +124,7 @@ impl CHUID {
     }
 
     /// Get Cardholder Unique Identifier (CHUID)
-    pub fn get(yubikey: &mut YubiKey) -> Result<CHUID, Error> {
+    pub fn get(yubikey: &mut YubiKey) -> Result<ChuId, Error> {
         let txn = yubikey.begin_transaction()?;
         let response = txn.fetch_object(OBJ_CHUID)?;
 
@@ -134,13 +134,12 @@ impl CHUID {
 
         let mut chuid = [0u8; CHUID_SIZE];
         chuid.copy_from_slice(&response[0..CHUID_SIZE]);
-        let retval = CHUID { 0: chuid };
+        let retval = ChuId { 0: chuid };
         Ok(retval)
     }
 
     /// Set Cardholder Unique Identifier (CHUID)
     #[cfg(feature = "untested")]
-
     pub fn set(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
         let mut buf = CHUID_TMPL.to_vec();
         buf[0..self.0.len()].copy_from_slice(&self.0);
@@ -150,7 +149,7 @@ impl CHUID {
     }
 }
 
-impl Display for CHUID {
+impl Display for ChuId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -160,7 +159,7 @@ impl Display for CHUID {
     }
 }
 
-impl Debug for CHUID {
+impl Debug for ChuId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "CHUID({:?})", &self.0[..])
     }

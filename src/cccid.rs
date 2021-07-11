@@ -77,9 +77,9 @@ impl CardId {
 
 /// Cardholder Capability Container (CCC) Identifier
 #[derive(Copy, Clone)]
-pub struct CCC(pub [u8; CCC_SIZE]);
+pub struct Ccc(pub [u8; CCC_SIZE]);
 
-impl CCC {
+impl Ccc {
     /// Return CardId component of CCC
     pub fn cccid(&self) -> Result<CardId, Error> {
         let mut cccid = [0u8; CCCID_SIZE];
@@ -101,7 +101,7 @@ impl CCC {
         Ok(Self(ccc))
     }
 
-    /// Get Cardholder Capability Container (CCC) ID
+    /// Set Cardholder Capability Container (CCC) ID
     #[cfg(feature = "untested")]
     pub fn set(&self, yubikey: &mut YubiKey) -> Result<(), Error> {
         let mut buf = CCC_TMPL.to_vec();
@@ -112,13 +112,13 @@ impl CCC {
     }
 }
 
-impl Debug for CCC {
+impl Debug for Ccc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "CCC({:?})", &self.0[..])
     }
 }
 
-impl Display for CCC {
+impl Display for Ccc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

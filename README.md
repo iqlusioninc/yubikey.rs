@@ -115,17 +115,17 @@ Application Protocol Data Unit (APDU) messages, use the `trace` log level:
 
 ```
 running 1 test
-[INFO  yubikey_piv::yubikey] trying to connect to reader 'Yubico YubiKey OTP+FIDO+CCID'
-[INFO  yubikey_piv::yubikey] connected to 'Yubico YubiKey OTP+FIDO+CCID' successfully
-[TRACE yubikey_piv::apdu] >>> APDU { cla: 0, ins: SelectApplication, p1: 4, p2: 0, data: [160, 0, 0, 3, 8] }
-[TRACE yubikey_piv::transaction] >>> [0, 164, 4, 0, 5, 160, 0, 0, 3, 8]
-[TRACE yubikey_piv::apdu] <<< Response { status_words: Success, data: [97, 17, 79, 6, 0, 0, 16, 0, 1, 0, 121, 7, 79, 5, 160, 0, 0, 3, 8] }
-[TRACE yubikey_piv::apdu] >>> APDU { cla: 0, ins: GetVersion, p1: 0, p2: 0, data: [] }
-[TRACE yubikey_piv::transaction] >>> [0, 253, 0, 0, 0]
-[TRACE yubikey_piv::apdu] <<< Response { status_words: Success, data: [5, 1, 2] }
-[TRACE yubikey_piv::apdu] >>> APDU { cla: 0, ins: GetSerial, p1: 0, p2: 0, data: [] }
-[TRACE yubikey_piv::transaction] >>> [0, 248, 0, 0, 0]
-[TRACE yubikey_piv::apdu] <<< Response { status_words: Success, data: [0, 115, 0, 178] }
+[INFO  yubikey::yubikey] trying to connect to reader 'Yubico YubiKey OTP+FIDO+CCID'
+[INFO  yubikey::yubikey] connected to 'Yubico YubiKey OTP+FIDO+CCID' successfully
+[TRACE yubikey::apdu] >>> Apdu { cla: 0, ins: SelectApplication, p1: 4, p2: 0, data: [160, 0, 0, 3, 8] }
+[TRACE yubikey::transaction] >>> [0, 164, 4, 0, 5, 160, 0, 0, 3, 8]
+[TRACE yubikey::apdu] <<< Response { status_words: Success, data: [97, 17, 79, 6, 0, 0, 16, 0, 1, 0, 121, 7, 79, 5, 160, 0, 0, 3, 8] }
+[TRACE yubikey::apdu] >>> Apdu { cla: 0, ins: GetVersion, p1: 0, p2: 0, data: [] }
+[TRACE yubikey::transaction] >>> [0, 253, 0, 0, 0]
+[TRACE yubikey::apdu] <<< Response { status_words: Success, data: [5, 1, 2] }
+[TRACE yubikey::apdu] >>> Apdu { cla: 0, ins: GetSerial, p1: 0, p2: 0, data: [] }
+[TRACE yubikey::transaction] >>> [0, 248, 0, 0, 0]
+[TRACE yubikey::apdu] <<< Response { status_words: Success, data: [0, 115, 0, 178] }
 test connect ... ok
 ```
 
