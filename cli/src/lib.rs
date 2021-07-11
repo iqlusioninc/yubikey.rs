@@ -1,4 +1,4 @@
-//! `yubikey` command-line utility
+//! `yubikey` command-line utility.
 
 #![forbid(unsafe_code)]
 #![warn(
@@ -22,7 +22,7 @@ use termcolor::{ColorSpec, StandardStreamLock, WriteColor};
 use x509_parser::parse_x509_certificate;
 use yubikey::{certificate::Certificate, key::*, YubiKey};
 
-///Write information about certificate found in slot a la yubico-piv-tool output.
+/// Write information about certificate found in slot a la yubico-piv-tool output.
 pub fn print_cert_info(
     yubikey: &mut YubiKey,
     slot: SlotId,
