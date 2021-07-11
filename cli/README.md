@@ -18,7 +18,7 @@ utility with general-purpose public-key encryption and signing support.
 
 ## Minimum Supported Rust Version
 
-- Rust **1.39+**
+Rust **1.51** or newer.
 
 ## Supported YubiKeys
 
@@ -47,7 +47,7 @@ For more information, please see [CODE_OF_CONDUCT.md][cc-md].
 
 ## License
 
-Copyright (c) 2014-2019 Yubico AB, Tony Arcieri
+Copyright (c) 2014-2021 Yubico AB, Tony Arcieri
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

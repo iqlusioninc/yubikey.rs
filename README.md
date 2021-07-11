@@ -36,7 +36,7 @@ endorsed by Yubico.
 
 ## Minimum Supported Rust Version
 
-- Rust **1.46** or newer
+Rust **1.51** or newer.
 
 ## Supported YubiKeys
 
@@ -152,7 +152,7 @@ Yubico's [yubico-piv-tool], a C library/CLI program. The original library
 was licensed under a [2-Clause BSD License][BSDL], which this library inherits
 as a derived work.
 
-Copyright (c) 2014-2020 Yubico AB, Tony Arcieri
+Copyright (c) 2014-2021 Yubico AB, Tony Arcieri
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -194,7 +194,7 @@ or conditions.
 [docs-link]: https://docs.rs/yubikey/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-link]: https://github.com/iqlusioninc/yubikey.rs/blob/main/COPYING
-[rustc-image]: https://img.shields.io/badge/rustc-1.46+-blue.svg
+[rustc-image]: https://img.shields.io/badge/rustc-1.51+-blue.svg
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/

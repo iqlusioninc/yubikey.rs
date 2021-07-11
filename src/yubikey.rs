@@ -231,7 +231,7 @@ impl YubiKey {
     /// Begin a transaction.
     pub(crate) fn begin_transaction(&mut self) -> Result<Transaction<'_>, Error> {
         // TODO(tarcieri): reconnect support
-        Ok(Transaction::new(&mut self.card)?)
+        Transaction::new(&mut self.card)
     }
 
     /// Get the name of the associated PC/SC card reader
