@@ -473,7 +473,7 @@ pub fn generate(
     const SZ_ROCA_BLOCK_ADMIN: &str = "was blocked due to an administrator configuration setting.";
     const SZ_ROCA_DEFAULT: &str = "was permitted by default, but is not recommended.  The default behavior will change in a future Yubico release.";
 
-    let setting_roca: settings::BoolValue;
+    let setting_roca: settings::ConfigValue;
 
     match algorithm {
         AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
@@ -481,7 +481,7 @@ pub fn generate(
                 && (yubikey.version.minor < 3
                     || yubikey.version.minor == 3 && (yubikey.version.patch < 5))
             {
-                setting_roca = settings::BoolValue::get(SZ_SETTING_ROCA, true);
+                setting_roca = settings::ConfigValue::get(SZ_SETTING_ROCA, true);
 
                 let psz_msg = match setting_roca.source {
                     settings::Source::User => {
