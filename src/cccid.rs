@@ -81,7 +81,7 @@ pub struct Ccc(pub [u8; CCC_SIZE]);
 
 impl Ccc {
     /// Return CardId component of CCC
-    pub fn cccid(&self) -> Result<CardId, Error> {
+    pub fn card_id(&self) -> Result<CardId, Error> {
         let mut cccid = [0u8; CCCID_SIZE];
         cccid.copy_from_slice(&self.0[CCC_ID_OFFS..(CCC_ID_OFFS + CCCID_SIZE)]);
         Ok(CardId(cccid))
