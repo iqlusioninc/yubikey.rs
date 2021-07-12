@@ -40,6 +40,15 @@
 //!
 //! NOTE: RSASSA-PSS signatures and RSA-OAEP encryption may be supportable (TBD)
 //!
+//! # Status
+//!
+//! Functionality which has been successfully tested is available by default.
+//!
+//! Any functionality which is gated on the `untested` feature has not been
+//! properly tested and is not known to function correctly.
+//!
+//! If
+//!
 //! # History
 //!
 //! This library is a Rust translation of the [yubico-piv-tool] utility by
@@ -141,7 +150,7 @@ mod mscmap;
 mod msroots;
 pub mod piv;
 mod policy;
-pub mod readers;
+pub mod reader;
 mod serialization;
 mod settings;
 mod transaction;
@@ -155,7 +164,7 @@ pub use crate::{
     mgm::{MgmKey, MgmType},
     piv::Key,
     policy::{PinPolicy, TouchPolicy},
-    readers::Readers,
+    reader::Context,
     settings::{SettingSource, SettingValue},
     yubikey::{CachedPin, Serial, Version, YubiKey},
 };

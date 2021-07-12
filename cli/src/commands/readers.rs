@@ -7,7 +7,7 @@ use std::{
     process::exit,
 };
 use termcolor::{ColorSpec, StandardStreamLock, WriteColor};
-use yubikey::{Readers, Serial};
+use yubikey::{Context, Serial};
 
 /// The `readers` subcommand
 #[derive(Debug, Options)]
@@ -16,7 +16,7 @@ pub struct ReadersCmd {}
 impl ReadersCmd {
     /// Run the `readers` subcommand
     pub fn run(&self) {
-        let mut readers = Readers::open().unwrap_or_else(|e| {
+        let mut readers = Context::open().unwrap_or_else(|e| {
             status_err!("couldn't open PC/SC context: {}", e);
             exit(1);
         });
