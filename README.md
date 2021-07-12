@@ -53,41 +53,6 @@ an experimental stage and may still contain high-severity issues.
 
 USE AT YOUR OWN RISK!
 
-## Status
-
-This project is a largely incomplete work-in-progress. So far the only
-functionality which has actually been tested is connecting to Yubikeys.
-
-If you're interested helping test functionality, the table below documents
-the current status of the project and relevant GitHub issues for various
-functions of the YubiKey:
-
-|    | Module        | Issue | Description |
-|----|---------------|-------|-------------|
-| 🚧 | `yubikey`     | [#20] | Core functionality: auth, keys, PIN/PUK, encrypt, sign, attest |
-| 🚧 | `cccid`       | [#21] | Cardholder Capability Container (CCC) IDs |
-| 🚧️ | `certificate` | [#22] | Certificates for stored keys |
-| 🚧 | `chuid`       | [#23] | Cardholder Unique Identifier (CHUID) |
-| ✅️ | `config`      | [#24] | Support for reading on-key configuration |
-| 🚧 | `key`         | [#26] | Crypto key management: list, generate, import |
-| 🚧 | `mgm`         | [#26] | Management Key (MGM) support: set, get, derive |
-| ⚠️ | `mscmap`      | [#25] | MS Container Map Records |
-| ⚠️ | `msroots`     | [#28] | `msroots` file: PKCS#7 formatted certificate store for enterprise trusted roots |
-
-Legend:
-
-|    | Description                        |
-|----|------------------------------------|
-| ✅ | Working                            |
-| 🚧 | Testing and validation in progress |
-| ⚠️ | Untested support                   |
-
-NOTE: Commands marked ⚠️ are disabled by default as they have have not been properly tested and may contain bugs or
-not work at all. USE AT YOUR OWN RISK!
-
-Enable the `untested` feature in your `Cargo.toml` to enable features marked ⚠️
-above.
-
 ## Testing
 
 To run the full test suite, you'll need a connected YubiKey NEO/4/5 device in

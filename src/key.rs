@@ -350,10 +350,13 @@ pub const SLOTS: [SlotId; 24] = [
 pub enum AlgorithmId {
     /// 1024-bit RSA.
     Rsa1024,
+
     /// 2048-bit RSA.
     Rsa2048,
+
     /// ECDSA with the NIST P256 curve.
     EccP256,
+
     /// ECDSA with the NIST P384 curve.
     EccP384,
 }
@@ -390,6 +393,7 @@ impl AlgorithmId {
     }
 
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     fn get_elem_len(self) -> usize {
         match self {
             AlgorithmId::Rsa1024 => 64,
@@ -400,6 +404,7 @@ impl AlgorithmId {
     }
 
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     fn get_param_tag(self) -> u8 {
         match self {
             AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => 0x01,
@@ -453,8 +458,7 @@ impl Key {
     }
 }
 
-/// Generate key
-#[allow(clippy::cognitive_complexity)]
+/// Generate new key.
 pub fn generate(
     yubikey: &mut YubiKey,
     slot: SlotId,
@@ -473,7 +477,7 @@ pub fn generate(
     const SZ_ROCA_BLOCK_ADMIN: &str = "was blocked due to an administrator configuration setting.";
     const SZ_ROCA_DEFAULT: &str = "was permitted by default, but is not recommended.  The default behavior will change in a future Yubico release.";
 
-    let setting_roca: settings::ConfigValue;
+    let setting_roca: settings::SettingValue;
 
     match algorithm {
         AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
@@ -481,17 +485,17 @@ pub fn generate(
                 && (yubikey.version.minor < 3
                     || yubikey.version.minor == 3 && (yubikey.version.patch < 5))
             {
-                setting_roca = settings::ConfigValue::get(SZ_SETTING_ROCA, true);
+                setting_roca = settings::SettingValue::get(SZ_SETTING_ROCA, true);
 
                 let psz_msg = match setting_roca.source {
-                    settings::Source::User => {
+                    settings::SettingSource::User => {
                         if setting_roca.value {
                             SZ_ROCA_ALLOW_USER
                         } else {
                             SZ_ROCA_BLOCK_USER
                         }
                     }
-                    settings::Source::Admin => {
+                    settings::SettingSource::Admin => {
                         if setting_roca.value {
                             SZ_ROCA_ALLOW_ADMIN
                         } else {
@@ -660,6 +664,7 @@ pub fn generate(
 }
 
 #[cfg(feature = "untested")]
+#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 fn write_key(
     yubikey: &mut YubiKey,
     slot: SlotId,
@@ -708,6 +713,7 @@ fn write_key(
 
 /// The key data that makes up an RSA key.
 #[cfg(feature = "untested")]
+#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub struct RsaKeyData {
     /// The secret prime `p`.
     p: Buffer,
@@ -769,6 +775,7 @@ impl RsaKeyData {
 ///
 /// Errors if `algorithm` isn't `AlgorithmId::Rsa1024` or `AlgorithmId::Rsa2048`.
 #[cfg(feature = "untested")]
+#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub fn import_rsa_key(
     yubikey: &mut YubiKey,
     slot: SlotId,
@@ -803,6 +810,7 @@ pub fn import_rsa_key(
 ///
 /// Errors if `algorithm` isn't `AlgorithmId::EccP256` or ` AlgorithmId::EccP384`.
 #[cfg(feature = "untested")]
+#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub fn import_ecc_key(
     yubikey: &mut YubiKey,
     slot: SlotId,
@@ -828,8 +836,10 @@ pub fn import_ecc_key(
 }
 
 /// Generate an attestation certificate for a stored key.
+///
 /// <https://developers.yubico.com/PIV/Introduction/PIV_attestation.html>
 #[cfg(feature = "untested")]
+#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub fn attest(yubikey: &mut YubiKey, key: SlotId) -> Result<Buffer> {
     let templ = [0, Ins::Attest.code(), key.into(), 0];
     let txn = yubikey.begin_transaction()?;
@@ -850,7 +860,7 @@ pub fn attest(yubikey: &mut YubiKey, key: SlotId) -> Result<Buffer> {
     Ok(Buffer::new(response.data().into()))
 }
 
-/// Sign data using a PIV key
+/// Sign data using a PIV key.
 pub fn sign_data(
     yubikey: &mut YubiKey,
     raw_in: &[u8],
@@ -863,8 +873,9 @@ pub fn sign_data(
     txn.authenticated_command(raw_in, algorithm, key, false)
 }
 
-/// Decrypt data using a PIV key
+/// Decrypt data using a PIV key.
 #[cfg(feature = "untested")]
+#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub fn decrypt_data(
     yubikey: &mut YubiKey,
     input: &[u8],

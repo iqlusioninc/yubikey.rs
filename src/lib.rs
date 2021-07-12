@@ -34,14 +34,6 @@
 //!
 //! NOTE: RSASSA-PSS signatures and RSA-OAEP encryption may be supportable (TBD)
 //!
-//! ## Status
-//!
-//! This is a work-in-progress effort, and while much of the library-level
-//! code from upstream [yubico-piv-tool] has been translated into Rust
-//! presenting a safe interface, much of it is still untested.
-//!
-//! Please see the [project's README.md for a complete status][status].
-//!
 //! ## History
 //!
 //! This library is a Rust translation of the [yubico-piv-tool] utility by
@@ -83,7 +75,6 @@
 //! [YubiKey NEO]: https://support.yubico.com/support/solutions/articles/15000006494-yubikey-neo
 //! [YubiKey 4]: https://support.yubico.com/support/solutions/articles/15000006486-yubikey-4
 //! [YubiKey 5]: https://www.yubico.com/products/yubikey-5-overview/
-//! [status]: https://github.com/iqlusioninc/yubikey.rs#status
 //! [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/
 //! [Corrode]: https://github.com/jameysharp/corrode
 //! [piv-tool-guide]: https://www.yubico.com/wp-content/uploads/2016/05/Yubico_PIV_Tool_Command_Line_Guide_en.pdf
@@ -121,6 +112,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey.rs/main/img/logo.png",
     html_root_url = "https://docs.rs/yubikey/0.4.0-pre"
@@ -129,34 +121,44 @@
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
 
 mod apdu;
-pub mod cccid;
+mod cccid;
 pub mod certificate;
-pub mod chuid;
-pub mod config;
-pub mod error;
+mod chuid;
+mod config;
+mod error;
 pub mod key;
 mod metadata;
-pub mod mgm;
+mod mgm;
 #[cfg(feature = "untested")]
-pub mod mscmap;
+mod mscmap;
 #[cfg(feature = "untested")]
-pub mod msroots;
-pub mod policy;
+mod msroots;
+mod policy;
 pub mod readers;
 mod serialization;
-pub mod settings;
+mod settings;
 mod transaction;
-pub mod yubikey;
+mod yubikey;
 
-pub use self::{
+pub use crate::{
+    cccid::{CardId, Ccc},
+    chuid::ChuId,
+    config::Config,
     error::{Error, Result},
     key::Key,
-    mgm::MgmKey,
+    mgm::{MgmKey, MgmType},
+    policy::{PinPolicy, TouchPolicy},
     readers::Readers,
-    yubikey::{Serial, YubiKey},
+    settings::{SettingSource, SettingValue},
+    yubikey::{CachedPin, Serial, Version, YubiKey},
 };
 
-/// Object identifiers
+#[cfg(feature = "untested")]
+pub use crate::{mscmap::MsContainer, msroots::MsRoots};
+
+pub use uuid::Uuid;
+
+/// Object identifiers: handles to particular objects stored on a YubiKey.
 pub type ObjectId = u32;
 
 /// Buffer type (self-zeroizing byte vector)

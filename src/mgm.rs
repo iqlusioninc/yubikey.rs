@@ -73,7 +73,7 @@ pub(crate) const DES_LEN_3DES: usize = DES_LEN_DES * 3;
 #[cfg(feature = "untested")]
 const ITER_MGM_PBKDF2: u32 = 10000;
 
-/// Management Key (MGM) key types (manual/derived/protected)
+/// Management Key (MGM) key types (manual/derived/protected).
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum MgmType {
     /// Manual
@@ -132,6 +132,7 @@ impl MgmKey {
 
     /// Get derived management key (MGM)
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn get_derived(yubikey: &mut YubiKey, pin: &[u8]) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
 
@@ -157,6 +158,7 @@ impl MgmKey {
 
     /// Get protected management key (MGM)
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn get_protected(yubikey: &mut YubiKey) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
 
@@ -187,6 +189,7 @@ impl MgmKey {
     ///
     /// This will wipe any metadata related to derived and PIN-protected management keys.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn set_default(yubikey: &mut YubiKey) -> Result<()> {
         MgmKey::default().set_manual(yubikey, false)
     }
@@ -198,6 +201,7 @@ impl MgmKey {
     ///
     /// This will wipe any metadata related to derived and PIN-protected management keys.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn set_manual(&self, yubikey: &mut YubiKey, require_touch: bool) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 
@@ -257,6 +261,7 @@ impl MgmKey {
     ///
     /// This enables key management operations to be performed with access to the PIN.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 

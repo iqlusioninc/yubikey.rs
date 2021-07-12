@@ -31,21 +31,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{Error, Result, YubiKey};
-use getrandom::getrandom;
-use std::fmt::{self, Debug, Display};
+use std::{
+    convert::TryInto,
+    fmt::{self, Debug, Display},
+    str,
+};
 use subtle_encoding::hex;
-
-/// CHUID size
-pub const CHUID_SIZE: usize = 59;
-
-/// CARDID size
-pub const CARDID_SIZE: usize = 16;
-
-/// FASC-N component size
-pub const FASCN_SIZE: usize = 25;
-
-/// Expiration size
-pub const EXPIRATION_SIZE: usize = 8;
+use uuid::Uuid;
 
 /// FASC-N offset
 const CHUID_FASCN_OFFS: usize = 2;
@@ -81,46 +73,38 @@ const CHUID_TMPL: &[u8] = &[
     0x30, 0x33, 0x30, 0x30, 0x31, 0x30, 0x31, 0x3e, 0x00, 0xfe, 0x00,
 ];
 
-/// Cardholder Unique Identifier (CHUID) Card UUID/GUID value
+/// Cardholder Unique Identifier (CHUID).
 #[derive(Copy, Clone, Debug)]
-pub struct Uuid(pub [u8; CARDID_SIZE]);
-
-impl Uuid {
-    /// Generate a random Cardholder Unique Identifier (CHUID) UUID
-    pub fn generate() -> Result<Self> {
-        let mut id = [0u8; CARDID_SIZE];
-        getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
-        Ok(Self(id))
-    }
-}
-
-/// Cardholder Unique Identifier (CHUID)
-#[derive(Copy, Clone)]
-pub struct ChuId(pub [u8; CHUID_SIZE]);
+pub struct ChuId(pub [u8; Self::BYTE_SIZE]);
 
 impl ChuId {
+    /// CHUID size in bytes
+    pub const BYTE_SIZE: usize = 59;
+
+    /// FASC-N component size
+    pub const FASCN_SIZE: usize = 25;
+
+    /// Expiration size
+    pub const EXPIRATION_SIZE: usize = 8;
+
     /// Return FASC-N component of CHUID
-    pub fn fascn(&self) -> Result<[u8; FASCN_SIZE]> {
-        let mut fascn = [0u8; FASCN_SIZE];
-        fascn.copy_from_slice(&self.0[CHUID_FASCN_OFFS..(CHUID_FASCN_OFFS + FASCN_SIZE)]);
-        Ok(fascn)
+    pub fn fascn(&self) -> [u8; Self::FASCN_SIZE] {
+        self.0[CHUID_FASCN_OFFS..(CHUID_FASCN_OFFS + Self::FASCN_SIZE)]
+            .try_into()
+            .unwrap()
     }
 
     /// Return Card UUID/GUID component of CHUID
-    pub fn uuid(&self) -> Result<[u8; CARDID_SIZE]> {
-        let mut uuid = [0u8; CARDID_SIZE];
-        uuid.copy_from_slice(&self.0[CHUID_GUID_OFFS..(CHUID_GUID_OFFS + CARDID_SIZE)]);
-        Ok(uuid)
+    pub fn uuid(&self) -> Uuid {
+        Uuid::from_slice(&self.0[CHUID_GUID_OFFS..(CHUID_GUID_OFFS + 16)]).unwrap()
     }
 
     /// Return expiration date component of CHUID
     // TODO(tarcieri): parse expiration?
-    pub fn expiration(&self) -> Result<[u8; EXPIRATION_SIZE]> {
-        let mut expiration = [0u8; EXPIRATION_SIZE];
-        expiration.copy_from_slice(
-            &self.0[CHUID_EXPIRATION_OFFS..(CHUID_EXPIRATION_OFFS + EXPIRATION_SIZE)],
-        );
-        Ok(expiration)
+    pub fn expiration(&self) -> [u8; Self::EXPIRATION_SIZE] {
+        self.0[CHUID_EXPIRATION_OFFS..(CHUID_EXPIRATION_OFFS + Self::EXPIRATION_SIZE)]
+            .try_into()
+            .unwrap()
     }
 
     /// Get Cardholder Unique Identifier (CHUID)
@@ -132,17 +116,15 @@ impl ChuId {
             return Err(Error::GenericError);
         }
 
-        let mut chuid = [0u8; CHUID_SIZE];
-        chuid.copy_from_slice(&response[0..CHUID_SIZE]);
-        let retval = ChuId { 0: chuid };
-        Ok(retval)
+        Ok(ChuId(response[..Self::BYTE_SIZE].try_into().unwrap()))
     }
 
     /// Set Cardholder Unique Identifier (CHUID)
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn set(&self, yubikey: &mut YubiKey) -> Result<()> {
         let mut buf = CHUID_TMPL.to_vec();
-        buf[0..self.0.len()].copy_from_slice(&self.0);
+        buf[..Self::BYTE_SIZE].copy_from_slice(&self.0);
 
         let txn = yubikey.begin_transaction()?;
         txn.save_object(OBJ_CHUID, &buf)
@@ -151,16 +133,6 @@ impl ChuId {
 
 impl Display for ChuId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            String::from_utf8(hex::encode(&self.0[..])).unwrap()
-        )
-    }
-}
-
-impl Debug for ChuId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CHUID({:?})", &self.0[..])
+        write!(f, "{}", str::from_utf8(&hex::encode(&self.0[..])).unwrap())
     }
 }

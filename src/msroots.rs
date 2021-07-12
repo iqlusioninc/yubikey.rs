@@ -1,11 +1,4 @@
-//! `msroots`: PKCS#7 formatted certificate store for enterprise trusted roots.
-//!
-//! This `msroots` file contains a bag of certificates with empty content and
-//! an empty signature, allowing an enterprise root certificate truststore to
-//! be written to and read from a YubiKey.
-//!
-//! For more information, see:
-//! <https://docs.microsoft.com/en-us/windows-hardware/drivers/smartcard/developer-guidelines#-interoperability-with-msroots>
+//! PKCS#7 formatted certificate store for enterprise trusted roots.
 
 // Adapted from yubico-piv-tool:
 // <https://github.com/Yubico/yubico-piv-tool/>
@@ -53,7 +46,15 @@ const OBJ_MSROOTS5: u32 = 0x005f_ff15;
 const TAG_MSROOTS_END: u8 = 0x82;
 const TAG_MSROOTS_MID: u8 = 0x83;
 
-/// `msroots` file: PKCS#7-formatted certificate store for enterprise trust roots
+/// PKCS#7-formatted certificate store for enterprise trust roots.
+///
+/// The `msroots` file contains a bag of certificates with empty content and
+/// an empty signature, allowing an enterprise root certificate truststore to
+/// be written to and read from a YubiKey.
+///
+/// For more information, see:
+/// <https://docs.microsoft.com/en-us/windows-hardware/drivers/smartcard/developer-guidelines#-interoperability-with-msroots>
+#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub struct MsRoots(Vec<u8>);
 
 impl MsRoots {

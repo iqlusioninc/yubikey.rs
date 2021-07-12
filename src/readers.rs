@@ -1,4 +1,4 @@
-//! Support for enumerating available readers
+//! Support for enumerating available PC/SC card readers.
 
 use crate::{Result, YubiKey};
 use std::{
@@ -32,7 +32,7 @@ impl Readers {
         })
     }
 
-    /// Iterate over the available readers
+    /// Iterate over the available readers.
     pub fn iter(&mut self) -> Result<Iter<'_>> {
         let Self { ctx, reader_names } = self;
 
@@ -54,7 +54,7 @@ impl Readers {
     }
 }
 
-/// An individual connected reader
+/// An individual connected PC/SC card reader.
 pub struct Reader<'ctx> {
     /// Name of this reader
     name: &'ctx CStr,
@@ -64,24 +64,24 @@ pub struct Reader<'ctx> {
 }
 
 impl<'ctx> Reader<'ctx> {
-    /// Create a new reader from its name and context
+    /// Create a new reader from its name and context.
     fn new(name: &'ctx CStr, ctx: Arc<Mutex<pcsc::Context>>) -> Self {
         // TODO(tarcieri): open devices, determine they're YubiKeys, get serial?
         Self { name, ctx }
     }
 
-    /// Get this reader's name
+    /// Get this reader's name.
     pub fn name(&self) -> Cow<'_, str> {
         // TODO(tarcieri): is lossy ok here? try to avoid lossiness?
         self.name.to_string_lossy()
     }
 
-    /// Open a connection to this reader, returning a `YubiKey` if successful
+    /// Open a connection to this reader, returning a `YubiKey` if successful.
     pub fn open(&self) -> Result<YubiKey> {
         self.try_into()
     }
 
-    /// Connect to this reader, returning its `pcsc::Card`
+    /// Connect to this reader, returning its `pcsc::Card`.
     pub(crate) fn connect(&self) -> Result<pcsc::Card> {
         let ctx = self.ctx.lock().unwrap();
         Ok(ctx.connect(self.name, pcsc::ShareMode::Shared, pcsc::Protocols::T1)?)
