@@ -4,7 +4,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.3.0 (2021-03-22)
+## 0.4.0 (2021-07-12)
+### Added
+- `Result` alias ([#271])
+
+### Changed
+- Renamed crate from `yubikey-piv` => `yubikey` ([#267])
+- Renamed the following:
+    - `APDU` => `Apdu` ([#269])
+    - `CCC` => `Ccc` ([#269])
+    - `CHUID` => `ChuId` ([#269])
+    - `Ccc::cccid` => `Ccc::card_id` ([#270])
+    - `key` => `piv` ([#277])
+    - `readers` => `reader` ([#278])
+    - `readers::Readers` => `reader::Context` ([#278])
+- Bumped the following dependencies:
+  - `rsa` => v0.4 ([#246])
+  - `des` => v0.7 ([#251])
+  - `elliptic-curve` => v0.10 ([#268])
+  - `hmac` => v0.11 ([#251])
+  - `pbkdf2` => v0.8 ([#251])
+  - `p256` => v0.9 ([#268])
+  - `p384` => v0.8 ([#268])
+- MSRV 1.51+ ([#268])
+- Flatten API ([#274])
+- Replace `getrandom` with `rand_core` ([#276])
+
+### Fixed
+- Potential local DoS in TLV parser ([#279])
+
+[#246]: https://github.com/iqlusioninc/yubikey.rs/pull/246
+[#251]: https://github.com/iqlusioninc/yubikey.rs/pull/251
+[#267]: https://github.com/iqlusioninc/yubikey.rs/pull/267
+[#268]: https://github.com/iqlusioninc/yubikey.rs/pull/268
+[#269]: https://github.com/iqlusioninc/yubikey.rs/pull/269
+[#270]: https://github.com/iqlusioninc/yubikey.rs/pull/270
+[#271]: https://github.com/iqlusioninc/yubikey.rs/pull/271
+[#274]: https://github.com/iqlusioninc/yubikey.rs/pull/274
+[#276]: https://github.com/iqlusioninc/yubikey.rs/pull/276
+[#277]: https://github.com/iqlusioninc/yubikey.rs/pull/277
+[#278]: https://github.com/iqlusioninc/yubikey.rs/pull/278
+[#279]: https://github.com/iqlusioninc/yubikey.rs/pull/279
+
+## yubikey-piv 0.3.0 (2021-03-22)
 ### Added
 - Typed structs for PIN-protected and admin metadata ([#223])
 - `MgmKey::set_default`/`MgmKey::set_manual` methods ([#224])
@@ -18,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#223]: https://github.com/iqlusioninc/yubikey.rs/pull/223
 [#224]: https://github.com/iqlusioninc/yubikey.rs/pull/224
 
-## 0.2.0 (2021-01-30)
+## yubikey-piv 0.2.0 (2021-01-30)
 ### Changed
 - Bump `der-parser` to v5.0 ([#194])
 - Improve self-signed certificates ([#207])
@@ -32,7 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#208]: https://github.com/iqlusioninc/yubikey.rs/pull/208
 [#219]: https://github.com/iqlusioninc/yubikey.rs/pull/219
 
-## 0.1.0 (2020-10-19)
+## yubikey-piv 0.1.0 (2020-10-19)
 ### Added
 - `Certificate::generate_self_signed` ([#80])
 - `YubiKey::open_by_serial` ([#69])
@@ -74,7 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#61]: https://github.com/iqlusioninc/yubikey.rs/pull/61
 [#60]: https://github.com/iqlusioninc/yubikey.rs/pull/60
 
-## 0.0.3 (2019-12-02)
+## yubikey-piv 0.0.3 (2019-12-02)
 ### Added
 - Initial `Readers` enumerator for detecting YubiKeys ([#51])
 - Certificate parsing ([#45])
@@ -102,7 +144,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#33]: https://github.com/iqlusioninc/yubikey.rs/pull/33
 [#32]: https://github.com/iqlusioninc/yubikey.rs/pull/32
 
-## 0.0.2 (2019-11-25)
+## yubikey-piv 0.0.2 (2019-11-25)
 ### Added
 - `untested` Cargo feature to mark untested functionality ([#30])
 - Initial connect test and docs ([#19])
@@ -128,5 +170,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#7]: https://github.com/iqlusioninc/yubikey.rs/pull/7
 [#6]: https://github.com/iqlusioninc/yubikey.rs/pull/6
 
-## 0.0.1 (2019-11-18)
+## yubikey-piv 0.0.1 (2019-11-18)
 - Initial release
