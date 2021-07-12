@@ -30,7 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{key::SlotId, serialization::*, Error, Result, YubiKey, CB_OBJ_MAX};
+use crate::{piv::SlotId, serialization::*, Error, Result, YubiKey, CB_OBJ_MAX};
 use log::error;
 use std::convert::{TryFrom, TryInto};
 
