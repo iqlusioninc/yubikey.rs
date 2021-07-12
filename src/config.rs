@@ -31,11 +31,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
+    consts::{
+        TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_ADMIN_TIMESTAMP, TAG_PROTECTED_FLAGS_1,
+        TAG_PROTECTED_MGM,
+    },
     metadata::{AdminData, ProtectedData},
     mgm::{MgmType, ADMIN_FLAGS_1_PROTECTED_MGM},
     yubikey::{YubiKey, ADMIN_FLAGS_1_PUK_BLOCKED},
-    Result, TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_ADMIN_TIMESTAMP, TAG_PROTECTED_FLAGS_1,
-    TAG_PROTECTED_MGM,
+    Result,
 };
 use log::error;
 use std::{

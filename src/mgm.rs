@@ -38,30 +38,21 @@ use zeroize::{Zeroize, Zeroizing};
 
 #[cfg(feature = "untested")]
 use crate::{
+    consts::{TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_PROTECTED_MGM},
     metadata::{AdminData, ProtectedData},
     yubikey::YubiKey,
-    TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_PROTECTED_MGM,
 };
 use des::{
     cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, NewBlockCipher},
     TdesEde3,
 };
 #[cfg(feature = "untested")]
-use hmac::Hmac;
-#[cfg(feature = "untested")]
-use pbkdf2::pbkdf2;
-#[cfg(feature = "untested")]
-use sha1::Sha1;
+use {hmac::Hmac, pbkdf2::pbkdf2, sha1::Sha1};
 
 pub(crate) const ADMIN_FLAGS_1_PROTECTED_MGM: u8 = 0x02;
 
 #[cfg(feature = "untested")]
 const CB_ADMIN_SALT: usize = 16;
-
-/// Default MGM key configured on all YubiKeys
-const DEFAULT_MGM_KEY: [u8; DES_LEN_3DES] = [
-    1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,
-];
 
 /// Size of a DES key
 const DES_LEN_DES: usize = 8;
@@ -349,9 +340,12 @@ impl AsRef<[u8; DES_LEN_3DES]> for MgmKey {
     }
 }
 
+/// Default MGM key configured on all YubiKeys
 impl Default for MgmKey {
     fn default() -> Self {
-        MgmKey(DEFAULT_MGM_KEY)
+        MgmKey([
+            1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,
+        ])
     }
 }
 

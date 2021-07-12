@@ -59,7 +59,7 @@ use std::{convert::TryFrom, str::FromStr};
 
 #[cfg(feature = "untested")]
 use {
-    crate::CB_OBJ_MAX,
+    crate::consts::CB_OBJ_MAX,
     num_bigint_dig::traits::ModInverse,
     num_integer::Integer,
     num_traits::{FromPrimitive, One},
