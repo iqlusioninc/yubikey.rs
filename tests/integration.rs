@@ -3,9 +3,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
 
-use getrandom::getrandom;
 use lazy_static::lazy_static;
 use log::trace;
+use rand_core::{OsRng, RngCore};
 use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
 use std::{convert::TryInto, env, sync::Mutex};
@@ -120,16 +120,13 @@ fn test_set_mgmkey() {
     assert!(yubikey.authenticate(MgmKey::default()).is_ok());
 
     // Set a protected management key.
-    assert!(MgmKey::generate()
-        .unwrap()
-        .set_protected(&mut yubikey)
-        .is_ok());
+    assert!(MgmKey::generate().set_protected(&mut yubikey).is_ok());
     let protected = MgmKey::get_protected(&mut yubikey).unwrap();
     assert!(yubikey.authenticate(MgmKey::default()).is_err());
     assert!(yubikey.authenticate(protected.clone()).is_ok());
 
     // Set a manual management key.
-    let manual = MgmKey::generate().unwrap();
+    let manual = MgmKey::generate();
     assert!(manual.set_manual(&mut yubikey, false).is_ok());
     assert!(MgmKey::get_protected(&mut yubikey).is_err());
     assert!(yubikey.authenticate(MgmKey::default()).is_err());
@@ -167,7 +164,7 @@ fn generate_self_signed_cert(algorithm: AlgorithmId) -> Certificate {
     .unwrap();
 
     let mut serial = [0u8; 20];
-    getrandom(&mut serial).unwrap();
+    OsRng.fill_bytes(&mut serial);
 
     // Generate a self-signed certificate for the new key.
     let extensions: &[x509::Extension<'_, &[u64]>] = &[];

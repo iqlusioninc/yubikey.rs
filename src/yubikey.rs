@@ -42,6 +42,7 @@ use crate::{
 };
 use log::{error, info};
 use pcsc::Card;
+use rand_core::{OsRng, RngCore};
 use std::{
     convert::{TryFrom, TryInto},
     fmt::{self, Display},
@@ -49,15 +50,14 @@ use std::{
 };
 
 #[cfg(feature = "untested")]
-use crate::{
-    apdu::StatusWords, metadata::AdminData, transaction::ChangeRefAction, Buffer, ObjectId,
-    MGMT_AID, TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP,
+use {
+    crate::{
+        apdu::StatusWords, metadata::AdminData, transaction::ChangeRefAction, Buffer, ObjectId,
+        MGMT_AID, TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP,
+    },
+    secrecy::ExposeSecret,
+    std::time::{SystemTime, UNIX_EPOCH},
 };
-use getrandom::getrandom;
-#[cfg(feature = "untested")]
-use secrecy::ExposeSecret;
-#[cfg(feature = "untested")]
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Flag for PUK blocked
 pub(crate) const ADMIN_FLAGS_1_PUK_BLOCKED: u8 = 0x01;
@@ -294,11 +294,7 @@ impl YubiKey {
         data[4..12].copy_from_slice(&response);
         data[12] = 0x81;
         data[13] = 8;
-
-        if getrandom(&mut data[14..22]).is_err() {
-            error!("failed getting randomness for authentication");
-            return Err(Error::RandomnessError);
-        }
+        OsRng.fill_bytes(&mut data[14..22]);
 
         let mut challenge = [0u8; 8];
         challenge.copy_from_slice(&data[14..22]);

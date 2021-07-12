@@ -65,17 +65,22 @@ pub struct Config {
     pub mgm_type: MgmType,
 }
 
-impl Config {
-    /// Get YubiKey config.
-    pub(crate) fn get(yubikey: &mut YubiKey) -> Result<Config> {
-        let mut config = Config {
+impl Default for Config {
+    fn default() -> Config {
+        Config {
             protected_data_available: false,
             puk_blocked: false,
             puk_noblock_on_upgrade: false,
             pin_last_changed: None,
             mgm_type: MgmType::Manual,
-        };
+        }
+    }
+}
 
+impl Config {
+    /// Get YubiKey config.
+    pub(crate) fn get(yubikey: &mut YubiKey) -> Result<Config> {
+        let mut config = Self::default();
         let txn = yubikey.begin_transaction()?;
 
         if let Ok(admin_data) = AdminData::read(&txn) {

@@ -81,9 +81,6 @@ pub enum Error {
     /// PIN locked
     PinLocked,
 
-    /// Randomness error
-    RandomnessError,
-
     /// Range error
     RangeError,
 
@@ -116,7 +113,6 @@ impl Error {
             Error::ParseError => "YKPIV_PARSE_ERROR",
             Error::PcscError { .. } => "YKPIV_PCSC_ERROR",
             Error::PinLocked => "YKPIV_PIN_LOCKED",
-            Error::RandomnessError => "YKPIV_RANDOMNESS_ERROR",
             Error::RangeError => "YKPIV_RANGE_ERROR",
             Error::SizeError => "YKPIV_SIZE_ERROR",
             Error::WrongPin { .. } => "YKPIV_WRONG_PIN",
@@ -140,7 +136,6 @@ impl Error {
             Error::ParseError => "parse error",
             Error::PcscError { .. } => "PC/SC error",
             Error::PinLocked => "PIN locked",
-            Error::RandomnessError => "randomness error",
             Error::RangeError => "range error",
             Error::SizeError => "size error",
             Error::WrongPin { .. } => "wrong pin",
