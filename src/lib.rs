@@ -146,6 +146,7 @@ mod cccid;
 pub mod certificate;
 mod chuid;
 mod config;
+mod consts;
 mod error;
 mod metadata;
 mod mgm;
@@ -185,30 +186,3 @@ pub type ObjectId = u32;
 
 /// Buffer type (self-zeroizing byte vector)
 pub(crate) type Buffer = zeroize::Zeroizing<Vec<u8>>;
-
-/// YubiKey max buffer size
-pub(crate) const CB_BUF_MAX: usize = 3072;
-
-/// YubiKey max object size
-pub(crate) const CB_OBJ_MAX: usize = CB_BUF_MAX - 9;
-pub(crate) const CB_OBJ_TAG_MIN: usize = 2; // 1 byte tag + 1 byte len
-#[cfg(feature = "untested")]
-pub(crate) const CB_OBJ_TAG_MAX: usize = CB_OBJ_TAG_MIN + 2; // 1 byte tag + 3 bytes len
-
-pub(crate) const TAG_ADMIN_FLAGS_1: u8 = 0x81;
-pub(crate) const TAG_ADMIN_SALT: u8 = 0x82;
-pub(crate) const TAG_ADMIN_TIMESTAMP: u8 = 0x83;
-pub(crate) const TAG_PROTECTED_FLAGS_1: u8 = 0x81;
-pub(crate) const TAG_PROTECTED_MGM: u8 = 0x89;
-
-/// PIV Applet ID
-pub(crate) const PIV_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
-
-/// MGMT Applet ID.
-///
-/// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
-#[cfg(feature = "untested")]
-pub(crate) const MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
-
-/// YubiKey OTP Applet ID. Needed to query serial on YK4.
-pub(crate) const YK_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01];

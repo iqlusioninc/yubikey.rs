@@ -31,6 +31,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
+    consts::CB_OBJ_MAX,
     error::{Error, Result},
     piv::{sign_data, AlgorithmId, SlotId},
     serialization::*,
@@ -52,8 +53,6 @@ use std::ops::DerefMut;
 use x509::{der::Oid, RelativeDistinguishedName};
 use x509_parser::{parse_x509_certificate, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
-
-use crate::CB_OBJ_MAX;
 
 // TODO: Make these der_parser::oid::Oid constants when it has const fn support.
 const OID_RSA_ENCRYPTION: &str = "1.2.840.113549.1.1.1";

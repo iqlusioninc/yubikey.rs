@@ -36,7 +36,7 @@ use zeroize::Zeroizing;
 use crate::{serialization::*, transaction::Transaction, Buffer, Error, Result};
 
 #[cfg(feature = "untested")]
-use crate::{CB_OBJ_MAX, CB_OBJ_TAG_MAX};
+use crate::consts::{CB_OBJ_MAX, CB_OBJ_TAG_MAX};
 
 #[cfg(feature = "untested")]
 use std::iter;

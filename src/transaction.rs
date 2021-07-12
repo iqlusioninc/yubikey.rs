@@ -3,11 +3,12 @@
 use crate::{
     apdu::Response,
     apdu::{Apdu, Ins, StatusWords},
+    consts::{CB_BUF_MAX, CB_OBJ_MAX},
     error::{Error, Result},
     piv::{AlgorithmId, SlotId},
     serialization::*,
     yubikey::*,
-    Buffer, ObjectId, CB_BUF_MAX, CB_OBJ_MAX, PIV_AID, YK_AID,
+    Buffer, ObjectId,
 };
 use log::{error, trace};
 use std::convert::TryInto;
@@ -15,6 +16,12 @@ use zeroize::Zeroizing;
 
 #[cfg(feature = "untested")]
 use crate::mgm::{MgmKey, DES_LEN_3DES};
+
+/// PIV Applet ID
+const PIV_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
+
+/// YubiKey OTP Applet ID. Needed to query serial on YK4.
+const YK_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01];
 
 const CB_PIN_MAX: usize = 8;
 

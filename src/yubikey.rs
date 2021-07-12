@@ -53,8 +53,11 @@ use std::{
 #[cfg(feature = "untested")]
 use {
     crate::{
-        apdu::StatusWords, metadata::AdminData, transaction::ChangeRefAction, Buffer, ObjectId,
-        MGMT_AID, TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP,
+        apdu::StatusWords,
+        consts::{TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP},
+        metadata::AdminData,
+        transaction::ChangeRefAction,
+        Buffer, ObjectId,
     },
     secrecy::ExposeSecret,
     std::time::{SystemTime, UNIX_EPOCH},
@@ -68,6 +71,12 @@ pub(crate) const ALGO_3DES: u8 = 0x03;
 
 /// Card management key
 pub(crate) const KEY_CARDMGM: u8 = 0x9b;
+
+/// MGMT Applet ID.
+///
+/// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
+#[cfg(feature = "untested")]
+const MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
 
 const TAG_DYN_AUTH: u8 = 0x7c;
 

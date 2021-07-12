@@ -30,7 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{Buffer, Error, ObjectId, Result, CB_OBJ_TAG_MIN};
+use crate::{consts::CB_OBJ_TAG_MIN, Buffer, Error, ObjectId, Result};
 
 pub const OBJ_DISCOVERY: u32 = 0x7e;
 
