@@ -8,11 +8,7 @@ use lazy_static::lazy_static;
 use log::trace;
 use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
-use std::{
-    convert::{TryFrom, TryInto},
-    env,
-    sync::Mutex,
-};
+use std::{convert::TryInto, env, sync::Mutex};
 use x509::RelativeDistinguishedName;
 use yubikey::{
     certificate::{Certificate, PublicKeyInfo},
@@ -242,7 +238,7 @@ fn generate_self_signed_ec_cert() {
     let sig_algo_len = data[7 + tbs_cert_len + 1] as usize;
     let sig_start = 7 + tbs_cert_len + 2 + sig_algo_len + 3;
     let msg = &data[4..7 + tbs_cert_len];
-    let sig = p256::ecdsa::Signature::try_from(&data[sig_start..]).unwrap();
+    let sig = p256::ecdsa::Signature::from_der(&data[sig_start..]).unwrap();
     let vk = p256::ecdsa::VerifyingKey::from_sec1_bytes(pubkey.as_bytes()).unwrap();
 
     use p256::ecdsa::signature::Verifier;
