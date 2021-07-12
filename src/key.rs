@@ -47,20 +47,19 @@ use crate::{
     yubikey::YubiKey,
     Buffer, ObjectId,
 };
-use log::debug;
+use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
+use log::{debug, error, warn};
+use rsa::{BigUint, RSAPublicKey};
 use std::convert::TryFrom;
 
 #[cfg(feature = "untested")]
-use crate::CB_OBJ_MAX;
-use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
-use log::{error, warn};
-#[cfg(feature = "untested")]
-use num_bigint_dig::traits::ModInverse;
-#[cfg(feature = "untested")]
-use num_integer::Integer;
-#[cfg(feature = "untested")]
-use num_traits::{FromPrimitive, One};
-use rsa::{BigUint, RSAPublicKey};
+use {
+    crate::CB_OBJ_MAX,
+    num_bigint_dig::traits::ModInverse,
+    num_integer::Integer,
+    num_traits::{FromPrimitive, One},
+};
+
 #[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 

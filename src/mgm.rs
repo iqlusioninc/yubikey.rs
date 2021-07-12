@@ -31,8 +31,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{Error, Result};
-use getrandom::getrandom;
 use log::error;
+use rand_core::{OsRng, RngCore};
 use std::convert::{TryFrom, TryInto};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -97,14 +97,10 @@ pub struct MgmKey([u8; DES_LEN_3DES]);
 
 impl MgmKey {
     /// Generate a random MGM key
-    pub fn generate() -> Result<Self> {
+    pub fn generate() -> Self {
         let mut key_bytes = [0u8; DES_LEN_3DES];
-
-        if getrandom(&mut key_bytes).is_err() {
-            return Err(Error::RandomnessError);
-        }
-
-        MgmKey::new(key_bytes)
+        OsRng.fill_bytes(&mut key_bytes);
+        Self(key_bytes)
     }
 
     /// Create an MGM key from byte slice.
@@ -127,7 +123,7 @@ impl MgmKey {
             return Err(Error::KeyError);
         }
 
-        Ok(MgmKey(key_bytes))
+        Ok(Self(key_bytes))
     }
 
     /// Get derived management key (MGM)
@@ -152,7 +148,6 @@ impl MgmKey {
 
         let mut mgm = [0u8; DES_LEN_3DES];
         pbkdf2::<Hmac<Sha1>>(pin, &salt, ITER_MGM_PBKDF2, &mut mgm);
-
         MgmKey::from_bytes(mgm)
     }
 

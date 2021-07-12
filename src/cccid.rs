@@ -31,7 +31,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{Error, Result, YubiKey};
-use getrandom::getrandom;
+use rand_core::{OsRng, RngCore};
 use std::{
     fmt::{self, Debug, Display},
     str,
@@ -68,10 +68,10 @@ impl CardId {
     pub const BYTE_SIZE: usize = 14;
 
     /// Generate a random CCC Card ID
-    pub fn generate() -> Result<Self> {
+    pub fn generate() -> Self {
         let mut id = [0u8; Self::BYTE_SIZE];
-        getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
-        Ok(Self(id))
+        OsRng.fill_bytes(&mut id);
+        Self(id)
     }
 }
 
