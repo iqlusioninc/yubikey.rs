@@ -7,7 +7,7 @@
 //!
 //! - **Encryption**:
 //!   - RSA: `RSA1024`, `RSA2048`
-//!   - ECC: `ECCP256`, `ECCP384` (i.e. NIST curves: P-256, P-384)
+//!   - ECC: `ECCP256`, `ECCP384` (NIST curves: P-256, P-384)
 //! - **Signatures**:
 //!   - RSASSA-PKCS#1v1.5: `RSA1024`, `RSA2048`
 //!   - ECDSA: `ECCP256`, `ECCP384` (NIST curves: P-256, P-384)

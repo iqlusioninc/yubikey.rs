@@ -33,6 +33,7 @@
 use crate::{Error, Result, YubiKey};
 use rand_core::{OsRng, RngCore};
 use std::{
+    convert::TryInto,
     fmt::{self, Debug, Display},
     str,
 };
@@ -99,13 +100,12 @@ impl Ccc {
             return Err(Error::GenericError);
         }
 
-        let mut ccc = [0u8; Self::BYTE_SIZE];
-        ccc.copy_from_slice(&response[0..Self::BYTE_SIZE]);
-        Ok(Self(ccc))
+        Ok(Self(response[..Self::BYTE_SIZE].try_into().unwrap()))
     }
 
     /// Set Cardholder Capability Container (CCC) ID
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn set(&self, yubikey: &mut YubiKey) -> Result<()> {
         let mut buf = CCC_TMPL.to_vec();
         buf[0..self.0.len()].copy_from_slice(&self.0);
@@ -117,6 +117,6 @@ impl Ccc {
 
 impl Display for Ccc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", str::from_utf8(&hex::encode(&self.0[..])).unwrap())
+        f.write_str(str::from_utf8(&hex::encode(&self.0[..])).unwrap())
     }
 }
