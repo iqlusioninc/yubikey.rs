@@ -6,7 +6,6 @@
 [![Docs][docs-image]][docs-link]
 [![2-Clause BSD Licensed][license-image]][license-link]
 ![Rust Version][rustc-image]
-![Maintenance Status: Experimental][maintenance-image]
 [![Safety Dance][safety-image]][safety-link]
 [![Build Status][build-image]][build-link]
 [![Gitter Chat][gitter-image]][gitter-link]
@@ -167,7 +166,6 @@ or conditions.
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-link]: https://github.com/iqlusioninc/yubikey.rs/blob/main/COPYING
 [rustc-image]: https://img.shields.io/badge/rustc-1.51+-blue.svg
-[maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
 [build-image]: https://github.com/iqlusioninc/yubikey.rs/workflows/CI/badge.svg?branch=main&event=push
