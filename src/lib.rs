@@ -3,9 +3,7 @@
 //! interface as provided by the [`pcsc` crate].
 //!
 //! # Features
-//!
 //! ## Personal Identity Verification (PIV)
-//!
 //! [PIV] is a [NIST] standard for both *signing* and *encryption*
 //! using SmartCards and SmartCard-based hardware tokens like YubiKeys.
 //!
@@ -19,19 +17,21 @@
 //! on which devices support PIV and the available functionality.
 //!
 //! # Minimum Supported Rust Version
-//!
 //! Rust **1.51** or newer.
 //!
 //! # Supported YubiKeys
-//!
 //! - [YubiKey 4] series
 //! - [YubiKey 5] series
 //!
 //! NOTE: Nano and USB-C variants of the above are also supported.
 //!       Pre-YK4 [YubiKey NEO] series is **NOT** supported.
 //!
-//! # Supported Algorithms
+//! # Supported Operating Systems
+//! - Linux
+//! - macOS
+//! - Windows
 //!
+//! # Supported Algorithms
 //! - **Authentication**: `3DES`
 //! - **Encryption**:
 //!   - RSA: `RSA1024`, `RSA2048`
@@ -43,7 +43,6 @@
 //! NOTE: RSASSA-PSS signatures and RSA-OAEP encryption may be supportable (TBD)
 //!
 //! # Status
-//!
 //! Functionality which has been successfully tested is available by default.
 //!
 //! Any functionality which is gated on the `untested` feature has not been
@@ -54,7 +53,6 @@
 //! `untested` gating as well as writing more automated tests.
 //!
 //! # History
-//!
 //! This library is a Rust translation of the [yubico-piv-tool] utility by
 //! Yubico, which was originally written in C. It was mechanically translated
 //! from C into Rust using [Corrode], and then subsequently heavily
@@ -65,20 +63,17 @@
 //! [Yubico PIV Tool Command Line Guide][piv-tool-guide].
 //!
 //! # Security Warning
-//!
 //! No security audits of this crate have ever been performed. Presently it is in
 //! an experimental stage and may still contain high-severity issues.
 //!
 //! USE AT YOUR OWN RISK!
 //!
 //! # Code of Conduct
-//!
 //! We abide by the [Contributor Covenant][cc-md] and ask that you do as well.
 //!
 //! For more information, please see [CODE_OF_CONDUCT.md][cc-md].
 //!
 //! # License
-//!
 //! **yubikey.rs** is a fork of and originally a mechanical translation from
 //! Yubico's [yubico-piv-tool], a C library/CLI program.
 //!
@@ -136,7 +131,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey.rs/main/img/logo.png",
-    html_root_url = "https://docs.rs/yubikey/0.4.0-pre"
+    html_root_url = "https://docs.rs/yubikey/0.4.0"
 )]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]

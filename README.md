@@ -11,8 +11,9 @@
 [![Build Status][build-image]][build-link]
 [![Gitter Chat][gitter-image]][gitter-link]
 
-Pure Rust host-side YubiKey [Personal Identity Verification (PIV)][PIV] driver
-with general-purpose public-key encryption and signing support.
+Pure Rust cross-platform host-side driver for [YubiKey] devices from [Yubico]
+with support for public-key encryption and digital signatures using the
+[Personal Identity Verification (PIV)][PIV] application.
 
 [Documentation][docs-link]
 
@@ -45,6 +46,12 @@ Rust **1.51** or newer.
 
 NOTE: Nano and USB-C variants of the above are also supported.
       Pre-YK4 [YubiKey NEO] series is **NOT** supported (see [#18]).
+
+## Supported Operating Systems
+
+- Linux
+- macOS
+- Windows
 
 ## Security Warning
 
@@ -170,6 +177,7 @@ or conditions.
 
 [//]: # (general links)
 
+[YubiKey]: https://www.yubico.com/products/yubikey-hardware/
 [PIV]: https://piv.idmanagement.gov/
 [yk-guide]: https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html
 [Yubico]: https://www.yubico.com/
