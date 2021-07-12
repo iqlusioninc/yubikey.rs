@@ -40,43 +40,48 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-/// Source of how a setting was configured
+/// Source of how a setting was configured.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Source {
-    /// User-specified setting
+pub enum SettingSource {
+    /// User-specified setting: sourced via `YUBIKEY_PIV_*` environment vars.
     User,
 
-    /// Admin-specified setting
+    /// Admin-specified setting: sourced via the `/etc/yubico/yubikeypiv.conf`
+    /// configuration file.
     Admin,
 
-    /// Default setting
+    /// Default setting.
     Default,
 }
 
-impl Default for Source {
+impl Default for SettingSource {
     fn default() -> Self {
         Self::Default
     }
 }
 
-/// Setting booleans
+/// Setting booleans: configuration values sourced from a file or the environment.
+///
+/// These can be configured globally in `/etc/yubico/yubikeypiv.conf` by a
+/// system administrator, or by the local user via `YUBIKEY_PIV_*` environment
+/// variables.
 #[derive(Copy, Clone, Debug)]
-pub struct ConfigValue {
+pub struct SettingValue {
     /// Boolean value
     pub value: bool,
 
     /// Source of the configuration setting (user, admin, or default)
-    pub source: Source,
+    pub source: SettingSource,
 }
 
-impl ConfigValue {
-    /// Get a [`BoolValue`] value by name.
+impl SettingValue {
+    /// Get a [`SettingValue`] value by name.
     pub fn get(key: &str, default: bool) -> Self {
         Self::from_file(key)
             .or_else(|| Self::from_env(key))
             .unwrap_or(Self {
                 value: default,
-                source: Source::Default,
+                source: SettingSource::Default,
             })
     }
 
@@ -104,8 +109,8 @@ impl ConfigValue {
                 };
 
                 if name == key {
-                    return Some(ConfigValue {
-                        source: Source::Admin,
+                    return Some(SettingValue {
+                        source: SettingSource::Admin,
                         value: value == "1" || value == "true",
                     });
                 }
@@ -119,18 +124,18 @@ impl ConfigValue {
     fn from_env(key: &str) -> Option<Self> {
         env::var(format!("YUBIKEY_PIV_{}", key))
             .ok()
-            .map(|value| ConfigValue {
-                source: Source::User,
+            .map(|value| SettingValue {
+                source: SettingSource::User,
                 value: value == "1" || value == "true",
             })
     }
 }
 
-impl Default for ConfigValue {
+impl Default for SettingValue {
     fn default() -> Self {
         Self {
             value: false,
-            source: Source::default(),
+            source: SettingSource::default(),
         }
     }
 }

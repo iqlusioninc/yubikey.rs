@@ -3,8 +3,9 @@
 use crate::{serialization::Tlv, Result};
 
 /// Specifies how often the PIN needs to be entered for access to the credential in a
-/// given slot. This policy must be set upon key generation or importation, and cannot be
-/// changed later.
+/// given slot.
+///
+/// This policy must be set when keys are generated or imported, and cannot be changed later.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PinPolicy {
     /// Use the default PIN policy for the slot. See the slot's documentation for details.
@@ -46,8 +47,9 @@ impl PinPolicy {
 }
 
 /// Specifies under what conditions a physical touch on the metal contact is required, in
-/// addition to the [`PinPolicy`]. This policy must be set upon key generation or
-/// importation, and cannot be changed later.
+/// addition to the [`PinPolicy`].
+///
+/// This policy must be set when keys are generated or imported, and cannot be changed later.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TouchPolicy {
     /// Use the default touch policy for the slot.

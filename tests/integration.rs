@@ -17,8 +17,7 @@ use x509::RelativeDistinguishedName;
 use yubikey::{
     certificate::{Certificate, PublicKeyInfo},
     key::{self, AlgorithmId, Key, RetiredSlotId, SlotId},
-    policy::{PinPolicy, TouchPolicy},
-    Error, MgmKey, YubiKey,
+    Error, MgmKey, PinPolicy, TouchPolicy, YubiKey,
 };
 
 lazy_static! {

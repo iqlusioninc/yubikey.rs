@@ -46,28 +46,28 @@ use std::{
 const CB_ADMIN_TIMESTAMP: usize = 0x04;
 const PROTECTED_FLAGS_1_PUK_NOBLOCK: u8 = 0x01;
 
-/// Config
+/// YubiKey configuration.
 #[derive(Copy, Clone, Debug)]
 pub struct Config {
     /// Protected data available
-    protected_data_available: bool,
+    pub protected_data_available: bool,
 
     /// PUK blocked
-    puk_blocked: bool,
+    pub puk_blocked: bool,
 
     /// No block on upgrade
-    puk_noblock_on_upgrade: bool,
+    pub puk_noblock_on_upgrade: bool,
 
     /// PIN last changed
-    pin_last_changed: Option<SystemTime>,
+    pub pin_last_changed: Option<SystemTime>,
 
     /// MGM type
-    mgm_type: MgmType,
+    pub mgm_type: MgmType,
 }
 
 impl Config {
-    /// Get YubiKey config
-    pub fn get(yubikey: &mut YubiKey) -> Result<Config> {
+    /// Get YubiKey config.
+    pub(crate) fn get(yubikey: &mut YubiKey) -> Result<Config> {
         let mut config = Config {
             protected_data_available: false,
             puk_blocked: false,
@@ -129,9 +129,7 @@ impl Config {
 
             if protected_data.get_item(TAG_PROTECTED_MGM).is_ok() {
                 if config.mgm_type != MgmType::Protected {
-                    error!(
-                        "conflicting types of mgm key administration configured: protected MGM exists"
-                    );
+                    error!("conflicting MGM key types: protected MGM exists");
                 }
 
                 // Always favor protected MGM

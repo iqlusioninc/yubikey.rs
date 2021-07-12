@@ -70,10 +70,10 @@ pub(crate) const KEY_CARDMGM: u8 = 0x9b;
 
 const TAG_DYN_AUTH: u8 = 0x7c;
 
-/// Cached YubiKey PIN
+/// Cached YubiKey PIN.
 pub type CachedPin = secrecy::SecretVec<u8>;
 
-/// YubiKey Serial Number
+/// YubiKey serial number.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Serial(pub u32);
 
@@ -103,7 +103,7 @@ impl Display for Serial {
     }
 }
 
-/// YubiKey Version
+/// YubiKey version.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Version {
     /// Major version component
@@ -133,8 +133,7 @@ impl Display for Version {
     }
 }
 
-/// YubiKey Device: this is the primary API for opening a session and
-/// performing various operations.
+/// YubiKey device: primary API for opening a session and performing various operations.
 ///
 /// Almost all functionality in this library will require an open session
 /// with a YubiKey which is represented by this type.
@@ -203,8 +202,9 @@ impl YubiKey {
         Err(Error::NotFound)
     }
 
-    /// Reconnect to a YubiKey
+    /// Reconnect to a YubiKey.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn reconnect(&mut self) -> Result<()> {
         info!("trying to reconnect to current reader");
 
@@ -235,7 +235,7 @@ impl YubiKey {
         Transaction::new(&mut self.card)
     }
 
-    /// Get the name of the associated PC/SC card reader
+    /// Get the name of the associated PC/SC card reader.
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -259,12 +259,12 @@ impl YubiKey {
         Config::get(self)
     }
 
-    /// Get CHUID
+    /// Get Cardholder Unique Identifier (CHUID).
     pub fn chuid(&mut self) -> Result<ChuId> {
         ChuId::get(self)
     }
 
-    /// Get CCCID
+    /// Get Cardholder Capability Container (CCC) Identifier.
     pub fn cccid(&mut self) -> Result<Ccc> {
         Ccc::get(self)
     }
@@ -325,6 +325,7 @@ impl YubiKey {
 
     /// Deauthenticate
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn deauthenticate(&mut self) -> Result<()> {
         let txn = self.begin_transaction()?;
 
@@ -359,7 +360,7 @@ impl YubiKey {
         Ok(())
     }
 
-    /// Get the number of PIN retries
+    /// Get the number of PIN retries.
     pub fn get_pin_retries(&mut self) -> Result<u8> {
         let txn = self.begin_transaction()?;
 
@@ -376,8 +377,9 @@ impl YubiKey {
         }
     }
 
-    /// Set the number of PIN retries
+    /// Set the number of PIN retries.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn set_pin_retries(&mut self, pin_tries: u8, puk_tries: u8) -> Result<()> {
         // Special case: if either retry count is 0, it's a successful no-op
         if pin_tries == 0 || puk_tries == 0 {
@@ -400,8 +402,9 @@ impl YubiKey {
 
     /// Change the Personal Identification Number (PIN).
     ///
-    /// The default PIN code is 123456
+    /// The default PIN code is `123456`.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn change_pin(&mut self, current_pin: &[u8], new_pin: &[u8]) -> Result<()> {
         {
             let txn = self.begin_transaction()?;
@@ -415,8 +418,9 @@ impl YubiKey {
         Ok(())
     }
 
-    /// Set PIN last changed
+    /// Set PIN last changed.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn set_pin_last_changed(yubikey: &mut YubiKey) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 
@@ -450,15 +454,17 @@ impl YubiKey {
     ///
     /// The PUK is part of the PIV standard that the YubiKey follows.
     ///
-    /// The default PUK code is 12345678.
+    /// The default PUK code is `12345678`.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn change_puk(&mut self, current_puk: &[u8], new_puk: &[u8]) -> Result<()> {
         let txn = self.begin_transaction()?;
         txn.change_ref(ChangeRefAction::ChangePuk, current_puk, new_puk)
     }
 
-    /// Block PUK: permanently prevent the PIN from becoming unblocked
+    /// Block PUK: permanently prevent the PIN from becoming unblocked.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn block_puk(yubikey: &mut YubiKey) -> Result<()> {
         let mut puk = [0x30, 0x42, 0x41, 0x44, 0x46, 0x30, 0x30, 0x44];
         let mut tries_remaining: i32 = -1;
@@ -488,24 +494,23 @@ impl YubiKey {
         }
 
         // Attempt to set the "PUK blocked" flag in admin data.
-
-        let mut admin_data = if let Ok(admin_data) = AdminData::read(&txn) {
-            if let Ok(item) = admin_data.get_item(TAG_ADMIN_FLAGS_1) {
-                if item.len() == flags.len() {
-                    flags.copy_from_slice(item)
-                } else {
-                    error!(
-                        "admin flags exist, but are incorrect size: {} (expected {})",
-                        item.len(),
-                        flags.len()
-                    );
+        let mut admin_data = AdminData::read(&txn)
+            .map(|data| {
+                if let Ok(item) = data.get_item(TAG_ADMIN_FLAGS_1) {
+                    if item.len() == flags.len() {
+                        flags.copy_from_slice(item)
+                    } else {
+                        error!(
+                            "admin flags exist, but are incorrect size: {} (expected {})",
+                            item.len(),
+                            flags.len()
+                        );
+                    }
                 }
-            }
 
-            admin_data
-        } else {
-            AdminData::default()
-        };
+                data
+            })
+            .unwrap_or_default();
 
         flags[0] |= ADMIN_FLAGS_1_PUK_BLOCKED;
 
@@ -523,27 +528,31 @@ impl YubiKey {
     /// Unblock a Personal Identification Number (PIN) using a previously
     /// configured PIN Unblocking Key (PUK).
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn unblock_pin(&mut self, puk: &[u8], new_pin: &[u8]) -> Result<()> {
         let txn = self.begin_transaction()?;
         txn.change_ref(ChangeRefAction::UnblockPin, puk, new_pin)
     }
 
-    /// Fetch an object from the YubiKey
+    /// Fetch an object from the YubiKey.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn fetch_object(&mut self, object_id: ObjectId) -> Result<Buffer> {
         let txn = self.begin_transaction()?;
         txn.fetch_object(object_id)
     }
 
-    /// Save an object
+    /// Save an object.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn save_object(&mut self, object_id: ObjectId, indata: &mut [u8]) -> Result<()> {
         let txn = self.begin_transaction()?;
         txn.save_object(object_id, indata)
     }
 
-    /// Get an auth challenge
+    /// Get an auth challenge.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn get_auth_challenge(&mut self) -> Result<[u8; 8]> {
         let txn = self.begin_transaction()?;
 
@@ -559,8 +568,9 @@ impl YubiKey {
         Ok(response.data()[4..12].try_into().unwrap())
     }
 
-    /// Verify an auth response
+    /// Verify an auth response.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn verify_auth_response(&mut self, response: [u8; 8]) -> Result<()> {
         let mut data = [0u8; 12];
         data[0] = 0x7c;
@@ -591,6 +601,7 @@ impl YubiKey {
     ///
     /// The reset function is only available when both pins are blocked.
     #[cfg(feature = "untested")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn reset_device(&mut self) -> Result<()> {
         let templ = [0, Ins::Reset.code(), 0, 0];
         let txn = self.begin_transaction()?;

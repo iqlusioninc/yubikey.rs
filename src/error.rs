@@ -35,7 +35,7 @@ use std::fmt::{self, Display};
 /// Result type with [`Error`].
 pub type Result<T> = core::result::Result<T, Error>;
 
-/// Kinds of errors
+/// Kinds of errors.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum Error {

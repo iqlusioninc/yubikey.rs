@@ -1,4 +1,4 @@
-//! YubiKey Certificates
+//! X.509 certificate support.
 
 // Adapted from yubico-piv-tool:
 // <https://github.com/Yubico/yubico-piv-tool/>

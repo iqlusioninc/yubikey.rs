@@ -32,14 +32,11 @@
 
 use crate::{Error, Result, YubiKey};
 use getrandom::getrandom;
-use std::fmt::{self, Debug, Display};
+use std::{
+    fmt::{self, Debug, Display},
+    str,
+};
 use subtle_encoding::hex;
-
-/// CCCID size
-pub const CCCID_SIZE: usize = 14;
-
-/// CCC size
-pub const CCC_SIZE: usize = 51;
 
 /// CCCID offset
 const CCC_ID_OFFS: usize = 9;
@@ -62,28 +59,34 @@ const CCC_TMPL: &[u8] = &[
     0x00, 0xfe, 0x00,
 ];
 
-/// Cardholder Capability Container (CCC) Identifier Card ID
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct CardId(pub [u8; CCCID_SIZE]);
+/// Cardholder Capability Container (CCC) Identifier Card ID.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+pub struct CardId(pub [u8; Self::BYTE_SIZE]);
 
 impl CardId {
+    /// CCCID size in bytes
+    pub const BYTE_SIZE: usize = 14;
+
     /// Generate a random CCC Card ID
     pub fn generate() -> Result<Self> {
-        let mut id = [0u8; CCCID_SIZE];
+        let mut id = [0u8; Self::BYTE_SIZE];
         getrandom(&mut id).map_err(|_| Error::RandomnessError)?;
         Ok(Self(id))
     }
 }
 
-/// Cardholder Capability Container (CCC) Identifier
-#[derive(Copy, Clone)]
-pub struct Ccc(pub [u8; CCC_SIZE]);
+/// Cardholder Capability Container (CCC) Identifier.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct Ccc(pub [u8; Self::BYTE_SIZE]);
 
 impl Ccc {
+    /// CCC size in bytes
+    pub const BYTE_SIZE: usize = 51;
+
     /// Return CardId component of CCC
     pub fn card_id(&self) -> Result<CardId> {
-        let mut cccid = [0u8; CCCID_SIZE];
-        cccid.copy_from_slice(&self.0[CCC_ID_OFFS..(CCC_ID_OFFS + CCCID_SIZE)]);
+        let mut cccid = [0u8; CardId::BYTE_SIZE];
+        cccid.copy_from_slice(&self.0[CCC_ID_OFFS..(CCC_ID_OFFS + CardId::BYTE_SIZE)]);
         Ok(CardId(cccid))
     }
 
@@ -96,8 +99,8 @@ impl Ccc {
             return Err(Error::GenericError);
         }
 
-        let mut ccc = [0u8; CCC_SIZE];
-        ccc.copy_from_slice(&response[0..CCC_SIZE]);
+        let mut ccc = [0u8; Self::BYTE_SIZE];
+        ccc.copy_from_slice(&response[0..Self::BYTE_SIZE]);
         Ok(Self(ccc))
     }
 
@@ -112,18 +115,8 @@ impl Ccc {
     }
 }
 
-impl Debug for Ccc {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CCC({:?})", &self.0[..])
-    }
-}
-
 impl Display for Ccc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            String::from_utf8(hex::encode(&self.0[..])).unwrap()
-        )
+        write!(f, "{}", str::from_utf8(&hex::encode(&self.0[..])).unwrap())
     }
 }
