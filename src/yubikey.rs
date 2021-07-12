@@ -38,7 +38,7 @@ use crate::{
     error::{Error, Result},
     mgm::MgmKey,
     piv,
-    readers::{Reader, Readers},
+    reader::{Context, Reader},
     transaction::Transaction,
 };
 use log::{error, info};
@@ -155,10 +155,10 @@ impl YubiKey {
     ///
     /// If you need to operate in environments with more than one YubiKey
     /// attached to the same system, use [`YubiKey::open_by_serial`] or
-    /// [`yubikey::Readers`][`Readers`] to select from the available
+    /// [`yubikey::reader::Context`][`Context`] to select from the available
     /// PC/SC readers.
     pub fn open() -> Result<Self> {
-        let mut readers = Readers::open().map_err(|e| match e {
+        let mut readers = Context::open().map_err(|e| match e {
             Error::PcscError {
                 inner: Some(pcsc::Error::NoReadersAvailable),
             } => Error::NotFound,
@@ -181,7 +181,7 @@ impl YubiKey {
 
     /// Open a YubiKey with a specific serial number.
     pub fn open_by_serial(serial: Serial) -> Result<Self> {
-        let mut readers = Readers::open().map_err(|e| match e {
+        let mut readers = Context::open().map_err(|e| match e {
             Error::PcscError {
                 inner: Some(pcsc::Error::NoReadersAvailable),
             } => Error::NotFound,

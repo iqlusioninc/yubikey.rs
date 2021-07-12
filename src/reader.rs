@@ -11,8 +11,8 @@ use std::{
 /// Iterator over connected readers
 pub type Iter<'ctx> = std::vec::IntoIter<Reader<'ctx>>;
 
-/// Enumeration support for available readers
-pub struct Readers {
+/// PC/SC reader context: used to enumerate available PC/SC [`Reader`]s.
+pub struct Context {
     /// PC/SC context
     ctx: Arc<Mutex<pcsc::Context>>,
 
@@ -20,7 +20,7 @@ pub struct Readers {
     reader_names: Vec<u8>,
 }
 
-impl Readers {
+impl Context {
     /// Open a PC/SC context, which can be used to enumerate available PC/SC
     /// readers (which can be used to connect to YubiKeys).
     pub fn open() -> Result<Self> {
