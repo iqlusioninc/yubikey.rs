@@ -50,13 +50,16 @@ impl<'a> Tlv<'a> {
         }
 
         let tag = buffer[0];
-
         let mut len = 0;
         let offset = 1 + get_length(&buffer[1..], &mut len);
+        let buffer = buffer.get(offset..).ok_or(Error::SizeError)?;
 
-        let (value, buffer) = buffer[offset..].split_at(len);
-
-        Ok((buffer, Tlv { tag, value }))
+        if buffer.len() >= len {
+            let (value, buffer) = buffer.split_at(len);
+            Ok((buffer, Tlv { tag, value }))
+        } else {
+            Err(Error::SizeError)
+        }
     }
 
     /// Takes a [`Buffer`] containing a single `Tlv` with the given tag, and returns a
