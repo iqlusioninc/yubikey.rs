@@ -998,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "yubikey-cli"
-version = "0.4.0-pre"
+version = "0.4.0"
 dependencies = [
  "env_logger",
  "gumdrop",
