@@ -33,10 +33,12 @@
 //! # Supported Algorithms
 //!
 //! - **Authentication**: `3DES`
-//! - **Encryption**: `RSA1024`, `RSA2048`, `ECCP256`, `ECCP384`
+//! - **Encryption**:
+//!   - RSA: `RSA1024`, `RSA2048`
+//!   - ECC: `ECCP256`, `ECCP384` (NIST curves: P-256, P-384)
 //! - **Signatures**:
 //!   - RSASSA-PKCS#1v1.5: `RSA1024`, `RSA2048`
-//!   - ECDSA: `ECCP256`, `ECCP384`
+//!   - ECDSA: `ECCP256`, `ECCP384` (NIST curves: P-256, P-384)
 //!
 //! NOTE: RSASSA-PSS signatures and RSA-OAEP encryption may be supportable (TBD)
 //!
@@ -47,7 +49,9 @@
 //! Any functionality which is gated on the `untested` feature has not been
 //! properly tested and is not known to function correctly.
 //!
-//! If
+//! Please see the [`untested` functionality tracking issue] for current status.
+//! We would appreciate any help testing this functionality and removing the
+//! `untested` gating as well as writing more automated tests.
 //!
 //! # History
 //!
@@ -91,6 +95,7 @@
 //! [YubiKey NEO]: https://support.yubico.com/support/solutions/articles/15000006494-yubikey-neo
 //! [YubiKey 4]: https://support.yubico.com/support/solutions/articles/15000006486-yubikey-4
 //! [YubiKey 5]: https://www.yubico.com/products/yubikey-5-overview/
+//! [`untested` functionality tracking issue]: https://github.com/iqlusioninc/yubikey.rs/issues/280
 //! [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/
 //! [Corrode]: https://github.com/jameysharp/corrode
 //! [piv-tool-guide]: https://www.yubico.com/wp-content/uploads/2016/05/Yubico_PIV_Tool_Command_Line_Guide_en.pdf
@@ -158,6 +163,7 @@ mod yubikey;
 
 pub use crate::{
     cccid::{CardId, Ccc},
+    certificate::Certificate,
     chuid::ChuId,
     config::Config,
     error::{Error, Result},

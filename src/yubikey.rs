@@ -94,7 +94,7 @@ impl FromStr for Serial {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        u32::from_str(s).map(Serial).map_err(|_| Error::ParseError)
+        s.parse().map(Serial).map_err(|_| Error::ParseError)
     }
 }
 

@@ -325,7 +325,6 @@ impl MgmKey {
     }
 
     /// Encrypt with 3DES key
-    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub(crate) fn encrypt(&self, input: &[u8; DES_LEN_DES]) -> [u8; DES_LEN_DES] {
         let mut output = input.to_owned();
         TdesEde3::new(GenericArray::from_slice(&self.0))
@@ -334,7 +333,6 @@ impl MgmKey {
     }
 
     /// Decrypt with 3DES key
-    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub(crate) fn decrypt(&self, input: &[u8; DES_LEN_DES]) -> [u8; DES_LEN_DES] {
         let mut output = input.to_owned();
         TdesEde3::new(GenericArray::from_slice(&self.0))

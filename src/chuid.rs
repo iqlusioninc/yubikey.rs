@@ -133,6 +133,6 @@ impl ChuId {
 
 impl Display for ChuId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", str::from_utf8(&hex::encode(&self.0[..])).unwrap())
+        f.write_str(str::from_utf8(&hex::encode(&self.0[..])).unwrap())
     }
 }
