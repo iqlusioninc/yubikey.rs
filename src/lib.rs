@@ -1,9 +1,15 @@
-//! [YubiKey] PIV: [Personal Identity Verification][PIV] support for
-//! [Yubico] devices using the Personal Computer/Smart Card ([PC/SC])
+//! **yubikey.rs**: pure Rust cross-platform host-side driver for [YubiKey]
+//! devices from [Yubico] using the Personal Computer/Smart Card ([PC/SC])
 //! interface as provided by the [`pcsc` crate].
 //!
-//! **PIV** is a [NIST] standard for both *signing* and *encryption*
+//! # Features
+//!
+//! ## Personal Identity Verification (PIV)
+//!
+//! [PIV] is a [NIST] standard for both *signing* and *encryption*
 //! using SmartCards and SmartCard-based hardware tokens like YubiKeys.
+//!
+//! PIV-related functionality can be found in the [`piv`] module.
 //!
 //! This library natively implements the protocol used to manage and
 //! utilize PIV encryption and signing keys which can be generated, imported,
@@ -12,11 +18,11 @@
 //! See [Yubico's guide to PIV-enabled YubiKeys][yk-guide] for more information
 //! on which devices support PIV and the available functionality.
 //!
-//! ## Minimum Supported Rust Version
+//! # Minimum Supported Rust Version
 //!
 //! Rust **1.51** or newer.
 //!
-//! ## Supported YubiKeys
+//! # Supported YubiKeys
 //!
 //! - [YubiKey 4] series
 //! - [YubiKey 5] series
@@ -24,7 +30,7 @@
 //! NOTE: Nano and USB-C variants of the above are also supported.
 //!       Pre-YK4 [YubiKey NEO] series is **NOT** supported.
 //!
-//! ## Supported Algorithms
+//! # Supported Algorithms
 //!
 //! - **Authentication**: `3DES`
 //! - **Encryption**: `RSA1024`, `RSA2048`, `ECCP256`, `ECCP384`
@@ -34,7 +40,7 @@
 //!
 //! NOTE: RSASSA-PSS signatures and RSA-OAEP encryption may be supportable (TBD)
 //!
-//! ## History
+//! # History
 //!
 //! This library is a Rust translation of the [yubico-piv-tool] utility by
 //! Yubico, which was originally written in C. It was mechanically translated
@@ -45,25 +51,26 @@
 //! the YubiKey implementation of PIV works in general, see the
 //! [Yubico PIV Tool Command Line Guide][piv-tool-guide].
 //!
-//! ## Security Warning
+//! # Security Warning
 //!
 //! No security audits of this crate have ever been performed. Presently it is in
 //! an experimental stage and may still contain high-severity issues.
 //!
 //! USE AT YOUR OWN RISK!
 //!
-//! ## Code of Conduct
+//! # Code of Conduct
 //!
 //! We abide by the [Contributor Covenant][cc-md] and ask that you do as well.
 //!
 //! For more information, please see [CODE_OF_CONDUCT.md][cc-md].
 //!
-//! ## License
+//! # License
 //!
 //! **yubikey.rs** is a fork of and originally a mechanical translation from
-//! Yubico's [yubico-piv-tool], a C library/CLI program. The original library
-//! was licensed under a [2-Clause BSD License][BSDL], which this library inherits
-//! as a derived work.
+//! Yubico's [yubico-piv-tool], a C library/CLI program.
+//!
+//! The original library was licensed under a [2-Clause BSD License][BSDL],
+//! which this library inherits as a derived work.
 //!
 //! [YubiKey]: https://www.yubico.com/products/yubikey-hardware/
 //! [PIV]: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-73-4.pdf
@@ -126,13 +133,13 @@ pub mod certificate;
 mod chuid;
 mod config;
 mod error;
-pub mod key;
 mod metadata;
 mod mgm;
 #[cfg(feature = "untested")]
 mod mscmap;
 #[cfg(feature = "untested")]
 mod msroots;
+pub mod piv;
 mod policy;
 pub mod readers;
 mod serialization;
@@ -145,8 +152,8 @@ pub use crate::{
     chuid::ChuId,
     config::Config,
     error::{Error, Result},
-    key::Key,
     mgm::{MgmKey, MgmType},
+    piv::Key,
     policy::{PinPolicy, TouchPolicy},
     readers::Readers,
     settings::{SettingSource, SettingValue},
@@ -183,6 +190,7 @@ pub(crate) const TAG_PROTECTED_MGM: u8 = 0x89;
 pub(crate) const PIV_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
 
 /// MGMT Applet ID.
+///
 /// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
 #[cfg(feature = "untested")]
 pub(crate) const MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];

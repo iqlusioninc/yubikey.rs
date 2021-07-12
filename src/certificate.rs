@@ -32,7 +32,7 @@
 
 use crate::{
     error::{Error, Result},
-    key::{sign_data, AlgorithmId, SlotId},
+    piv::{sign_data, AlgorithmId, SlotId},
     serialization::*,
     transaction::Transaction,
     yubikey::YubiKey,
@@ -597,7 +597,7 @@ mod read_pki {
     use rsa::{BigUint, RSAPublicKey};
 
     use super::{OID_NIST_P256, OID_NIST_P384};
-    use crate::{key::AlgorithmId, Error, Result};
+    use crate::{piv::AlgorithmId, Error, Result};
 
     /// From [RFC 8017](https://tools.ietf.org/html/rfc8017#appendix-A.1.1):
     /// ```text

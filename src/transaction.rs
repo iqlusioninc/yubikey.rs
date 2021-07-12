@@ -4,7 +4,7 @@ use crate::{
     apdu::Response,
     apdu::{Apdu, Ins, StatusWords},
     error::{Error, Result},
-    key::{AlgorithmId, SlotId},
+    piv::{AlgorithmId, SlotId},
     serialization::*,
     yubikey::*,
     Buffer, ObjectId, CB_BUF_MAX, CB_OBJ_MAX, PIV_AID, YK_AID,

@@ -1,11 +1,16 @@
-//! PIV cryptographic keys stored in a YubiKey.
+//! Personal Identity Verification (PIV) cryptographic keys stored in a YubiKey.
+//!
+//! Support for public-key cryptography using keys stored within the PIV
+//! slots of a YubiKey.
 //!
 //! Supported algorithms:
 //!
-//! - **Encryption**: `RSA1024`, `RSA2048`, `ECCP256`, `ECCP384`
+//! - **Encryption**:
+//!   - RSA: `RSA1024`, `RSA2048`
+//!   - ECC: `ECCP256`, `ECCP384` (i.e. NIST curves: P-256, P-384)
 //! - **Signatures**:
 //!   - RSASSA-PKCS#1v1.5: `RSA1024`, `RSA2048`
-//!   - ECDSA: `ECCP256`, `ECCP384`
+//!   - ECDSA: `ECCP256`, `ECCP384` (NIST curves: P-256, P-384)
 
 // Adapted from yubico-piv-tool:
 // <https://github.com/Yubico/yubico-piv-tool/>
@@ -50,7 +55,7 @@ use crate::{
 use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
 use log::{debug, error, warn};
 use rsa::{BigUint, RSAPublicKey};
-use std::convert::TryFrom;
+use std::{convert::TryFrom, str::FromStr};
 
 #[cfg(feature = "untested")]
 use {
@@ -146,17 +151,17 @@ impl From<SlotId> for u8 {
     }
 }
 
-impl TryFrom<String> for SlotId {
-    type Error = Error;
+impl FromStr for SlotId {
+    type Err = Error;
 
-    fn try_from(s: String) -> Result<SlotId> {
-        match s.as_ref() {
+    fn from_str(s: &str) -> Result<SlotId> {
+        match s {
             "9a" => Ok(SlotId::Authentication),
             "9c" => Ok(SlotId::Signature),
             "9d" => Ok(SlotId::KeyManagement),
             "9e" => Ok(SlotId::CardAuthentication),
             "f9" => Ok(SlotId::Attestation),
-            _ => RetiredSlotId::try_from(s).map(SlotId::Retired),
+            _ => s.parse().map(SlotId::Retired),
         }
     }
 }
@@ -231,11 +236,11 @@ impl TryFrom<u8> for RetiredSlotId {
     }
 }
 
-impl TryFrom<String> for RetiredSlotId {
-    type Error = Error;
+impl FromStr for RetiredSlotId {
+    type Err = Error;
 
-    fn try_from(value: String) -> Result<Self> {
-        match value.as_ref() {
+    fn from_str(value: &str) -> Result<Self> {
+        match value {
             "82" => Ok(RetiredSlotId::R1),
             "83" => Ok(RetiredSlotId::R2),
             "84" => Ok(RetiredSlotId::R3),

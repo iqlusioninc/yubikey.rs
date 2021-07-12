@@ -12,7 +12,7 @@ use std::{convert::TryInto, env, sync::Mutex};
 use x509::RelativeDistinguishedName;
 use yubikey::{
     certificate::{Certificate, PublicKeyInfo},
-    key::{self, AlgorithmId, Key, RetiredSlotId, SlotId},
+    piv::{self, AlgorithmId, Key, RetiredSlotId, SlotId},
     Error, MgmKey, PinPolicy, TouchPolicy, YubiKey,
 };
 
@@ -154,7 +154,7 @@ fn generate_self_signed_cert(algorithm: AlgorithmId) -> Certificate {
     let slot = SlotId::Retired(RetiredSlotId::R1);
 
     // Generate a new key in the selected slot.
-    let generated = key::generate(
+    let generated = piv::generate(
         &mut yubikey,
         slot,
         algorithm,

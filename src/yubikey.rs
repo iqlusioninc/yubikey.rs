@@ -37,6 +37,7 @@ use crate::{
     config::Config,
     error::{Error, Result},
     mgm::MgmKey,
+    piv,
     readers::{Reader, Readers},
     transaction::Transaction,
 };
@@ -319,7 +320,12 @@ impl YubiKey {
         Ok(())
     }
 
-    /// Deauthenticate
+    /// Get the PIV keys contained in this YubiKey.
+    pub fn piv_keys(&mut self) -> Result<Vec<piv::Key>> {
+        piv::Key::list(self)
+    }
+
+    /// Deauthenticate.
     #[cfg(feature = "untested")]
     #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn deauthenticate(&mut self) -> Result<()> {
