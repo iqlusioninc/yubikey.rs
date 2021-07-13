@@ -476,12 +476,12 @@ impl YubiKey {
     /// Block PUK: permanently prevent the PIN from becoming unblocked.
     #[cfg(feature = "untested")]
     #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
-    pub fn block_puk(yubikey: &mut YubiKey) -> Result<()> {
+    pub fn block_puk(&mut self) -> Result<()> {
         let mut puk = [0x30, 0x42, 0x41, 0x44, 0x46, 0x30, 0x30, 0x44];
         let mut tries_remaining: i32 = -1;
         let mut flags = [0];
 
-        let txn = yubikey.begin_transaction()?;
+        let txn = self.begin_transaction()?;
 
         while tries_remaining != 0 {
             // 2 -> change puk
