@@ -1,6 +1,6 @@
 [package]
 name    = "yubikey"
-version = "0.4.1" # Also update html_root_url in lib.rs when bumping this
+version = "0.4.2" # Also update html_root_url in lib.rs when bumping this
 description = """
 Pure Rust cross-platform host-side driver for YubiKey devices from Yubico with
 support for hardware-backed public-key decryption and digital signatures using
