@@ -131,7 +131,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey.rs/main/img/logo.png",
-    html_root_url = "https://docs.rs/yubikey/0.4.0"
+    html_root_url = "https://docs.rs/yubikey/0.4.1"
 )]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
