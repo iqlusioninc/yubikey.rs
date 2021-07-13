@@ -66,7 +66,7 @@ impl Default for SettingSource {
 /// system administrator, or by the local user via `YUBIKEY_PIV_*` environment
 /// variables.
 #[derive(Copy, Clone, Debug)]
-pub struct SettingValue {
+pub struct Setting {
     /// Boolean value
     pub value: bool,
 
@@ -74,7 +74,7 @@ pub struct SettingValue {
     pub source: SettingSource,
 }
 
-impl SettingValue {
+impl Setting {
     /// Get a [`SettingValue`] value by name.
     pub fn get(key: &str, default: bool) -> Self {
         Self::from_file(key)
@@ -109,7 +109,7 @@ impl SettingValue {
                 };
 
                 if name == key {
-                    return Some(SettingValue {
+                    return Some(Setting {
                         source: SettingSource::Admin,
                         value: value == "1" || value == "true",
                     });
@@ -124,14 +124,14 @@ impl SettingValue {
     fn from_env(key: &str) -> Option<Self> {
         env::var(format!("YUBIKEY_PIV_{}", key))
             .ok()
-            .map(|value| SettingValue {
+            .map(|value| Setting {
                 source: SettingSource::User,
                 value: value == "1" || value == "true",
             })
     }
 }
 
-impl Default for SettingValue {
+impl Default for Setting {
     fn default() -> Self {
         Self {
             value: false,
