@@ -180,4 +180,4 @@ pub use uuid::Uuid;
 pub type ObjectId = u32;
 
 /// Buffer type (self-zeroizing byte vector)
-pub(crate) type Buffer = zeroize::Zeroizing<Vec<u8>>;
+pub type Buffer = zeroize::Zeroizing<Vec<u8>>;
