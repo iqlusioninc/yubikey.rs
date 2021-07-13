@@ -32,7 +32,7 @@
 
 use crate::{
     apdu::{Apdu, Ins},
-    cccid::Ccc,
+    cccid::CccId,
     chuid::ChuId,
     config::Config,
     error::{Error, Result},
@@ -275,8 +275,8 @@ impl YubiKey {
     }
 
     /// Get Cardholder Capability Container (CCC) Identifier.
-    pub fn cccid(&mut self) -> Result<Ccc> {
-        Ccc::get(self)
+    pub fn cccid(&mut self) -> Result<CccId> {
+        CccId::get(self)
     }
 
     /// Authenticate to the card using the provided management key (MGM).

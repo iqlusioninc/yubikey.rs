@@ -78,9 +78,9 @@ impl CardId {
 
 /// Cardholder Capability Container (CCC) Identifier.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Ccc(pub [u8; Self::BYTE_SIZE]);
+pub struct CccId(pub [u8; Self::BYTE_SIZE]);
 
-impl Ccc {
+impl CccId {
     /// CCC size in bytes
     pub const BYTE_SIZE: usize = 51;
 
@@ -115,7 +115,7 @@ impl Ccc {
     }
 }
 
-impl Display for Ccc {
+impl Display for CccId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(str::from_utf8(&hex::encode(&self.0[..])).unwrap())
     }
