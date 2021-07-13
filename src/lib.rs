@@ -153,7 +153,7 @@ pub mod piv;
 mod policy;
 pub mod reader;
 mod serialization;
-mod settings;
+mod setting;
 mod transaction;
 mod yubikey;
 
@@ -167,7 +167,7 @@ pub use crate::{
     piv::Key,
     policy::{PinPolicy, TouchPolicy},
     reader::Context,
-    settings::{SettingSource, SettingValue},
+    setting::{Setting, SettingSource},
     yubikey::{CachedPin, Serial, Version, YubiKey},
 };
 
