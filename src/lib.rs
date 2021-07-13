@@ -158,7 +158,7 @@ mod transaction;
 mod yubikey;
 
 pub use crate::{
-    cccid::{CardId, Ccc},
+    cccid::{CardId, CccId},
     certificate::Certificate,
     chuid::ChuId,
     config::Config,

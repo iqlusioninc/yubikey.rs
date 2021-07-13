@@ -75,7 +75,7 @@ pub struct Setting {
 }
 
 impl Setting {
-    /// Get a [`SettingValue`] value by name.
+    /// Get a setting by name.
     pub fn get(key: &str, default: bool) -> Self {
         Self::from_file(key)
             .or_else(|| Self::from_env(key))
