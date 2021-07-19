@@ -47,7 +47,7 @@ x509-parser = "0.9"
 zeroize = "1"
 
 [dev-dependencies]
-env_logger = "0.8"
+env_logger = "0.9"
 lazy_static = "1"
 
 [features]
