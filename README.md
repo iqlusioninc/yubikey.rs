@@ -8,6 +8,7 @@
 ![Rust Version][rustc-image]
 [![Safety Dance][safety-image]][safety-link]
 [![Build Status][build-image]][build-link]
+[![dependency status][deps-image]][deps-link]
 
 Pure Rust cross-platform host-side driver for [YubiKey] devices from [Yubico]
 with support for public-key encryption and digital signatures using the
@@ -169,6 +170,8 @@ or conditions.
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
 [build-image]: https://github.com/iqlusioninc/yubikey.rs/workflows/CI/badge.svg?branch=main&event=push
 [build-link]: https://github.com/iqlusioninc/yubikey.rs/actions
+[deps-image]: https://deps.rs/repo/github/iqlusioninc/yubikey.rs/status.svg
+[deps-link]: https://deps.rs/repo/github/iqlusioninc/yubikey.rs
 
 [//]: # (general links)
 
