@@ -35,7 +35,7 @@ p256 = "0.9"
 p384 = "0.8"
 pcsc = "2"
 rand_core = { version = "0.6", features = ["std"] }
-rsa = "0.4"
+rsa = "0.5"
 secrecy = "0.8"
 sha-1 = "0.9"
 sha2 = "0.9"
