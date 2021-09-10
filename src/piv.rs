@@ -54,7 +54,7 @@ use crate::{
 };
 use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
 use log::{debug, error, warn};
-use rsa::{BigUint, RSAPublicKey};
+use rsa::{BigUint, RsaPublicKey};
 use std::{convert::TryFrom, str::FromStr};
 
 #[cfg(feature = "untested")]
@@ -624,7 +624,7 @@ pub fn generate(
 
             Ok(PublicKeyInfo::Rsa {
                 algorithm,
-                pubkey: RSAPublicKey::new(
+                pubkey: RsaPublicKey::new(
                     BigUint::from_bytes_be(&modulus),
                     BigUint::from_bytes_be(&exp),
                 )

@@ -45,7 +45,7 @@ use log::error;
 use num_bigint_dig::BigUint;
 use p256::NistP256;
 use p384::NistP384;
-use rsa::{PublicKeyParts, RSAPublicKey};
+use rsa::{PublicKeyParts, RsaPublicKey};
 use sha2::{Digest, Sha256};
 use std::convert::TryFrom;
 use std::fmt;
@@ -172,7 +172,7 @@ pub enum PublicKeyInfo {
         algorithm: AlgorithmId,
 
         /// Public key
-        pubkey: RSAPublicKey,
+        pubkey: RsaPublicKey,
     },
 
     /// EC P-256 keys
@@ -594,7 +594,7 @@ mod read_pki {
         *,
     };
     use nom::{combinator, IResult};
-    use rsa::{BigUint, RSAPublicKey};
+    use rsa::{BigUint, RsaPublicKey};
 
     use super::{OID_NIST_P256, OID_NIST_P384};
     use crate::{piv::AlgorithmId, Error, Result};
@@ -606,7 +606,7 @@ mod read_pki {
     ///     publicExponent    INTEGER   -- e
     /// }
     /// ```
-    pub(super) fn rsa_pubkey(encoded: &[u8]) -> Result<RSAPublicKey> {
+    pub(super) fn rsa_pubkey(encoded: &[u8]) -> Result<RsaPublicKey> {
         fn parse_rsa_pubkey(i: &[u8]) -> IResult<&[u8], DerObject<'_>, BerError> {
             parse_der_sequence_defined!(i, parse_der_integer >> parse_der_integer)
         }
@@ -634,7 +634,7 @@ mod read_pki {
             _ => return Err(Error::InvalidObject),
         };
 
-        RSAPublicKey::new(n, e).map_err(|_| Error::InvalidObject)
+        RsaPublicKey::new(n, e).map_err(|_| Error::InvalidObject)
     }
 
     /// From [RFC 5480](https://tools.ietf.org/html/rfc5480#section-2.1.1):
@@ -658,7 +658,7 @@ mod read_pki {
 
 mod write_pki {
     use cookie_factory::{SerializeFn, WriteContext};
-    use rsa::{BigUint, PublicKeyParts, RSAPublicKey};
+    use rsa::{BigUint, PublicKeyParts, RsaPublicKey};
     use std::io::Write;
     use x509::der::write::{der_integer, der_sequence};
 
@@ -675,7 +675,7 @@ mod write_pki {
     /// }
     /// ```
     pub(super) fn rsa_pubkey<'a, W: Write + 'a>(
-        pubkey: &'a RSAPublicKey,
+        pubkey: &'a RsaPublicKey,
     ) -> impl SerializeFn<W> + 'a {
         der_sequence((
             der_integer_biguint(pubkey.n()),
