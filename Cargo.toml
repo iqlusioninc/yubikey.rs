@@ -26,7 +26,7 @@ des = "0.7"
 elliptic-curve = "0.10"
 hmac = "0.11"
 log = "0.4"
-nom = "6"
+nom = "7"
 num-bigint-dig = { version = "0.7", features = ["rand"] }
 num-traits = "0.2"
 num-integer = "0.1"
