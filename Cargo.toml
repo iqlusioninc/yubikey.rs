@@ -21,7 +21,7 @@ members = [".", "cli"]
 [dependencies]
 chrono = "0.4"
 cookie-factory = "0.3"
-der-parser = "5"
+der-parser = "6"
 des = "0.7"
 elliptic-curve = "0.10"
 hmac = "0.11"
