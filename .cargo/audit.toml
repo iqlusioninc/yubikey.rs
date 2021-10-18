@@ -1,0 +1,5 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2020-0071", # time
+    "RUSTSEC-2020-0159", # chrono
+] 
