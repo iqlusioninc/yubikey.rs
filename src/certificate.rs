@@ -589,11 +589,10 @@ pub(crate) fn write_certificate(
 mod read_pki {
     use der_parser::{
         ber::BerObjectContent,
-        der::{parse_der_integer, DerObject},
+        der::{parse_der_integer, parse_der_sequence_defined_g, DerObject},
         error::BerError,
-        *,
     };
-    use nom::{combinator, IResult};
+    use nom::{combinator, sequence::pair, IResult};
     use rsa::{BigUint, RsaPublicKey};
 
     use super::{OID_NIST_P256, OID_NIST_P384};
@@ -607,20 +606,17 @@ mod read_pki {
     /// }
     /// ```
     pub(super) fn rsa_pubkey(encoded: &[u8]) -> Result<RsaPublicKey> {
-        fn parse_rsa_pubkey(i: &[u8]) -> IResult<&[u8], DerObject<'_>, BerError> {
-            parse_der_sequence_defined!(i, parse_der_integer >> parse_der_integer)
+        fn parse_rsa_pubkey(i: &[u8]) -> IResult<&[u8], (DerObject<'_>, DerObject<'_>), BerError> {
+            parse_der_sequence_defined_g(|i, _| pair(parse_der_integer, parse_der_integer)(i))(i)
         }
 
         fn rsa_pubkey_parts(i: &[u8]) -> IResult<&[u8], (BigUint, BigUint), BerError> {
-            combinator::map(parse_rsa_pubkey, |object| {
-                let seq = object.as_sequence().expect("is DER sequence");
-                assert_eq!(seq.len(), 2);
-
-                let n = match seq[0].content {
+            combinator::map(parse_rsa_pubkey, |(modulus, public_exponent)| {
+                let n = match modulus.content {
                     BerObjectContent::Integer(s) => BigUint::from_bytes_be(s),
                     _ => panic!("expected DER integer"),
                 };
-                let e = match seq[1].content {
+                let e = match public_exponent.content {
                     BerObjectContent::Integer(s) => BigUint::from_bytes_be(s),
                     _ => panic!("expected DER integer"),
                 };
