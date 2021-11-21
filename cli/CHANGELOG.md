@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `status` command ([#72], [#74])
 
 ### Changed
-- Bump `yubikey-piv` to v0.1.0 ([#180])
+- Bump `yubikey-piv` to v0.1 ([#180])
 - Bump `x509-parser` to v0.8 ([#181])
 - Bump `sha2` to v0.9 ([#182])
 - Rename `list` command to `readers`; improve usage ([#71])
