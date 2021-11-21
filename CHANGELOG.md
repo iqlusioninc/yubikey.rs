@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Update `rsa` dependency to 0.5 ([#315])
 - Update `pbkdf2` dependency to 0.9 ([#315])
-- Update `x509-parser` dependency to 0.11 ([#315])
+- Update `x509-parser` dependency to 0.12 ([#315], [#322])
 - Update `nom` to v7.0 ([#322])
 
 [#315]: https://github.com/iqlusioninc/yubikey.rs/pull/315
