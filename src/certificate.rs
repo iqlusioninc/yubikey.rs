@@ -320,6 +320,7 @@ impl x509::AlgorithmIdentifier for SignatureId {
 #[derive(Clone, Debug)]
 pub struct Certificate {
     serial: Serial,
+    #[allow(dead_code)]
     issuer: String,
     subject: String,
     subject_pki: PublicKeyInfo,
