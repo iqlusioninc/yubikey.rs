@@ -65,7 +65,7 @@ impl Default for SettingSource {
 /// These can be configured globally in `/etc/yubico/yubikeypiv.conf` by a
 /// system administrator, or by the local user via `YUBIKEY_PIV_*` environment
 /// variables.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct Setting {
     /// Boolean value
     pub value: bool,
@@ -99,7 +99,7 @@ impl Setting {
                 }
 
                 let (name, value) = {
-                    let mut parts = line.splitn(1, '=');
+                    let mut parts = line.splitn(2, '=');
                     let name = parts.next();
                     let value = parts.next();
                     match (name, value, parts.next()) {
@@ -128,14 +128,5 @@ impl Setting {
                 source: SettingSource::User,
                 value: value == "1" || value == "true",
             })
-    }
-}
-
-impl Default for Setting {
-    fn default() -> Self {
-        Self {
-            value: false,
-            source: SettingSource::default(),
-        }
     }
 }

@@ -44,6 +44,7 @@ impl Context {
             c.list_readers(reader_names)?.collect()
         };
 
+        #[allow(clippy::needless_collect)]
         let readers: Vec<_> = reader_cstrs
             .iter()
             .map(|name| Reader::new(name, Arc::clone(ctx)))

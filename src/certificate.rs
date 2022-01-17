@@ -83,7 +83,7 @@ impl TryFrom<&[u8]> for Serial {
 
     fn try_from(bytes: &[u8]) -> Result<Serial> {
         if bytes.len() <= 20 {
-            Ok(Serial(BigUint::from_bytes_be(&bytes)))
+            Ok(Serial(BigUint::from_bytes_be(bytes)))
         } else {
             Err(Error::ParseError)
         }
@@ -363,12 +363,12 @@ impl Certificate {
                 &serial.to_bytes(),
                 &signature_algorithm,
                 // Issuer and subject are the same in self-signed certificates.
-                &subject,
+                subject,
                 Utc::now(),
                 not_after,
-                &subject,
+                subject,
                 &subject_pki,
-                &extensions,
+                extensions,
             ),
             tbs_cert.deref_mut(),
         )
