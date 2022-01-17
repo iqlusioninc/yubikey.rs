@@ -54,6 +54,8 @@ use crate::{
 };
 use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
 use log::{debug, error, warn};
+use p256::NistP256;
+use p384::NistP384;
 use rsa::{BigUint, RsaPublicKey};
 use std::str::FromStr;
 
@@ -657,10 +659,14 @@ pub fn generate(
 
             let point = tlv.value.to_vec();
 
-            if let AlgorithmId::EccP256 = algorithm {
-                EcPublicKey::from_bytes(point).map(PublicKeyInfo::EcP256)
-            } else {
-                EcPublicKey::from_bytes(point).map(PublicKeyInfo::EcP384)
+            match algorithm {
+                AlgorithmId::EccP256 => {
+                    EcPublicKey::<NistP256>::from_bytes(point).map(PublicKeyInfo::EcP256)
+                }
+                AlgorithmId::EccP384 => {
+                    EcPublicKey::<NistP384>::from_bytes(point).map(PublicKeyInfo::EcP384)
+                }
+                _ => return Err(Error::AlgorithmError),
             }
             .map_err(|_| Error::InvalidObject)
         }
