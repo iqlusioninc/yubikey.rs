@@ -210,10 +210,10 @@ impl PublicKeyInfo {
                     .ok_or(Error::InvalidObject)?;
 
                 match read_pki::ec_parameters(algorithm_parameters)? {
-                    AlgorithmId::EccP256 => EcPublicKey::from_bytes(key_bytes)
+                    AlgorithmId::EccP256 => EcPublicKey::<NistP256>::from_bytes(key_bytes)
                         .map(PublicKeyInfo::EcP256)
                         .map_err(|_| Error::InvalidObject),
-                    AlgorithmId::EccP384 => EcPublicKey::from_bytes(key_bytes)
+                    AlgorithmId::EccP384 => EcPublicKey::<NistP384>::from_bytes(key_bytes)
                         .map(PublicKeyInfo::EcP384)
                         .map_err(|_| Error::InvalidObject),
                     _ => Err(Error::AlgorithmError),
