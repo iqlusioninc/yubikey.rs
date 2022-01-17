@@ -41,10 +41,7 @@ use crate::{
     Result,
 };
 use log::error;
-use std::{
-    convert::TryInto,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const CB_ADMIN_TIMESTAMP: usize = 0x04;
 const PROTECTED_FLAGS_1_PUK_NOBLOCK: u8 = 0x01;

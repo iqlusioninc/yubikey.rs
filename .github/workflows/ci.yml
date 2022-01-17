@@ -36,13 +36,13 @@ jobs:
             toolchain: stable
             deps: true
           - platform: ubuntu-latest
-            toolchain: 1.51.0 # MSRV
+            toolchain: 1.56.0 # MSRV
             deps: sudo apt-get install libpcsclite-dev
           - platform: windows-latest
-            toolchain: 1.51.0 # MSRV
+            toolchain: 1.56.0 # MSRV
             deps: true
           - platform: macos-latest
-            toolchain: 1.51.0 # MSRV
+            toolchain: 1.56.0 # MSRV
             deps: true
     runs-on: ${{ matrix.platform }}
     steps:
@@ -82,7 +82,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.51.0 # MSRV
+          toolchain: 1.56.0 # MSRV
           components: clippy
           override: true
       - run: sudo apt-get install libpcsclite-dev

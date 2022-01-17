@@ -1,17 +1,18 @@
 [package]
 name = "yubikey-cli"
-version = "0.5.0"
+version = "0.6.0-pre"
 description = """
 Command-line interface for performing encryption and signing using RSA/ECC keys
 stored on YubiKey devices.
 """
-authors    = ["Tony Arcieri <tony@iqlusion.io>"]
-edition    = "2018"
-license    = "BSD-2-Clause"
+authors = ["Tony Arcieri <tony@iqlusion.io>"]
+license = "BSD-2-Clause"
 repository = "https://github.com/iqlusioninc/yubikey.rs"
-readme     = "README.md"
+readme = "README.md"
 categories = ["command-line-utilities", "cryptography", "hardware-support"]
-keywords   = ["ecdsa", "rsa", "piv", "pcsc", "yubikey"]
+keywords = ["ecdsa", "rsa", "piv", "pcsc", "yubikey"]
+edition = "2021"
+rust-version = "1.56"
 
 [dependencies]
 gumdrop = "0.8"
@@ -22,4 +23,4 @@ sha2 = "0.9"
 subtle-encoding = "0.5"
 termcolor = "1"
 x509-parser = "0.12"
-yubikey = { version = "0.5", path = ".." }
+yubikey = { version = "=0.6.0-pre", path = ".." }

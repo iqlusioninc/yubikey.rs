@@ -55,7 +55,7 @@ use crate::{
 use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
 use log::{debug, error, warn};
 use rsa::{BigUint, RsaPublicKey};
-use std::{convert::TryFrom, str::FromStr};
+use std::str::FromStr;
 
 #[cfg(feature = "untested")]
 use {

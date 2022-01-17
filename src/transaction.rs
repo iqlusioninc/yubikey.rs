@@ -11,7 +11,6 @@ use crate::{
     Buffer, ObjectId,
 };
 use log::{error, trace};
-use std::convert::TryInto;
 use zeroize::Zeroizing;
 
 #[cfg(feature = "untested")]

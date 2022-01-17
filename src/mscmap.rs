@@ -32,7 +32,6 @@
 
 use crate::{consts::CB_OBJ_MAX, piv::SlotId, serialization::*, Error, Result, YubiKey};
 use log::error;
-use std::convert::{TryFrom, TryInto};
 
 const OBJ_MSCMAP: u32 = 0x005f_ff10;
 

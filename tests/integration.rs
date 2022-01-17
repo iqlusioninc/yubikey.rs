@@ -8,7 +8,7 @@ use log::trace;
 use rand_core::{OsRng, RngCore};
 use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
-use std::{convert::TryInto, env, sync::Mutex};
+use std::{env, sync::Mutex};
 use x509::RelativeDistinguishedName;
 use yubikey::{
     certificate::{Certificate, PublicKeyInfo},

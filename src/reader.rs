@@ -3,7 +3,6 @@
 use crate::{Result, YubiKey};
 use std::{
     borrow::Cow,
-    convert::TryInto,
     ffi::CStr,
     sync::{Arc, Mutex},
 };

@@ -33,7 +33,6 @@
 use crate::{Error, Result};
 use log::error;
 use rand_core::{OsRng, RngCore};
-use std::convert::{TryFrom, TryInto};
 use zeroize::{Zeroize, Zeroizing};
 
 #[cfg(feature = "untested")]
