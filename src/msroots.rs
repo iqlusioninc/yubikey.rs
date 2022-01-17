@@ -111,7 +111,7 @@ impl MsRoots {
         let mut data_chunk: usize;
         let data = &self.0;
         let data_len = data.len();
-        let n_objs: usize;
+
         let txn = yubikey.begin_transaction()?;
 
         if data_len == 0 {
@@ -119,7 +119,7 @@ impl MsRoots {
         }
 
         // Calculate number of objects required to store blob
-        n_objs = (data_len / (CB_OBJ_MAX - CB_OBJ_TAG_MAX)) + 1;
+        let n_objs: usize = (data_len / (CB_OBJ_MAX - CB_OBJ_TAG_MAX)) + 1;
 
         if n_objs > 5 {
             return Err(Error::SizeError);

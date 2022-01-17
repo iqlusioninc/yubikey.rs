@@ -32,7 +32,6 @@
 
 use crate::{Error, Result, YubiKey};
 use std::{
-    convert::TryInto,
     fmt::{self, Debug, Display},
     str,
 };

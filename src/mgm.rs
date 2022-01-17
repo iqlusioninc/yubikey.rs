@@ -33,7 +33,6 @@
 use crate::{Error, Result};
 use log::error;
 use rand_core::{OsRng, RngCore};
-use std::convert::{TryFrom, TryInto};
 use zeroize::{Zeroize, Zeroizing};
 
 #[cfg(feature = "untested")]
@@ -138,7 +137,7 @@ impl MgmKey {
         }
 
         let mut mgm = [0u8; DES_LEN_3DES];
-        pbkdf2::<Hmac<Sha1>>(pin, &salt, ITER_MGM_PBKDF2, &mut mgm);
+        pbkdf2::<Hmac<Sha1>>(pin, salt, ITER_MGM_PBKDF2, &mut mgm);
         MgmKey::from_bytes(mgm)
     }
 
@@ -191,7 +190,7 @@ impl MgmKey {
     pub fn set_manual(&self, yubikey: &mut YubiKey, require_touch: bool) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 
-        txn.set_mgm_key(&self, require_touch).map_err(|e| {
+        txn.set_mgm_key(self, require_touch).map_err(|e| {
             // Log a warning, since the device mgm key is corrupt or we're in a state
             // where we can't set the mgm key.
             error!("could not set new derived mgm key, err = {}", e);

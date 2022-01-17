@@ -33,7 +33,6 @@
 use crate::{Error, Result, YubiKey};
 use rand_core::{OsRng, RngCore};
 use std::{
-    convert::TryInto,
     fmt::{self, Debug, Display},
     str,
 };

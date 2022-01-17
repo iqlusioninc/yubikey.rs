@@ -47,9 +47,7 @@ use p256::NistP256;
 use p384::NistP384;
 use rsa::{PublicKeyParts, RsaPublicKey};
 use sha2::{Digest, Sha256};
-use std::convert::TryFrom;
-use std::fmt;
-use std::ops::DerefMut;
+use std::{fmt, ops::DerefMut};
 use x509::{der::Oid, RelativeDistinguishedName};
 use x509_parser::{parse_x509_certificate, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
@@ -85,7 +83,7 @@ impl TryFrom<&[u8]> for Serial {
 
     fn try_from(bytes: &[u8]) -> Result<Serial> {
         if bytes.len() <= 20 {
-            Ok(Serial(BigUint::from_bytes_be(&bytes)))
+            Ok(Serial(BigUint::from_bytes_be(bytes)))
         } else {
             Err(Error::ParseError)
         }
@@ -365,12 +363,12 @@ impl Certificate {
                 &serial.to_bytes(),
                 &signature_algorithm,
                 // Issuer and subject are the same in self-signed certificates.
-                &subject,
+                subject,
                 Utc::now(),
                 not_after,
-                &subject,
+                subject,
                 &subject_pki,
-                &extensions,
+                extensions,
             ),
             tbs_cert.deref_mut(),
         )

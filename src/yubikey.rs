@@ -45,7 +45,6 @@ use log::{error, info};
 use pcsc::Card;
 use rand_core::{OsRng, RngCore};
 use std::{
-    convert::{TryFrom, TryInto},
     fmt::{self, Display},
     str::FromStr,
 };

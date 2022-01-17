@@ -5,7 +5,7 @@
 [![crate][crate-image]][crate-link]
 [![Docs][docs-image]][docs-link]
 [![2-Clause BSD Licensed][license-image]][license-link]
-![Rust Version][rustc-image]
+![MSRV][msrv-image]
 [![Safety Dance][safety-image]][safety-link]
 [![Build Status][build-image]][build-link]
 [![dependency status][deps-image]][deps-link]
@@ -36,7 +36,7 @@ endorsed by Yubico.
 
 ## Minimum Supported Rust Version
 
-Rust **1.51** or newer.
+Rust **1.56** or newer.
 
 ## Supported YubiKeys
 
@@ -165,7 +165,7 @@ or conditions.
 [docs-link]: https://docs.rs/yubikey/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-link]: https://github.com/iqlusioninc/yubikey.rs/blob/main/COPYING
-[rustc-image]: https://img.shields.io/badge/rustc-1.51+-blue.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.56+-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
 [build-image]: https://github.com/iqlusioninc/yubikey.rs/workflows/CI/badge.svg?branch=main&event=push
