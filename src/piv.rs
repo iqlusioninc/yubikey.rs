@@ -44,7 +44,6 @@
 
 use crate::{
     apdu::{Ins, StatusWords},
-    certificate::{self, Certificate, PublicKeyInfo},
     error::{Error, Result},
     policy::{PinPolicy, TouchPolicy},
     serialization::*,
@@ -52,12 +51,19 @@ use crate::{
     yubikey::YubiKey,
     Buffer, ObjectId,
 };
-use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
+//use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
 use log::{debug, error, warn};
-use p256::NistP256;
-use p384::NistP384;
+//use p256::NistP256;
+//use p384::NistP384;
+use rsa::pkcs1::ToRsaPublicKey;
 use rsa::{BigUint, RsaPublicKey};
 use std::str::FromStr;
+
+use crate::certificate::OID_RSA_ENCRYPTION;
+use crate::certificate::{read_certificate, OID_EC_PUBLIC_KEY, OID_NIST_P256};
+use der::asn1::Any;
+use der::{Decodable, Encodable, Tag};
+use x509::{AlgorithmIdentifier, Certificate, SubjectPublicKeyInfo};
 
 #[cfg(feature = "untested")]
 use {
@@ -421,32 +427,44 @@ impl AlgorithmId {
 
 /// PIV cryptographic keys stored in a YubiKey
 #[derive(Clone, Debug)]
-pub struct Key {
+pub struct Key<'a> {
     /// Card slot
     slot: SlotId,
 
     /// Cert
-    cert: Certificate,
+    cert: Certificate<'a>,
 }
 
-impl Key {
-    /// List Personal Identity Verification (PIV) keys stored in a YubiKey
-    pub fn list(yubikey: &mut YubiKey) -> Result<Vec<Self>> {
+impl<'a> Key<'a> {
+    /// List Personal Identity Verification (PIV) keys stored in a YubiKey.
+    pub fn list(yubikey: &mut YubiKey, buffers: &'a mut Vec<Buffer>) -> Result<Vec<Self>> {
         let mut keys = vec![];
         let txn = yubikey.begin_transaction()?;
 
+        // collect IDs of slots from which certificate buffers were read
+        let mut slots = vec![];
         for slot in SLOTS.iter().cloned() {
-            let buf = match certificate::read_certificate(&txn, slot) {
+            let buf = match read_certificate(&txn, slot) {
                 Ok(b) => b,
                 Err(e) => {
                     debug!("error reading certificate in slot {:?}: {}", slot, e);
                     continue;
                 }
             };
-
             if !buf.is_empty() {
-                let cert = Certificate::from_bytes(buf)?;
-                keys.push(Key { slot, cert });
+                buffers.push(buf);
+                slots.push(slot);
+            }
+        }
+        for (i, buffer) in buffers.iter().enumerate() {
+            if !buffer.is_empty() {
+                let cert = Certificate::from_der(buffer.as_slice());
+                if let Ok(cert) = cert {
+                    keys.push(Key {
+                        slot: slots[i],
+                        cert,
+                    });
+                }
             }
         }
 
@@ -459,7 +477,7 @@ impl Key {
     }
 
     /// Get the certificate for this key
-    pub fn certificate(&self) -> &Certificate {
+    pub fn certificate(&self) -> &Certificate<'_> {
         &self.cert
     }
 }
@@ -471,7 +489,7 @@ pub fn generate(
     algorithm: AlgorithmId,
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
-) -> Result<PublicKeyInfo> {
+) -> Result<Vec<u8>> {
     // Keygen messages
     // TODO(tarcieri): extract these into an I18N-handling type?
     const SZ_SETTING_ROCA: &str = "Enable_Unsafe_Keygen_ROCA";
@@ -624,14 +642,36 @@ pub fn generate(
             }
             let exp = exp_tlv.value.to_vec();
 
-            Ok(PublicKeyInfo::Rsa {
-                algorithm,
-                pubkey: RsaPublicKey::new(
-                    BigUint::from_bytes_be(&modulus),
-                    BigUint::from_bytes_be(&exp),
-                )
-                .map_err(|_| Error::InvalidObject)?,
-            })
+            let rsa = match RsaPublicKey::new(
+                BigUint::from_bytes_be(&modulus),
+                BigUint::from_bytes_be(&exp),
+            ) {
+                Ok(rsa) => rsa,
+                Err(_e) => {
+                    error!("Failed to prepare public key structure");
+                    return Err(Error::ParseError);
+                }
+            };
+
+            let p1 = match rsa.to_pkcs1_der() {
+                Ok(p1) => p1,
+                Err(_e) => {
+                    error!("Failed to encode public key structure");
+                    return Err(Error::ParseError);
+                }
+            };
+            let enc_key = p1.as_der();
+
+            let algorithm_id = AlgorithmIdentifier {
+                oid: OID_RSA_ENCRYPTION,
+                parameters: Some(Any::NULL),
+            };
+            SubjectPublicKeyInfo {
+                algorithm: algorithm_id,
+                subject_public_key: enc_key,
+            }
+            .to_vec()
+            .map_err(|_| Error::KeyError)
         }
         AlgorithmId::EccP256 | AlgorithmId::EccP384 => {
             // 2-byte ASN.1 tag, 1-byte length (because all supported EC pubkey lengths
@@ -661,10 +701,32 @@ pub fn generate(
 
             match algorithm {
                 AlgorithmId::EccP256 => {
-                    EcPublicKey::<NistP256>::from_bytes(point).map(PublicKeyInfo::EcP256)
+                    let parameters =
+                        Any::new(Tag::ObjectIdentifier, OID_NIST_P256.as_bytes()).unwrap();
+                    let algorithm_id = AlgorithmIdentifier {
+                        oid: OID_EC_PUBLIC_KEY,
+                        parameters: Some(parameters),
+                    };
+                    SubjectPublicKeyInfo {
+                        algorithm: algorithm_id,
+                        subject_public_key: point.as_slice(),
+                    }
+                    .to_vec()
+                    .map_err(|_| Error::KeyError)
                 }
                 AlgorithmId::EccP384 => {
-                    EcPublicKey::<NistP384>::from_bytes(point).map(PublicKeyInfo::EcP384)
+                    let parameters =
+                        Any::new(Tag::ObjectIdentifier, OID_NIST_P256.as_bytes()).unwrap();
+                    let algorithm_id = AlgorithmIdentifier {
+                        oid: OID_EC_PUBLIC_KEY,
+                        parameters: Some(parameters),
+                    };
+                    SubjectPublicKeyInfo {
+                        algorithm: algorithm_id,
+                        subject_public_key: point.as_slice(),
+                    }
+                    .to_vec()
+                    .map_err(|_| Error::KeyError)
                 }
                 _ => return Err(Error::AlgorithmError),
             }

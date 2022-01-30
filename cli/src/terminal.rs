@@ -1,5 +1,7 @@
 //! Status messages
 
+use der::asn1::ObjectIdentifier;
+use der::{Decodable, Encodable};
 use lazy_static::lazy_static;
 use log::debug;
 use sha2::{Digest, Sha256};
@@ -10,8 +12,96 @@ use std::{
 };
 use subtle_encoding::hex;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, StandardStreamLock, WriteColor};
-use x509_parser::parse_x509_certificate;
-use yubikey::{certificate::Certificate, piv::*, YubiKey};
+use x509::{AttributeTypeAndValue, Certificate, Name};
+use yubikey::{certificate::read, piv::*, YubiKey};
+
+// the next three functions currently live in certval and may move to x509
+fn oid_lookup(oid: &ObjectIdentifier) -> String {
+    let oidstr = oid.to_string();
+    if oidstr == "2.5.4.41" {
+        return "name".to_string();
+    } else if oidstr == "2.5.4.4" {
+        return "sn".to_string();
+    } else if oidstr == "2.5.4.42" {
+        return "givenName".to_string();
+    } else if oidstr == "2.5.4.43" {
+        return "initials".to_string();
+    } else if oidstr == "2.5.4.44" {
+        return "generationQualifier".to_string();
+    } else if oidstr == "2.5.4.3" {
+        return "cn".to_string();
+    } else if oidstr == "2.5.4.7" {
+        return "l".to_string();
+    } else if oidstr == "2.5.4.8" {
+        return "st".to_string();
+    } else if oidstr == "2.5.4.9" {
+        return "street".to_string();
+    } else if oidstr == "2.5.4.11" {
+        return "ou".to_string();
+    } else if oidstr == "2.5.4.10" {
+        return "o".to_string();
+    } else if oidstr == "2.5.4.12" {
+        return "title".to_string();
+    } else if oidstr == "2.5.4.46" {
+        return "dnQualifier".to_string();
+    } else if oidstr == "2.5.4.6" {
+        return "c".to_string();
+    } else if oidstr == "2.5.4.5" {
+        return "serialNumber".to_string();
+    } else if oidstr == "2.5.4.65" {
+        return "pseudonym".to_string();
+    } else if oidstr == "0.9.2342.19200300.100.1.25" {
+        return "dc".to_string();
+    } else if oidstr == "1.2.840.113549.1.9.1" {
+        return "emailAddress".to_string();
+    }
+
+    oid.to_string()
+}
+
+fn atav_to_str(atav: &AttributeTypeAndValue<'_>) -> String {
+    // Since character sets are so loosely used, just try the usual suspects
+    let s = atav.value.printable_string();
+    if let Ok(s) = s {
+        return s.to_string();
+    }
+
+    let s = atav.value.utf8_string();
+    if let Ok(s) = s {
+        return s.to_string();
+    }
+
+    let s = atav.value.ia5_string();
+    if let Ok(s) = s {
+        return s.to_string();
+    }
+
+    let hex = hex::encode_upper(atav.value.to_vec().unwrap().as_slice());
+    let r = str::from_utf8(hex.as_slice());
+    if let Ok(s) = r {
+        s.to_string()
+    } else {
+        "".to_string()
+    }
+}
+
+fn dn_to_string(name: &Name<'_>) -> String {
+    let mut s = vec![];
+    for rdn_set in name.iter().rev() {
+        let index = s.len();
+        for i in 0..rdn_set.len() {
+            let atav = rdn_set.get(i).unwrap();
+            let attr = oid_lookup(&atav.oid);
+            let val = atav_to_str(atav);
+            if 0 == i {
+                s.push(format!("{}={}", attr, val));
+            } else {
+                s[index] = format!("{}+{}={}", s[index], attr, val);
+            }
+        }
+    }
+    s.join(",")
+}
 
 /// Print a success status message (in green if colors are enabled)
 #[macro_export]
@@ -178,29 +268,33 @@ pub fn print_cert_info(
     slot: SlotId,
     stream: &mut StandardStreamLock<'_>,
 ) -> io::Result<()> {
-    let cert = match Certificate::read(yubikey, slot) {
+    let buf = match read(yubikey, slot) {
         Ok(c) => c,
         Err(e) => {
             debug!("error reading certificate in slot {:?}: {}", slot, e);
             return Ok(());
         }
     };
-    let buf = cert.into_buffer();
 
     if !buf.is_empty() {
         let fingerprint = Sha256::digest(&buf);
         let slot_id: u8 = slot.into();
         print_cert_attr(stream, "Slot", format!("{:x}", slot_id))?;
-        match parse_x509_certificate(&buf) {
-            Ok((_rem, cert)) => {
+        let cert = Certificate::from_der(buf.as_slice());
+        match cert {
+            Ok(cert) => {
                 print_cert_attr(
                     stream,
                     "Algorithm",
-                    cert.tbs_certificate.subject_pki.algorithm.algorithm,
+                    cert.tbs_certificate.subject_public_key_info.algorithm.oid,
                 )?;
 
-                print_cert_attr(stream, "Subject", cert.tbs_certificate.subject)?;
-                print_cert_attr(stream, "Issuer", cert.tbs_certificate.issuer)?;
+                print_cert_attr(
+                    stream,
+                    "Subject",
+                    dn_to_string(&cert.tbs_certificate.subject),
+                )?;
+                print_cert_attr(stream, "Issuer", dn_to_string(&cert.tbs_certificate.issuer))?;
                 print_cert_attr(
                     stream,
                     "Fingerprint",
@@ -209,12 +303,12 @@ pub fn print_cert_info(
                 print_cert_attr(
                     stream,
                     "Not Before",
-                    cert.tbs_certificate.validity.not_before.to_rfc2822(),
+                    cert.tbs_certificate.validity.not_before.to_string(),
                 )?;
                 print_cert_attr(
                     stream,
                     "Not After",
-                    cert.tbs_certificate.validity.not_after.to_rfc2822(),
+                    cert.tbs_certificate.validity.not_after.to_string(),
                 )?;
             }
             _ => {

@@ -20,9 +20,6 @@ rust-version = "1.56"
 members = [".", "cli"]
 
 [dependencies]
-chrono = "0.4"
-cookie-factory = "0.3"
-der-parser = "6"
 des = "0.7"
 elliptic-curve = "0.11"
 hmac = "0.11"
@@ -43,9 +40,10 @@ sha2 = "0.9"
 subtle = "2"
 subtle-encoding = "0.5"
 uuid = { version = "0.8", features = ["v4"] }
-x509 = "0.2"
-x509-parser = "0.12"
 zeroize = "1"
+
+x509 = { git = "https://github.com/carl-wallace/formats", branch = "rfc5914" } # version = "0.0.1"
+der = { git = "https://github.com/carl-wallace/formats", branch = "rfc5914" } # version = "0.6.0-pre.0"
 
 [dev-dependencies]
 env_logger = "0.9"

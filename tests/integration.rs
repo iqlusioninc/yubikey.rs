@@ -9,12 +9,19 @@ use rand_core::{OsRng, RngCore};
 use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
 use std::{env, sync::Mutex};
-use x509::RelativeDistinguishedName;
 use yubikey::{
-    certificate::{Certificate, PublicKeyInfo},
     piv::{self, AlgorithmId, Key, RetiredSlotId, SlotId},
     Error, MgmKey, PinPolicy, TouchPolicy, YubiKey,
 };
+
+use der::{Decodable, Encodable};
+use p256::ecdsa::signature::Verifier as Verifier256;
+use p256::ecdsa::Signature as Signature256;
+use p256::ecdsa::VerifyingKey as VerifyingKey256;
+use rsa::pkcs8::FromPublicKey;
+use rsa::RsaPublicKey;
+use x509::{Certificate, Name};
+use yubikey::certificate::generate_self_signed;
 
 lazy_static! {
     /// Provide thread-safe access to a YubiKey
@@ -85,10 +92,10 @@ fn test_get_config() {
 //
 
 #[test]
-#[ignore]
 fn test_list_keys() {
     let mut yubikey = YUBIKEY.lock().unwrap();
-    let keys_result = Key::list(&mut yubikey);
+    let mut buffers = vec![];
+    let keys_result = Key::list(&mut yubikey, &mut buffers);
     assert!(keys_result.is_ok());
     trace!("keys: {:?}", keys_result.unwrap());
 }
@@ -145,7 +152,7 @@ fn test_set_mgmkey() {
 // Certificate support
 //
 
-fn generate_self_signed_cert(algorithm: AlgorithmId) -> Certificate {
+fn generate_self_signed_cert(algorithm: AlgorithmId) -> Vec<u8> {
     let mut yubikey = YUBIKEY.lock().unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
@@ -166,16 +173,23 @@ fn generate_self_signed_cert(algorithm: AlgorithmId) -> Certificate {
     let mut serial = [0u8; 20];
     OsRng.fill_bytes(&mut serial);
 
+    // cn=testSubject
+    let name_bytes = [
+        0x30, 0x16, 0x31, 0x14, 0x30, 0x12, 0x06, 0x03, 0x55, 0x04, 0x03, 0x0C, 0x0B, 0x74, 0x65,
+        0x73, 0x74, 0x53, 0x75, 0x62, 0x6A, 0x65, 0x63, 0x74,
+    ];
+    let name = Name::from_der(&name_bytes).unwrap();
+
     // Generate a self-signed certificate for the new key.
-    let extensions: &[x509::Extension<'_, &[u64]>] = &[];
-    let cert_result = Certificate::generate_self_signed(
+    let cert_result = generate_self_signed(
         &mut yubikey,
         slot,
-        serial,
+        &serial,
         None,
-        &[RelativeDistinguishedName::common_name("testSubject")],
-        generated,
-        extensions,
+        &name,
+        generated.as_slice(),
+        None,
+        algorithm,
     );
 
     assert!(cert_result.is_ok());
@@ -185,59 +199,78 @@ fn generate_self_signed_cert(algorithm: AlgorithmId) -> Certificate {
 }
 
 #[test]
-#[ignore]
-fn generate_self_signed_rsa_cert() {
-    let cert = generate_self_signed_cert(AlgorithmId::Rsa1024);
-
-    //
-    // Verify that the certificate is signed correctly
-    //
-
-    let pubkey = match cert.subject_pki() {
-        PublicKeyInfo::Rsa { pubkey, .. } => pubkey,
-        _ => unreachable!(),
+fn generate_self_signed_rsa_cert2048() {
+    let certbuf = generate_self_signed_cert(AlgorithmId::Rsa2048);
+    let cert = Certificate::from_der(certbuf.as_slice()).unwrap();
+    let tbsbuf = cert.tbs_certificate.to_vec().unwrap();
+    let hash_to_verify = Sha256::digest(tbsbuf.as_slice()).to_vec();
+    let spkibuf = cert
+        .tbs_certificate
+        .subject_public_key_info
+        .to_vec()
+        .unwrap();
+    let rsa = RsaPublicKey::from_public_key_der(&spkibuf).unwrap();
+    let ps = PaddingScheme::PKCS1v15Sign {
+        hash: Some(SHA2_256),
     };
-
-    let data = cert.as_ref();
-    let tbs_cert_len = u16::from_be_bytes(data[6..8].try_into().unwrap()) as usize;
-    let msg = &data[4..8 + tbs_cert_len];
-    let sig = &data[data.len() - 128..];
-
-    let hash = Sha256::digest(msg);
-
-    assert!(pubkey
-        .verify(
-            PaddingScheme::PKCS1v15Sign {
-                hash: Some(SHA2_256)
-            },
-            &hash,
-            sig
-        )
-        .is_ok());
+    let x = rsa.verify(
+        ps,
+        hash_to_verify.as_slice(),
+        cert.signature.as_bytes().unwrap(),
+    );
+    if let Err(e) = x {
+        panic!(
+            "Self-signed certificate signature failed to verify: {:?}",
+            e
+        );
+    }
 }
 
 #[test]
-#[ignore]
-fn generate_self_signed_ec_cert() {
-    let cert = generate_self_signed_cert(AlgorithmId::EccP256);
-
-    //
-    // Verify that the certificate is signed correctly
-    //
-
-    let pubkey = match cert.subject_pki() {
-        PublicKeyInfo::EcP256(pubkey) => pubkey,
-        _ => unreachable!(),
+fn generate_self_signed_rsa_cert1024() {
+    let certbuf = generate_self_signed_cert(AlgorithmId::Rsa1024);
+    let cert = Certificate::from_der(certbuf.as_slice()).unwrap();
+    let tbsbuf = cert.tbs_certificate.to_vec().unwrap();
+    let hash_to_verify = Sha256::digest(tbsbuf.as_slice()).to_vec();
+    let spkibuf = cert
+        .tbs_certificate
+        .subject_public_key_info
+        .to_vec()
+        .unwrap();
+    let rsa = RsaPublicKey::from_public_key_der(&spkibuf).unwrap();
+    let ps = PaddingScheme::PKCS1v15Sign {
+        hash: Some(SHA2_256),
     };
+    let x = rsa.verify(
+        ps,
+        hash_to_verify.as_slice(),
+        cert.signature.as_bytes().unwrap(),
+    );
+    if let Err(e) = x {
+        panic!(
+            "Self-signed certificate signature failed to verify: {:?}",
+            e
+        );
+    }
+}
 
-    let data = cert.as_ref();
-    let tbs_cert_len = data[6] as usize;
-    let sig_algo_len = data[7 + tbs_cert_len + 1] as usize;
-    let sig_start = 7 + tbs_cert_len + 2 + sig_algo_len + 3;
-    let msg = &data[4..7 + tbs_cert_len];
-    let sig = p256::ecdsa::Signature::from_der(&data[sig_start..]).unwrap();
-    let vk = p256::ecdsa::VerifyingKey::from_sec1_bytes(pubkey.as_bytes()).unwrap();
-
-    use p256::ecdsa::signature::Verifier;
-    assert!(vk.verify(msg, &sig).is_ok());
+#[test]
+fn generate_self_signed_ec_cert() {
+    let certbuf = generate_self_signed_cert(AlgorithmId::EccP256);
+    let cert = Certificate::from_der(certbuf.as_slice()).unwrap();
+    let tbsbuf = cert.tbs_certificate.to_vec().unwrap();
+    let ecdsa = VerifyingKey256::from_sec1_bytes(
+        cert.tbs_certificate
+            .subject_public_key_info
+            .subject_public_key,
+    )
+    .unwrap();
+    let s = Signature256::from_der(cert.signature.as_bytes().unwrap()).unwrap();
+    let x = ecdsa.verify(tbsbuf.as_slice(), &s);
+    if let Err(e) = x {
+        panic!(
+            "Self-signed certificate signature failed to verify: {:?}",
+            e
+        );
+    }
 }

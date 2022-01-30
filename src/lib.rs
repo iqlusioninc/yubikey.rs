@@ -159,7 +159,6 @@ mod yubikey;
 
 pub use crate::{
     cccid::{CardId, CccId},
-    certificate::Certificate,
     chuid::ChuId,
     config::Config,
     error::{Error, Result},

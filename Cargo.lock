@@ -35,12 +35,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
-name = "base64"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
-
-[[package]]
 name = "base64ct"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -74,19 +68,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "chrono"
-version = "0.4.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
-dependencies = [
- "libc",
- "num-integer",
- "num-traits",
- "time",
- "winapi",
-]
-
-[[package]]
 name = "cipher"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -108,10 +89,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4c78c047431fee22c1a7bb92e00ad095a02a983affe4d8a72e2a2c62c1b94f3"
 
 [[package]]
-name = "cookie-factory"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "396de984970346b0d9e93d1415082923c679e5ae5c3ee3dcbd104f5610af126b"
+name = "const-oid"
+version = "0.8.0"
+source = "git+https://github.com/carl-wallace/formats?branch=rfc5914#53f6a914d9765eb909800f0ed46217626a07d7c0"
 
 [[package]]
 name = "cpufeatures"
@@ -156,12 +136,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "data-encoding"
-version = "2.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
-
-[[package]]
 name = "der"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -181,27 +155,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "der-oid-macro"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c73af209b6a5dc8ca7cbaba720732304792cddc933cfea3d74509c2b1ef2f436"
+name = "der"
+version = "0.6.0-pre.0"
+source = "git+https://github.com/carl-wallace/formats?branch=rfc5914#53f6a914d9765eb909800f0ed46217626a07d7c0"
 dependencies = [
- "num-bigint",
- "num-traits",
- "syn",
+ "const-oid 0.8.0",
+ "der_derive",
 ]
 
 [[package]]
-name = "der-parser"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9807efb310ce4ea172924f3a69d82f9fd6c9c3a19336344591153e665b31c43e"
+name = "der_derive"
+version = "0.6.0-pre.0"
+source = "git+https://github.com/carl-wallace/formats?branch=rfc5914#53f6a914d9765eb909800f0ed46217626a07d7c0"
 dependencies = [
- "der-oid-macro",
- "nom",
- "num-bigint",
- "num-traits",
- "rusticata-macros",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -407,17 +377,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num-bigint"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
-dependencies = [
- "autocfg 1.0.1",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
 name = "num-bigint-dig"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -465,15 +424,6 @@ checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
 dependencies = [
  "autocfg 1.0.1",
  "libm",
-]
-
-[[package]]
-name = "oid-registry"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe554cb2393bc784fd678c82c84cc0599c31ceadc7f03a594911f822cb8d1815"
-dependencies = [
- "der-parser",
 ]
 
 [[package]]
@@ -589,6 +539,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eb9f9e6e233e5c4a35559a617bf40a4ec447db2e84c20b55a6f83167b7e57872"
 
 [[package]]
+name = "proc-macro-error"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da25490ff9892aab3fcf7c36f08cfb902dd3e71ca0f9f9517bea02a73a5ce38c"
+dependencies = [
+ "proc-macro-error-attr",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "version_check",
+]
+
+[[package]]
+name = "proc-macro-error-attr"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1be40180e52ecc98ad80b184934baf3d0d29f979574e439af5a55274b35f869"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "version_check",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -695,15 +669,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rusticata-macros"
-version = "4.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65c52377bb2288aa522a0c8208947fada1e0c76397f108cc08f57efe6077b50d"
-dependencies = [
- "nom",
-]
-
-[[package]]
 name = "sec1"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -799,6 +764,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "spki"
+version = "0.6.0-pre"
+source = "git+https://github.com/carl-wallace/formats?branch=rfc5914#53f6a914d9765eb909800f0ed46217626a07d7c0"
+dependencies = [
+ "der 0.6.0-pre.0",
+]
+
+[[package]]
 name = "subtle"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -843,36 +816,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dfed899f0eb03f32ee8c6a0aabdb8a7949659e3466561fc0adf54e26d88c5f4"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "thiserror"
-version = "1.0.30"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "854babe52e4df1653706b98fcfc05843010039b406875930a70e4d9644e5c417"
-dependencies = [
- "thiserror-impl",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "1.0.30"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa32fd3f627f367fe16f893e2597ae3c05020f8bba2666a4e6ea73d377e5714b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "time"
-version = "0.1.43"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
-dependencies = [
- "libc",
- "winapi",
 ]
 
 [[package]]
@@ -941,38 +884,18 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "x509"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca3cec94c3999f31341553f358ef55f65fc031291a022cd42ec0ce7219560c76"
+version = "0.0.1"
+source = "git+https://github.com/carl-wallace/formats?branch=rfc5914#53f6a914d9765eb909800f0ed46217626a07d7c0"
 dependencies = [
- "chrono",
- "cookie-factory",
-]
-
-[[package]]
-name = "x509-parser"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffc90836a84cb72e6934137b1504d0cae304ef5d83904beb0c8d773bbfe256ed"
-dependencies = [
- "base64",
- "chrono",
- "data-encoding",
- "der-parser",
- "lazy_static",
- "nom",
- "oid-registry",
- "rusticata-macros",
- "thiserror",
+ "der 0.6.0-pre.0",
+ "spki 0.6.0-pre",
 ]
 
 [[package]]
 name = "yubikey"
 version = "0.6.0-pre"
 dependencies = [
- "chrono",
- "cookie-factory",
- "der-parser",
+ "der 0.6.0-pre.0",
  "des",
  "elliptic-curve",
  "env_logger",
@@ -996,7 +919,6 @@ dependencies = [
  "subtle-encoding",
  "uuid",
  "x509",
- "x509-parser",
  "zeroize",
 ]
 
@@ -1004,6 +926,7 @@ dependencies = [
 name = "yubikey-cli"
 version = "0.6.0-pre"
 dependencies = [
+ "der 0.6.0-pre.0",
  "env_logger",
  "gumdrop",
  "lazy_static",
@@ -1011,7 +934,7 @@ dependencies = [
  "sha2",
  "subtle-encoding",
  "termcolor",
- "x509-parser",
+ "x509",
  "yubikey",
 ]
 

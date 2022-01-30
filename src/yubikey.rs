@@ -40,6 +40,7 @@ use crate::{
     piv,
     reader::{Context, Reader},
     transaction::Transaction,
+    Buffer,
 };
 use log::{error, info};
 use pcsc::Card;
@@ -329,8 +330,8 @@ impl YubiKey {
     }
 
     /// Get the PIV keys contained in this YubiKey.
-    pub fn piv_keys(&mut self) -> Result<Vec<piv::Key>> {
-        piv::Key::list(self)
+    pub fn piv_keys<'a>(&mut self, buffers: &'a mut Vec<Buffer>) -> Result<Vec<piv::Key<'a>>> {
+        piv::Key::list(self, buffers)
     }
 
     /// Deauthenticate.
