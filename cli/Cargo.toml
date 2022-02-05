@@ -22,7 +22,8 @@ log = "0.4"
 sha2 = "0.9"
 subtle-encoding = "0.5"
 termcolor = "1"
-x509 = { git = "https://github.com/carl-wallace/formats", branch = "rfc5914" } # version = "0.0.1"
-der = { git = "https://github.com/carl-wallace/formats", branch = "rfc5914" } # version = "0.6.0-pre.0"
+x501 = { git = "https://github.com/RustCrypto/formats", branch = "master" }
+x509 = { git = "https://github.com/RustCrypto/formats", branch = "master" } # version = "0.0.1"
+der = { git = "https://github.com/RustCrypto/formats", branch = "master" } # version = "0.6.0-pre.0"
 
 yubikey = { version = "=0.6.0-pre", path = ".." }

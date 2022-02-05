@@ -12,7 +12,9 @@ use std::{
 };
 use subtle_encoding::hex;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, StandardStreamLock, WriteColor};
-use x509::{AttributeTypeAndValue, Certificate, Name};
+use x501::attr::AttributeTypeAndValue;
+use x501::name::Name;
+use x509::Certificate;
 use yubikey::{certificate::read, piv::*, YubiKey};
 
 // the next three functions currently live in certval and may move to x509

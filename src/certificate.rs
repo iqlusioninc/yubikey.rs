@@ -50,8 +50,10 @@ use zeroize::Zeroizing;
 use der::asn1::{Any, BitString, ObjectIdentifier, UIntBytes, UtcTime};
 use der::{Decodable, Encodable, Sequence};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use x509::{AlgorithmIdentifier, Name, SubjectPublicKeyInfo, TBSCertificate, Validity};
-use x509::{Certificate, Extensions, Time};
+use x501::name::Name;
+use x501::time::{Time, Validity};
+use x509::{AlgorithmIdentifier, SubjectPublicKeyInfo, TBSCertificate};
+use x509::{Certificate, Extensions};
 
 // These exist in certval now and might ought move to x509. duplicating for now.
 /// OID for SubjectPublicKeyInfo structs with RSA keys

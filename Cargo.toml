@@ -42,8 +42,9 @@ subtle-encoding = "0.5"
 uuid = { version = "0.8", features = ["v4"] }
 zeroize = "1"
 
-x509 = { git = "https://github.com/carl-wallace/formats", branch = "rfc5914" } # version = "0.0.1"
-der = { git = "https://github.com/carl-wallace/formats", branch = "rfc5914" } # version = "0.6.0-pre.0"
+x501 = { git = "https://github.com/RustCrypto/formats", branch = "master" } # version = "0.0.1"
+x509 = { git = "https://github.com/RustCrypto/formats", branch = "master" } # version = "0.0.1"
+der = { git = "https://github.com/RustCrypto/formats", branch = "master" } # version = "0.6.0-pre.0"
 
 [dev-dependencies]
 env_logger = "0.9"

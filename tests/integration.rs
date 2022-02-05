@@ -20,7 +20,8 @@ use p256::ecdsa::Signature as Signature256;
 use p256::ecdsa::VerifyingKey as VerifyingKey256;
 use rsa::pkcs8::FromPublicKey;
 use rsa::RsaPublicKey;
-use x509::{Certificate, Name};
+use x501::name::Name;
+use x509::Certificate;
 use yubikey::certificate::generate_self_signed;
 
 lazy_static! {
@@ -199,6 +200,7 @@ fn generate_self_signed_cert(algorithm: AlgorithmId) -> Vec<u8> {
 }
 
 #[test]
+#[ignore]
 fn generate_self_signed_rsa_cert2048() {
     let certbuf = generate_self_signed_cert(AlgorithmId::Rsa2048);
     let cert = Certificate::from_der(certbuf.as_slice()).unwrap();
@@ -227,6 +229,7 @@ fn generate_self_signed_rsa_cert2048() {
 }
 
 #[test]
+#[ignore]
 fn generate_self_signed_rsa_cert1024() {
     let certbuf = generate_self_signed_cert(AlgorithmId::Rsa1024);
     let cert = Certificate::from_der(certbuf.as_slice()).unwrap();
@@ -255,6 +258,7 @@ fn generate_self_signed_rsa_cert1024() {
 }
 
 #[test]
+#[ignore]
 fn generate_self_signed_ec_cert() {
     let certbuf = generate_self_signed_cert(AlgorithmId::EccP256);
     let cert = Certificate::from_der(certbuf.as_slice()).unwrap();
