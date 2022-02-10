@@ -98,9 +98,11 @@ impl Display for Serial {
 }
 
 impl Serial {
+    /// Returns itself as vector of big endian bytes
     pub fn to_bytes(&self) -> Vec<u8> {
         self.0.to_bytes_be()
     }
+    /// Returns itself formatted as x509 compatible hex string
     pub fn as_x509_hex(&self) -> String {
         let data = self.to_bytes();
         let raw_hex_string = format!("{:02X?}", data);
@@ -110,6 +112,7 @@ impl Serial {
             .replace("[", "")
             .to_lowercase()
     }
+    /// Returns itself formatted as x509 compatible int string
     pub fn as_x509_int(&self) -> String {
         let Serial(buint) = self;
         format!("{}", buint)

@@ -3,14 +3,11 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
 
-use cookie_factory::combinator::hex;
-use cookie_factory::gen;
 use lazy_static::lazy_static;
 use log::trace;
 use rand_core::{OsRng, RngCore};
 use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
-use std::fmt::format;
 use std::{env, sync::Mutex};
 use x509::RelativeDistinguishedName;
 use yubikey::certificate::Serial;
@@ -250,7 +247,7 @@ fn generate_self_signed_ec_cert() {
 #[ignore]
 fn test_serial_string_conversions() {
     //2^152+1
-    let mut serial: [u8; 20] = [
+    let serial: [u8; 20] = [
         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x01,
     ];
@@ -265,7 +262,7 @@ fn test_serial_string_conversions() {
         "01:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:01"
     );
 
-    let mut serial2: [u8; 20] = [
+    let serial2: [u8; 20] = [
         0xA1, 0xF3, 0x02, 0x30, 0x76, 0x01, 0x32, 0x48, 0x09, 0x9C, 0x10, 0xAA, 0x3F, 0xA0, 0x54,
         0x0D, 0xC0, 0xB7, 0x65, 0x01,
     ];
@@ -280,7 +277,7 @@ fn test_serial_string_conversions() {
         "a1:f3:02:30:76:01:32:48:09:9c:10:aa:3f:a0:54:0d:c0:b7:65:01"
     );
 
-    let mut serial3: [u8; 20] = [
+    let serial3: [u8; 20] = [
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0x3F, 0xA0, 0x54,
         0x0D, 0xC0, 0xB7, 0x65, 0x01,
     ];
