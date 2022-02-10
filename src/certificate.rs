@@ -535,7 +535,7 @@ impl Certificate {
 
     /// Returns the Issuer field of the certificate.
     pub fn issuer(&self) -> &str {
-        &self.subject
+        &self.issuer
     }
 
     /// Returns the SubjectName field of the certificate.
