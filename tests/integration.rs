@@ -9,12 +9,16 @@ use rand_core::{OsRng, RngCore};
 use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
 use std::{env, sync::Mutex};
+use std::fmt::format;
+use cookie_factory::combinator::hex;
+use cookie_factory::gen;
 use x509::RelativeDistinguishedName;
 use yubikey::{
     certificate::{Certificate, PublicKeyInfo},
     piv::{self, AlgorithmId, Key, RetiredSlotId, SlotId},
     Error, MgmKey, PinPolicy, TouchPolicy, YubiKey,
 };
+use yubikey::certificate::Serial;
 
 lazy_static! {
     /// Provide thread-safe access to a YubiKey
@@ -240,4 +244,93 @@ fn generate_self_signed_ec_cert() {
 
     use p256::ecdsa::signature::Verifier;
     assert!(vk.verify(msg, &sig).is_ok());
+}
+
+#[test]
+#[ignore]
+fn test_serial_string_conversions(){
+    //2^152+1
+    let mut serial:[u8; 20] = [
+        0x01,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x01,
+    ];
+
+    let s: Serial = Serial::from(serial);
+    assert_eq!(s.as_x509_int(),"5708990770823839524233143877797980545530986497");
+    assert_eq!(s.as_x509_hex(), "01:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:01");
+
+    let mut serial2:[u8; 20] = [
+        0xA1,
+        0xF3,
+        0x02,
+        0x30,
+        0x76,
+        0x01,
+        0x32,
+        0x48,
+        0x09,
+        0x9C,
+        0x10,
+        0xAA,
+        0x3F,
+        0xA0,
+        0x54,
+        0x0D,
+        0xC0,
+        0xB7,
+        0x65,
+        0x01,
+    ];
+
+
+    let s2: Serial = Serial::from(serial2);
+    assert_eq!(s2.as_x509_int(),"924566785900861696177829411010986812227211191553");
+    assert_eq!(s2.as_x509_hex(), "a1:f3:02:30:76:01:32:48:09:9c:10:aa:3f:a0:54:0d:c0:b7:65:01");
+
+
+    let mut serial3:[u8; 20] = [
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0xAA,
+        0x3F,
+        0xA0,
+        0x54,
+        0x0D,
+        0xC0,
+        0xB7,
+        0x65,
+        0x01,
+    ];
+
+    let s3: Serial = Serial::from(serial3);
+    assert_eq!(s3.as_x509_int(),"3140531249369331492097");
+    assert_eq!(s3.as_x509_hex(), "aa:3f:a0:54:0d:c0:b7:65:01");
+
 }
