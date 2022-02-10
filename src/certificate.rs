@@ -47,8 +47,8 @@ use p256::NistP256;
 use p384::NistP384;
 use rsa::{PublicKeyParts, RsaPublicKey};
 use sha2::{Digest, Sha256};
+use std::fmt::{format, Display, Formatter};
 use std::{fmt, ops::DerefMut};
-use std::fmt::{Display, format, Formatter};
 use x509::{der::Oid, RelativeDistinguishedName};
 use x509_parser::{parse_x509_certificate, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
@@ -101,18 +101,18 @@ impl Serial {
     pub fn to_bytes(&self) -> Vec<u8> {
         self.0.to_bytes_be()
     }
-    pub fn as_x509_hex(&self) -> String{
+    pub fn as_x509_hex(&self) -> String {
         let data = self.to_bytes();
         let raw_hex_string = format!("{:02X?}", data);
         raw_hex_string
             .replace(", ", ":")
-            .replace("]","")
-            .replace("[","")
+            .replace("]", "")
+            .replace("[", "")
             .to_lowercase()
     }
-    pub fn as_x509_int(&self) -> String{
+    pub fn as_x509_int(&self) -> String {
         let Serial(buint) = self;
-        format!("{}",buint)
+        format!("{}", buint)
     }
 }
 
