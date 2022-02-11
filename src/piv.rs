@@ -158,7 +158,7 @@ impl Display for SlotId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             SlotId::Retired(r) => write!(f, "{:?}", r),
-            _ => write!(f, "{:?}", self)
+            _ => write!(f, "{:?}", self),
         }
     }
 }
