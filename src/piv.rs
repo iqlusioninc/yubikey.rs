@@ -157,14 +157,8 @@ impl From<SlotId> for u8 {
 impl Display for SlotId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SlotId::Authentication => f.write_str("Authentication"),
-            SlotId::Signature => f.write_str("Signature"),
-            SlotId::KeyManagement => f.write_str("KeyManagement"),
-            SlotId::CardAuthentication => f.write_str("CardAuthentication"),
-            SlotId::Retired(r) => {
-                write!(f, "{}", r)
-            }
-            SlotId::Attestation => f.write_str("Attestation"),
+            SlotId::Retired(r) => write!(f, "{:?}", r),
+            _ => write!(f, "{:?}", self)
         }
     }
 }
@@ -313,72 +307,7 @@ impl From<RetiredSlotId> for u8 {
 
 impl Display for RetiredSlotId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                RetiredSlotId::R1 => {
-                    "R1"
-                }
-                RetiredSlotId::R2 => {
-                    "R2"
-                }
-                RetiredSlotId::R3 => {
-                    "R3"
-                }
-                RetiredSlotId::R4 => {
-                    "R4"
-                }
-                RetiredSlotId::R5 => {
-                    "R5"
-                }
-                RetiredSlotId::R6 => {
-                    "R6"
-                }
-                RetiredSlotId::R7 => {
-                    "R7"
-                }
-                RetiredSlotId::R8 => {
-                    "R8"
-                }
-                RetiredSlotId::R9 => {
-                    "R9"
-                }
-                RetiredSlotId::R10 => {
-                    "R10"
-                }
-                RetiredSlotId::R11 => {
-                    "R11"
-                }
-                RetiredSlotId::R12 => {
-                    "R12"
-                }
-                RetiredSlotId::R13 => {
-                    "R13"
-                }
-                RetiredSlotId::R14 => {
-                    "R14"
-                }
-                RetiredSlotId::R15 => {
-                    "R15"
-                }
-                RetiredSlotId::R16 => {
-                    "R16"
-                }
-                RetiredSlotId::R17 => {
-                    "R17"
-                }
-                RetiredSlotId::R18 => {
-                    "R18"
-                }
-                RetiredSlotId::R19 => {
-                    "R19"
-                }
-                RetiredSlotId::R20 => {
-                    "R20"
-                }
-            }
-        )
+        write!(f, "{:?}", self)
     }
 }
 
