@@ -57,6 +57,7 @@ use log::{debug, error, warn};
 use p256::NistP256;
 use p384::NistP384;
 use rsa::{BigUint, RsaPublicKey};
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 #[cfg(feature = "untested")]
@@ -149,6 +150,15 @@ impl From<SlotId> for u8 {
             SlotId::CardAuthentication => 0x9e,
             SlotId::Retired(retired) => retired.into(),
             SlotId::Attestation => 0xf9,
+        }
+    }
+}
+
+impl Display for SlotId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SlotId::Retired(r) => write!(f, "{:?}", r),
+            _ => write!(f, "{:?}", self),
         }
     }
 }
@@ -292,6 +302,12 @@ impl From<RetiredSlotId> for u8 {
             RetiredSlotId::R19 => 0x94,
             RetiredSlotId::R20 => 0x95,
         }
+    }
+}
+
+impl Display for RetiredSlotId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 

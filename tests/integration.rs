@@ -241,3 +241,36 @@ fn generate_self_signed_ec_cert() {
     use p256::ecdsa::signature::Verifier;
     assert!(vk.verify(msg, &sig).is_ok());
 }
+
+#[test]
+#[ignore]
+fn test_slot_id_display() {
+    assert_eq!(format!("{}", SlotId::Authentication), "Authentication");
+    assert_eq!(format!("{}", SlotId::Signature), "Signature");
+    assert_eq!(format!("{}", SlotId::KeyManagement), "KeyManagement");
+    assert_eq!(
+        format!("{}", SlotId::CardAuthentication),
+        "CardAuthentication"
+    );
+    assert_eq!(format!("{}", SlotId::Attestation), "Attestation");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R1)), "R1");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R2)), "R2");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R3)), "R3");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R4)), "R4");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R5)), "R5");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R6)), "R6");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R7)), "R7");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R8)), "R8");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R9)), "R9");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R10)), "R10");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R11)), "R11");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R12)), "R12");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R13)), "R13");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R14)), "R14");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R15)), "R15");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R16)), "R16");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R17)), "R17");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R18)), "R18");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R19)), "R19");
+    assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R20)), "R20");
+}
