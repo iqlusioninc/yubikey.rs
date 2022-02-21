@@ -25,7 +25,7 @@ cookie-factory = "0.3"
 der-parser = "6"
 des = "0.7"
 elliptic-curve = "0.11"
-hmac = "0.11"
+hmac = "0.12"
 log = "0.4"
 nom = "7"
 num-bigint-dig = { version = "0.7", features = ["rand"] }
