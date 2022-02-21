@@ -438,9 +438,25 @@ dependencies = [
  "num-iter",
  "num-traits",
  "rand",
- "serde",
  "smallvec",
  "zeroize",
+]
+
+[[package]]
+name = "num-bigint-dig"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "665252d9cb8b7ff0c24e639fcaa6da5e8538180961c3a6ce43491b41e859e3a3"
+dependencies = [
+ "byteorder",
+ "lazy_static",
+ "libm",
+ "num-integer",
+ "num-iter",
+ "num-traits",
+ "rand",
+ "serde",
+ "smallvec",
 ]
 
 [[package]]
@@ -690,7 +706,7 @@ dependencies = [
  "byteorder",
  "digest",
  "lazy_static",
- "num-bigint-dig",
+ "num-bigint-dig 0.7.0",
  "num-integer",
  "num-iter",
  "num-traits",
@@ -987,7 +1003,7 @@ dependencies = [
  "lazy_static",
  "log",
  "nom",
- "num-bigint-dig",
+ "num-bigint-dig 0.8.0",
  "num-integer",
  "num-traits",
  "p256",
