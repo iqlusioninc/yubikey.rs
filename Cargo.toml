@@ -31,7 +31,7 @@ nom = "7"
 num-bigint-dig = { version = "0.7", features = ["rand"] }
 num-traits = "0.2"
 num-integer = "0.1"
-pbkdf2 = { version = "0.9", default-features = false }
+pbkdf2 = { version = "0.11", default-features = false }
 p256 = "0.10"
 p384 = "0.9"
 pcsc = "2"
