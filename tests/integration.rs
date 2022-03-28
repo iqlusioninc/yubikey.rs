@@ -8,12 +8,12 @@ use log::trace;
 use rand_core::{OsRng, RngCore};
 use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
-use std::{env, sync::Mutex};
+use std::{env, str::FromStr, sync::Mutex};
 use x509::RelativeDistinguishedName;
 use yubikey::{
     certificate::{Certificate, PublicKeyInfo},
-    piv::{self, AlgorithmId, Key, RetiredSlotId, SlotId},
-    Error, MgmKey, PinPolicy, TouchPolicy, YubiKey,
+    piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
+    Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
 };
 
 lazy_static! {
@@ -28,7 +28,12 @@ fn init_yubikey() -> Mutex<YubiKey> {
         env_logger::builder().format_timestamp(None).init();
     }
 
-    let yubikey = YubiKey::open().unwrap();
+    let yubikey = if let Ok(serial) = env::var("YUBIKEY_SERIAL") {
+        let serial = Serial::from_str(&serial).unwrap();
+        YubiKey::open_by_serial(serial).unwrap()
+    } else {
+        YubiKey::open().unwrap()
+    };
     trace!("serial: {}", yubikey.serial());
     trace!("version: {}", yubikey.version());
 
@@ -273,4 +278,46 @@ fn test_slot_id_display() {
     assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R18)), "R18");
     assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R19)), "R19");
     assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R20)), "R20");
+
+    assert_eq!(
+        format!("{}", SlotId::Management(ManagementSlotId::PIN)),
+        "PIN"
+    );
+    assert_eq!(
+        format!("{}", SlotId::Management(ManagementSlotId::PUK)),
+        "PUK"
+    );
+    assert_eq!(
+        format!("{}", SlotId::Management(ManagementSlotId::Management)),
+        "Management"
+    );
+}
+
+//
+// Metadata
+//
+
+#[test]
+#[ignore]
+fn test_read_metadata() {
+    let mut yubikey = YUBIKEY.lock().unwrap();
+
+    assert!(yubikey.verify_pin(b"123456").is_ok());
+    assert!(yubikey.authenticate(MgmKey::default()).is_ok());
+
+    let slot = SlotId::Retired(RetiredSlotId::R1);
+
+    // Generate a new key in the selected slot.
+    let generated = piv::generate(
+        &mut yubikey,
+        slot,
+        AlgorithmId::EccP256,
+        PinPolicy::Default,
+        TouchPolicy::Default,
+    )
+    .unwrap();
+
+    let metadata = piv::metadata(&mut yubikey, slot).unwrap();
+
+    assert_eq!(metadata.public, Some(generated));
 }
