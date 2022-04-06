@@ -86,7 +86,7 @@ const KEYDATA_RSA_EXP: u64 = 65537;
 
 /// Slot identifiers.
 /// <https://developers.yubico.com/PIV/Introduction/Certificate_slots.html>
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub enum SlotId {
     /// This certificate and its associated private key is used to authenticate the card
     /// and the cardholder. This slot is used for things like system login. The end user
@@ -194,7 +194,7 @@ impl SlotId {
 
 /// Retired slot IDs.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum RetiredSlotId {
     R1,
     R2,
