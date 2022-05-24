@@ -26,8 +26,8 @@ encryption (PKCS#1v1.5/ECIES) use cases are supported for either key type.
 See [Yubico's guide to PIV-enabled YubiKeys][yk-guide] for more information
 on which devices support PIV and the available functionality.
 
-If you've been wanting to use Rust to sign and/or encrypt stuff using a
-private key generated and stored on a Yubikey (with option PIN-based access),
+If you've been wanting to use Rust to sign and/or encrypt data using a
+private key generated and stored on a YubiKey (with option PIN-based access),
 this is the crate you've been after!
 
 Note that while this project started as a fork of a [Yubico] project,
@@ -36,7 +36,7 @@ endorsed by Yubico.
 
 ## Minimum Supported Rust Version
 
-Rust **1.56** or newer.
+Rust **1.57** or newer.
 
 ## Supported YubiKeys
 
@@ -165,7 +165,7 @@ or conditions.
 [docs-link]: https://docs.rs/yubikey/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-link]: https://github.com/iqlusioninc/yubikey.rs/blob/main/COPYING
-[msrv-image]: https://img.shields.io/badge/rustc-1.56+-blue.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.57+-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
 [build-image]: https://github.com/iqlusioninc/yubikey.rs/workflows/CI/badge.svg?branch=main&event=push
