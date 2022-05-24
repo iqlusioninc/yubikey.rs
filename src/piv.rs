@@ -57,8 +57,10 @@ use log::{debug, error, warn};
 use p256::NistP256;
 use p384::NistP384;
 use rsa::{BigUint, RsaPublicKey};
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 #[cfg(feature = "untested")]
 use {

@@ -42,7 +42,7 @@ use crate::{
     yubikey::YubiKey,
 };
 use des::{
-    cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, NewBlockCipher},
+    cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, KeyInit},
     TdesEde3,
 };
 #[cfg(feature = "untested")]
