@@ -1,7 +1,7 @@
 //! List detected readers
 
 use crate::terminal::STDOUT;
-use gumdrop::Options;
+use clap::Parser;
 use std::{
     io::{self, Write},
     process::exit,
@@ -10,7 +10,7 @@ use termcolor::{ColorSpec, StandardStreamLock, WriteColor};
 use yubikey::{Context, Serial};
 
 /// The `readers` subcommand
-#[derive(Debug, Options)]
+#[derive(Debug, Parser)]
 pub struct ReadersCmd {}
 
 impl ReadersCmd {
