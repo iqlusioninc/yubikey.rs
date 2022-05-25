@@ -8,9 +8,9 @@
     unused_qualifications
 )]
 
-use gumdrop::Options;
+use clap::Parser;
 use yubikey_cli::commands::YubiKeyCli;
 
 fn main() {
-    YubiKeyCli::parse_args_default_or_exit().run();
+    YubiKeyCli::parse().run()
 }

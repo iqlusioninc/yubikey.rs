@@ -1,7 +1,7 @@
 //! Print device status
 
 use crate::terminal::{print_cert_info, STDOUT};
-use gumdrop::Options;
+use clap::Parser;
 use std::io::{self, Write};
 use termcolor::{ColorSpec, StandardStreamLock, WriteColor};
 use yubikey::{piv::*, YubiKey};
@@ -10,7 +10,7 @@ use yubikey::{piv::*, YubiKey};
 const NONE_STR: &str = "<none>";
 
 /// The `status` subcommand
-#[derive(Debug, Options)]
+#[derive(Debug, Parser)]
 pub struct StatusCmd {}
 
 impl StatusCmd {
