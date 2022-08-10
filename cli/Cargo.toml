@@ -23,4 +23,4 @@ sha2 = "0.9"
 subtle-encoding = "0.5"
 termcolor = "1"
 x509-parser = "0.12"
-yubikey = { version = "=0.6.0-pre", path = ".." }
+yubikey = { version = "0.6", path = ".." }
