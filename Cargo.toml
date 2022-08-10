@@ -22,7 +22,7 @@ members = [".", "cli"]
 [dependencies]
 chrono = "0.4"
 cookie-factory = "0.3"
-der-parser = "6"
+der-parser = "8"
 des = "0.8"
 elliptic-curve = "0.12"
 hmac = "0.12"
@@ -44,7 +44,7 @@ subtle = "2"
 subtle-encoding = "0.5"
 uuid = { version = "1.0", features = ["v4"] }
 x509 = "0.2"
-x509-parser = "0.12"
+x509-parser = "0.14"
 zeroize = "1"
 
 [dev-dependencies]
