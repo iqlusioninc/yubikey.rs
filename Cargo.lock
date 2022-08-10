@@ -1351,7 +1351,7 @@ dependencies = [
 
 [[package]]
 name = "yubikey"
-version = "0.6.0-pre"
+version = "0.6.0"
 dependencies = [
  "chrono",
  "cookie-factory",

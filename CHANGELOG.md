@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.0 (2022-08-10)
+### Changed
+- 2021 edition upgrade ([#343])
+- RustCrypto crate upgrades; MSRV 1.57 ([#378])
+  - `des` v0.8
+  - `elliptic-curve` v0.12
+  - `hmac` v0.12
+  - `num-bigint-dig` v0.8
+  - `pbkdf2` v0.11
+  - `p256` v0.11
+  - `p384` v0.11
+  - `rsa` v0.6
+  - `sha1` v0.10 (replacing `sha-1`)
+  - `sha2` v0.10
+- Bump `uuid` to v1.0 ([#376])
+- Bump `der-parser` to v8.0 ([#402])
+- Bump `x509-parser` to v0.14 ([#402])
+
+[#343]: https://github.com/iqlusioninc/yubikey.rs/pull/343
+[#376]: https://github.com/iqlusioninc/yubikey.rs/pull/376
+[#378]: https://github.com/iqlusioninc/yubikey.rs/pull/378
+[#402]: https://github.com/iqlusioninc/yubikey.rs/pull/402
+
 ## 0.5.0 (2021-11-21)
 ### Changed
 - Update `rsa` dependency to 0.5 ([#315])
