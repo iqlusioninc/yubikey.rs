@@ -21,6 +21,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "asn1-rs"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf6690c370453db30743b373a60ba498fc0d6d83b11f4abfd87a84a075db5dd4"
+dependencies = [
+ "asn1-rs-derive",
+ "asn1-rs-impl",
+ "displaydoc",
+ "nom",
+ "num-traits",
+ "rusticata-macros",
+ "thiserror",
+ "time 0.3.13",
+]
+
+[[package]]
+name = "asn1-rs-derive"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "726535892e8eae7e70657b4c8ea93d26b8553afb1ce617caee529ef96d7dee6c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "synstructure",
+]
+
+[[package]]
+name = "asn1-rs-impl"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2777730b2039ac0f95f093556e61b6d26cebed5393ca6f152717777cec3a42ed"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -107,7 +146,7 @@ dependencies = [
  "js-sys",
  "num-integer",
  "num-traits",
- "time",
+ "time 0.1.44",
  "wasm-bindgen",
  "winapi",
 ]
@@ -289,6 +328,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "der-parser"
+version = "8.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42d4bc9b0db0a0df9ae64634ac5bdefb7afcb534e182275ca0beadbe486701c1"
+dependencies = [
+ "asn1-rs",
+ "displaydoc",
+ "nom",
+ "num-bigint",
+ "num-traits",
+ "rusticata-macros",
+]
+
+[[package]]
 name = "des"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -315,6 +368,17 @@ dependencies = [
  "block-buffer 0.10.2",
  "crypto-common",
  "subtle",
+]
+
+[[package]]
+name = "displaydoc"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bf95dc3f046b9da4f2d51833c0d3547d8564ef6910f5c1ed130306a75b92886"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -484,6 +548,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "itoa"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c8af84674fe1f223a982c933a0ee1086ac4d4052aa0fb8060c12c6ad838e754"
+
+[[package]]
 name = "js-sys"
 version = "0.3.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -605,12 +675,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "num_threads"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2819ce041d2ee131036f4fc9d6ae7ae125a3a40e97ba64d04fe799ad9dabbb44"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "oid-registry"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe554cb2393bc784fd678c82c84cc0599c31ceadc7f03a594911f822cb8d1815"
 dependencies = [
- "der-parser",
+ "der-parser 6.0.1",
+]
+
+[[package]]
+name = "oid-registry"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d4bda43fd1b844cbc6e6e54b5444e2b1bc7838bce59ad205902cccbb26d6761"
+dependencies = [
+ "asn1-rs",
 ]
 
 [[package]]
@@ -1011,6 +1099,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "synstructure"
+version = "0.12.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f36bdaa60a83aca3921b5259d5400cbf5e90fc51931376a9bd4a0eb79aa7210f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "unicode-xid",
+]
+
+[[package]]
 name = "termcolor"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1057,6 +1157,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "time"
+version = "0.3.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db76ff9fa4b1458b3c7f077f3ff9887394058460d21e634355b273aaf11eea45"
+dependencies = [
+ "itoa",
+ "libc",
+ "num_threads",
+ "time-macros",
+]
+
+[[package]]
+name = "time-macros"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42657b1a6f4d817cda8e7a0ace261fe0cc946cf3a80314390b22cc61ae080792"
+
+[[package]]
 name = "typenum"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1067,6 +1185,12 @@ name = "unicode-ident"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4f5b37a154999a8f3f98cc23a628d850e154479cd94decf3414696e12e31aaf"
+
+[[package]]
+name = "unicode-xid"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "957e51f3646910546462e67d5f7599b9e4fb8acdd304b087a6494730f9eebf04"
 
 [[package]]
 name = "uuid"
@@ -1199,12 +1323,30 @@ dependencies = [
  "base64",
  "chrono",
  "data-encoding",
- "der-parser",
+ "der-parser 6.0.1",
  "lazy_static",
  "nom",
- "oid-registry",
+ "oid-registry 0.2.0",
  "rusticata-macros",
  "thiserror",
+]
+
+[[package]]
+name = "x509-parser"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0ecbeb7b67ce215e40e3cc7f2ff902f94a223acf44995934763467e7b1febc8"
+dependencies = [
+ "asn1-rs",
+ "base64",
+ "data-encoding",
+ "der-parser 8.1.0",
+ "lazy_static",
+ "nom",
+ "oid-registry 0.6.0",
+ "rusticata-macros",
+ "thiserror",
+ "time 0.3.13",
 ]
 
 [[package]]
@@ -1213,7 +1355,7 @@ version = "0.6.0-pre"
 dependencies = [
  "chrono",
  "cookie-factory",
- "der-parser",
+ "der-parser 8.1.0",
  "des",
  "elliptic-curve",
  "env_logger",
@@ -1237,7 +1379,7 @@ dependencies = [
  "subtle-encoding",
  "uuid",
  "x509",
- "x509-parser",
+ "x509-parser 0.14.0",
  "zeroize",
 ]
 
@@ -1252,7 +1394,7 @@ dependencies = [
  "sha2 0.9.9",
  "subtle-encoding",
  "termcolor",
- "x509-parser",
+ "x509-parser 0.12.0",
  "yubikey",
 ]
 
