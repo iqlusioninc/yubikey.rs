@@ -18,7 +18,7 @@ utility with general-purpose public-key encryption and signing support.
 
 ## Minimum Supported Rust Version
 
-Rust **1.51** or newer.
+Rust **1.57** or newer.
 
 ## Supported YubiKeys
 
@@ -35,10 +35,6 @@ an experimental stage and may still contain high-severity issues.
 
 USE AT YOUR OWN RISK!
 
-## Status
-
-WIP. Check back later.
-
 ## Code of Conduct
 
 We abide by the [Contributor Covenant][cc-md] and ask that you do as well.
@@ -47,7 +43,7 @@ For more information, please see [CODE_OF_CONDUCT.md][cc-md].
 
 ## License
 
-Copyright (c) 2014-2021 Yubico AB, Tony Arcieri
+Copyright (c) 2014-2022 Yubico AB, Tony Arcieri
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -88,7 +84,7 @@ or conditions.
 [docs-image]: https://docs.rs/yubikey-cli/badge.svg
 [docs-link]: https://docs.rs/yubikey-cli/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
-[rustc-image]: https://img.shields.io/badge/rustc-1.39+-blue.svg
+[rustc-image]: https://img.shields.io/badge/rustc-1.57+-blue.svg
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/

@@ -1,6 +1,6 @@
 [package]
 name = "yubikey-cli"
-version = "0.6.0-pre"
+version = "0.6.0"
 description = """
 Command-line interface for performing encryption and signing using RSA/ECC keys
 stored on YubiKey devices.

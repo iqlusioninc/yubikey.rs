@@ -1385,7 +1385,7 @@ dependencies = [
 
 [[package]]
 name = "yubikey-cli"
-version = "0.6.0-pre"
+version = "0.6.0"
 dependencies = [
  "clap",
  "env_logger",
