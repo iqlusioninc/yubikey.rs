@@ -123,7 +123,7 @@ Yubico's [yubico-piv-tool], a C library/CLI program. The original library
 was licensed under a [2-Clause BSD License][BSDL], which this library inherits
 as a derived work.
 
-Copyright (c) 2014-2021 Yubico AB, Tony Arcieri
+Copyright (c) 2014-2022 Yubico AB, Tony Arcieri
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
