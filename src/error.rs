@@ -121,31 +121,37 @@ impl Error {
     }
 
     /// Error message
-    pub fn msg(self) -> &'static str {
+    pub fn msg(self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::AlgorithmError => "algorithm error",
-            Error::AppletError => "applet error",
-            Error::ArgumentError => "argument error",
-            Error::AuthenticationError => "authentication error",
-            Error::GenericError => "generic error",
-            Error::InvalidObject => "invalid object",
-            Error::KeyError => "key error",
-            Error::MemoryError => "memory error",
-            Error::NotSupported => "not supported",
-            Error::NotFound => "not found",
-            Error::ParseError => "parse error",
-            Error::PcscError { .. } => "PC/SC error",
-            Error::PinLocked => "PIN locked",
-            Error::RangeError => "range error",
-            Error::SizeError => "size error",
-            Error::WrongPin { .. } => "wrong pin",
+            Error::AlgorithmError => f.write_str("algorithm error"),
+            Error::AppletError => f.write_str("applet error"),
+            Error::ArgumentError => f.write_str("argument error"),
+            Error::AuthenticationError => f.write_str("authentication error"),
+            Error::GenericError => f.write_str("generic error"),
+            Error::InvalidObject => f.write_str("invalid object"),
+            Error::KeyError => f.write_str("key error"),
+            Error::MemoryError => f.write_str("memory error"),
+            Error::NotSupported => f.write_str("not supported"),
+            Error::NotFound => f.write_str("not found"),
+            Error::ParseError => f.write_str("parse error"),
+
+            Error::PcscError { inner: Some(pcsc_error) } => {
+                f.write_fmt(format_args!("PC/SC error: {}", pcsc_error))
+            },
+
+            Error::PcscError { .. } => f.write_str("PC/SC error"),
+
+            Error::PinLocked => f.write_str("PIN locked"),
+            Error::RangeError => f.write_str("range error"),
+            Error::SizeError => f.write_str("size error"),
+            Error::WrongPin { .. } => f.write_str("wrong pin"),
         }
     }
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.msg())
+        self.msg(f)
     }
 }
 
