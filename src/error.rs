@@ -135,9 +135,9 @@ impl Error {
             Error::NotFound => f.write_str("not found"),
             Error::ParseError => f.write_str("parse error"),
 
-            Error::PcscError { inner: Some(pcsc_error) } => {
-                f.write_fmt(format_args!("PC/SC error: {}", pcsc_error))
-            },
+            Error::PcscError {
+                inner: Some(pcsc_error),
+            } => f.write_fmt(format_args!("PC/SC error: {}", pcsc_error)),
 
             Error::PcscError { .. } => f.write_str("PC/SC error"),
 
