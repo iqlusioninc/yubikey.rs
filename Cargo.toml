@@ -1,6 +1,6 @@
 [package]
 name = "yubikey"
-version = "0.6.0-pre" # Also update html_root_url in lib.rs when bumping this
+version = "0.6.0"
 description = """
 Pure Rust cross-platform host-side driver for YubiKey devices from Yubico with
 support for hardware-backed public-key decryption and digital signatures using
@@ -14,37 +14,37 @@ readme = "README.md"
 categories = ["api-bindings", "cryptography", "hardware-support"]
 keywords = ["ecdsa", "encryption", "rsa", "piv", "signature"]
 edition = "2021"
-rust-version = "1.56"
+rust-version = "1.57"
 
 [workspace]
 members = [".", "cli"]
 
 [dependencies]
-chrono = "0.4"
+chrono = "0.4.23"
 cookie-factory = "0.3"
-der-parser = "6"
-des = "0.7"
-elliptic-curve = "0.11"
-hmac = "0.11"
+der-parser = "8"
+des = "0.8"
+elliptic-curve = "0.12"
+hmac = "0.12"
 log = "0.4"
 nom = "7"
-num-bigint-dig = { version = "0.7", features = ["rand"] }
+num-bigint-dig = { version = "0.8", features = ["rand"] }
 num-traits = "0.2"
 num-integer = "0.1"
-pbkdf2 = { version = "0.9", default-features = false }
-p256 = "0.10"
-p384 = "0.9"
+pbkdf2 = { version = "0.11", default-features = false }
+p256 = "0.11"
+p384 = "0.11"
 pcsc = "2"
 rand_core = { version = "0.6", features = ["std"] }
-rsa = "0.5"
+rsa = "0.6"
 secrecy = "0.8"
-sha-1 = "0.9"
-sha2 = "0.9"
+sha1 = "0.10"
+sha2 = "0.10"
 subtle = "2"
 subtle-encoding = "0.5"
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "1.2", features = ["v4"] }
 x509 = "0.2"
-x509-parser = "0.12"
+x509-parser = "0.14"
 zeroize = "1"
 
 [dev-dependencies]

@@ -17,7 +17,7 @@
 //! on which devices support PIV and the available functionality.
 //!
 //! # Minimum Supported Rust Version
-//! Rust **1.51** or newer.
+//! Rust **1.57** or newer.
 //!
 //! # Supported YubiKeys
 //! - [YubiKey 4] series
@@ -130,8 +130,7 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey.rs/main/img/logo.png",
-    html_root_url = "https://docs.rs/yubikey/0.5.0"
+    html_logo_url = "https://raw.githubusercontent.com/iqlusioninc/yubikey.rs/main/img/logo.png"
 )]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]

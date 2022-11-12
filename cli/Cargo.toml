@@ -1,6 +1,6 @@
 [package]
 name = "yubikey-cli"
-version = "0.6.0-pre"
+version = "0.6.0"
 description = """
 Command-line interface for performing encryption and signing using RSA/ECC keys
 stored on YubiKey devices.
@@ -15,12 +15,12 @@ edition = "2021"
 rust-version = "1.56"
 
 [dependencies]
-gumdrop = "0.8"
+clap = { version = "3", features = ["derive"] }
 env_logger = "0.9"
 lazy_static = "1"
 log = "0.4"
-sha2 = "0.9"
+sha2 = "0.10"
 subtle-encoding = "0.5"
 termcolor = "1"
 x509-parser = "0.12"
-yubikey = { version = "=0.6.0-pre", path = ".." }
+yubikey = { version = "0.6", path = ".." }

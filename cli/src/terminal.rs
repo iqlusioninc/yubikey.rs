@@ -140,14 +140,12 @@ impl Status {
 
     /// Print the given message to stdout
     pub fn print_stdout(self, msg: impl AsRef<str>) {
-        self.print(&*STDOUT, msg)
-            .expect("error printing to stdout!")
+        self.print(&STDOUT, msg).expect("error printing to stdout!")
     }
 
     /// Print the given message to stderr
     pub fn print_stderr(self, msg: impl AsRef<str>) {
-        self.print(&*STDERR, msg)
-            .expect("error printing to stderr!")
+        self.print(&STDERR, msg).expect("error printing to stderr!")
     }
 
     /// Print the given message

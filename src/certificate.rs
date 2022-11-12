@@ -120,7 +120,7 @@ impl Serial {
 }
 
 /// Information about how a [`Certificate`] is stored within a YubiKey.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertInfo {
     /// The certificate is uncompressed.
     Uncompressed,
@@ -213,7 +213,7 @@ impl PublicKeyInfo {
     fn parse(subject_pki: &SubjectPublicKeyInfo<'_>) -> Result<Self> {
         match subject_pki.algorithm.algorithm.to_string().as_str() {
             OID_RSA_ENCRYPTION => {
-                let pubkey = read_pki::rsa_pubkey(subject_pki.subject_public_key.data)?;
+                let pubkey = read_pki::rsa_pubkey(&subject_pki.subject_public_key.data)?;
 
                 Ok(PublicKeyInfo::Rsa {
                     algorithm: match pubkey.n().bits() {
@@ -610,6 +610,7 @@ pub(crate) fn write_certificate(
 
 mod read_pki {
     use der_parser::{
+        asn1_rs::Any,
         ber::BerObjectContent,
         der::{parse_der_integer, parse_der_sequence_defined_g, DerObject},
         error::BerError,
@@ -663,8 +664,8 @@ mod read_pki {
     ///   -- specifiedCurve  SpecifiedECDomain
     /// }
     /// ```
-    pub(super) fn ec_parameters(parameters: &DerObject<'_>) -> Result<AlgorithmId> {
-        let curve_oid = parameters.as_oid_val().map_err(|_| Error::InvalidObject)?;
+    pub(super) fn ec_parameters(parameters: &Any<'_>) -> Result<AlgorithmId> {
+        let curve_oid = parameters.as_oid().map_err(|_| Error::InvalidObject)?;
 
         match curve_oid.to_string().as_str() {
             OID_NIST_P256 => Ok(AlgorithmId::EccP256),
