@@ -97,7 +97,7 @@ impl Serial {
 }
 
 /// Information about how a [`Certificate`] is stored within a YubiKey.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertInfo {
     /// The certificate is uncompressed.
     Uncompressed,

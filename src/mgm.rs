@@ -404,7 +404,7 @@ fn is_weak_key(key: &[u8; DES_LEN_3DES]) -> bool {
         c = (c & 0x0F) + ((c >> 4) & 0x0F);
 
         // if count is even, set low key bit to 1, otherwise 0
-        tmp[i] = (key[i] & 0xFE) | (if c & 0x01 == 0x01 { 0x00 } else { 0x01 });
+        tmp[i] = (key[i] & 0xFE) | u8::from(c & 0x01 != 0x01);
     }
 
     // check odd parity key against table by DES key block

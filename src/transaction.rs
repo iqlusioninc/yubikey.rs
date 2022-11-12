@@ -69,7 +69,7 @@ impl<'tx> Transaction<'tx> {
     pub fn select_application(&self) -> Result<()> {
         let response = Apdu::new(Ins::SelectApplication)
             .p1(0x04)
-            .data(&PIV_AID)
+            .data(PIV_AID)
             .transmit(self, 0xFF)
             .map_err(|e| {
                 error!("failed communicating with card: '{}'", e);
@@ -109,7 +109,7 @@ impl<'tx> Transaction<'tx> {
             // YK4 requires switching to the yk applet to retrieve the serial
             let sw = Apdu::new(Ins::SelectApplication)
                 .p1(0x04)
-                .data(&YK_AID)
+                .data(YK_AID)
                 .transmit(self, 0xFF)?
                 .status_words();
 
@@ -131,7 +131,7 @@ impl<'tx> Transaction<'tx> {
             // reselect the PIV applet
             let sw = Apdu::new(Ins::SelectApplication)
                 .p1(0x04)
-                .data(&PIV_AID)
+                .data(PIV_AID)
                 .transmit(self, 0xFF)?
                 .status_words();
 
@@ -246,7 +246,7 @@ impl<'tx> Transaction<'tx> {
 
         let status_words = Apdu::new(Ins::SetMgmKey)
             .params(0xff, p2)
-            .data(&data)
+            .data(data)
             .transmit(self, 261)?
             .status_words();
 

@@ -143,7 +143,7 @@ impl TryFrom<u8> for SlotId {
             0xf9 => Ok(SlotId::Attestation),
             _ => RetiredSlotId::try_from(value)
                 .map(SlotId::Retired)
-                .or(ManagementSlotId::try_from(value).map(SlotId::Management)),
+                .or_else(|_| ManagementSlotId::try_from(value).map(SlotId::Management)),
         }
     }
 }
@@ -185,7 +185,7 @@ impl FromStr for SlotId {
             _ => s
                 .parse()
                 .map(SlotId::Management)
-                .or(s.parse().map(SlotId::Retired)),
+                .or_else(|_| s.parse().map(SlotId::Retired)),
         }
     }
 }
@@ -354,7 +354,7 @@ impl RetiredSlotId {
 
 /// Management slot IDs.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub enum ManagementSlotId {
     PIN,
     PUK,
@@ -670,7 +670,7 @@ pub fn generate(
         }
     }
 
-    let value = &response.data()[..];
+    let value = response.data();
     read_public_key(algorithm, value, true)
 }
 
