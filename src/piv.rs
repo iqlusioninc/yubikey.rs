@@ -353,11 +353,15 @@ impl RetiredSlotId {
 }
 
 /// Management slot IDs.
-#[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub enum ManagementSlotId {
-    PIN,
-    PUK,
+    /// Personal Identification Number (PIN).
+    Pin,
+
+    /// PIN Unblocking Key (PUK).
+    Puk,
+
+    /// Management Key.
     Management,
 }
 
@@ -366,8 +370,8 @@ impl TryFrom<u8> for ManagementSlotId {
 
     fn try_from(value: u8) -> Result<Self> {
         match value {
-            0x80 => Ok(ManagementSlotId::PIN),
-            0x81 => Ok(ManagementSlotId::PUK),
+            0x80 => Ok(ManagementSlotId::Pin),
+            0x81 => Ok(ManagementSlotId::Puk),
             0x9b => Ok(ManagementSlotId::Management),
             _ => Err(Error::InvalidObject),
         }
@@ -379,8 +383,8 @@ impl FromStr for ManagementSlotId {
 
     fn from_str(value: &str) -> Result<Self> {
         match value {
-            "80" => Ok(ManagementSlotId::PIN),
-            "81" => Ok(ManagementSlotId::PUK),
+            "80" => Ok(ManagementSlotId::Pin),
+            "81" => Ok(ManagementSlotId::Puk),
             "9b" => Ok(ManagementSlotId::Management),
             _ => Err(Error::InvalidObject),
         }
@@ -390,8 +394,8 @@ impl FromStr for ManagementSlotId {
 impl From<ManagementSlotId> for u8 {
     fn from(slot: ManagementSlotId) -> u8 {
         match slot {
-            ManagementSlotId::PIN => 0x80,
-            ManagementSlotId::PUK => 0x81,
+            ManagementSlotId::Pin => 0x80,
+            ManagementSlotId::Puk => 0x81,
             ManagementSlotId::Management => 0x9b,
         }
     }
@@ -405,11 +409,27 @@ impl Display for ManagementSlotId {
 
 impl ManagementSlotId {
     /// Returns the [`ObjectId`] that corresponds to a given [`ManagementSlotId`].
+    ///
+    /// These correspond to the "BER-TLV Tag" values from Table 3 of [NIST SP 800-73-4]:
+    /// "Object Identifiers of the PIV Data Objects for Interoperable Use".
+    ///
+    /// [NIST SP 800-73-4]: https://csrc.nist.gov/publications/detail/sp/800-73/4/final
     pub(crate) fn object_id(self) -> ObjectId {
         match self {
-            ManagementSlotId::PIN => 0x005f_c10b, // TODO: no idea where to get those object_ids
-            ManagementSlotId::PUK => 0x005f_c10c, // TODO
-            ManagementSlotId::Management => 0x005f_c10f, // TODO
+            // Data Object: "X.509 Certificate for Key Management"
+            // OID: 2.16.840.1.101.3.7.2.1.2
+            // BER-TLV Tag: '5FC10B'
+            ManagementSlotId::Pin => 0x005f_c10b,
+
+            // Data Object: "Key History Object"
+            // OID: 2.16.840.1.101.3.7.2.96.96
+            // BER-TLV Tag: '5FC10C'
+            ManagementSlotId::Puk => 0x005f_c10c,
+
+            // Data Object: "Retired X.509 Certificate for Key Management 3"
+            // OID: 2.16.840.1.101.3.7.2.16.3
+            // BER-TLV Tag: '5FC10F'
+            ManagementSlotId::Management => 0x005f_c10f,
         }
     }
 }
@@ -440,8 +460,8 @@ pub const SLOTS: [SlotId; 27] = [
     SlotId::Retired(RetiredSlotId::R19),
     SlotId::Retired(RetiredSlotId::R20),
     SlotId::CardAuthentication,
-    SlotId::Management(ManagementSlotId::PIN),
-    SlotId::Management(ManagementSlotId::PUK),
+    SlotId::Management(ManagementSlotId::Pin),
+    SlotId::Management(ManagementSlotId::Puk),
     SlotId::Management(ManagementSlotId::Management),
 ];
 
@@ -950,7 +970,7 @@ impl TryFrom<Buffer> for SlotMetadata {
             |input| Tlv::parse(input).map_err(|_| nom::Err::Error(())),
             || {
                 Ok(SlotMetadata {
-                    algorithm: ManagementAlgorithmId::PINPUK,
+                    algorithm: ManagementAlgorithmId::PinPuk,
                     policy: None,
                     origin: None,
                     public: None,
@@ -993,7 +1013,7 @@ impl TryFrom<Buffer> for SlotMetadata {
                     }
                     4 => {
                         match metadata.algorithm {
-                            ManagementAlgorithmId::Asymetric(alg) => {
+                            ManagementAlgorithmId::Asymmetric(alg) => {
                                 metadata.public = Some(read_public_key(alg, tlv.value, false)?);
                             }
                             _ => Err(Error::ParseError)?,
@@ -1186,11 +1206,11 @@ fn read_public_key(
 /// Algorithms as reported by the metadata command.
 pub enum ManagementAlgorithmId {
     /// Used on PIN and PUK slots.
-    PINPUK,
+    PinPuk,
     /// Used on the key management slot.
-    ThreeDES,
+    ThreeDes,
     /// Used on all other slots.
-    Asymetric(AlgorithmId),
+    Asymmetric(AlgorithmId),
 }
 
 impl TryFrom<u8> for ManagementAlgorithmId {
@@ -1198,9 +1218,9 @@ impl TryFrom<u8> for ManagementAlgorithmId {
 
     fn try_from(value: u8) -> Result<Self> {
         match value {
-            0xff => Ok(ManagementAlgorithmId::PINPUK),
-            0x03 => Ok(ManagementAlgorithmId::ThreeDES),
-            oth => AlgorithmId::try_from(oth).map(ManagementAlgorithmId::Asymetric),
+            0xff => Ok(ManagementAlgorithmId::PinPuk),
+            0x03 => Ok(ManagementAlgorithmId::ThreeDes),
+            oth => AlgorithmId::try_from(oth).map(ManagementAlgorithmId::Asymmetric),
         }
     }
 }
@@ -1208,9 +1228,9 @@ impl TryFrom<u8> for ManagementAlgorithmId {
 impl From<ManagementAlgorithmId> for u8 {
     fn from(id: ManagementAlgorithmId) -> u8 {
         match id {
-            ManagementAlgorithmId::PINPUK => 0xff,
-            ManagementAlgorithmId::ThreeDES => 0x03,
-            ManagementAlgorithmId::Asymetric(oth) => oth.into(),
+            ManagementAlgorithmId::PinPuk => 0xff,
+            ManagementAlgorithmId::ThreeDes => 0x03,
+            ManagementAlgorithmId::Asymmetric(oth) => oth.into(),
         }
     }
 }

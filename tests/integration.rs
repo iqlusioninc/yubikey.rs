@@ -280,11 +280,11 @@ fn test_slot_id_display() {
     assert_eq!(format!("{}", SlotId::Retired(RetiredSlotId::R20)), "R20");
 
     assert_eq!(
-        format!("{}", SlotId::Management(ManagementSlotId::PIN)),
+        format!("{}", SlotId::Management(ManagementSlotId::Pin)),
         "PIN"
     );
     assert_eq!(
-        format!("{}", SlotId::Management(ManagementSlotId::PUK)),
+        format!("{}", SlotId::Management(ManagementSlotId::Puk)),
         "PUK"
     );
     assert_eq!(
