@@ -6,7 +6,7 @@ use crate::{serialization::Tlv, Error, Result};
 /// given slot.
 ///
 /// This policy must be set when keys are generated or imported, and cannot be changed later.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PinPolicy {
     /// Use the default PIN policy for the slot. See the slot's documentation for details.
     Default,
@@ -64,7 +64,7 @@ impl PinPolicy {
 /// addition to the [`PinPolicy`].
 ///
 /// This policy must be set when keys are generated or imported, and cannot be changed later.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TouchPolicy {
     /// Use the default touch policy for the slot.
     Default,

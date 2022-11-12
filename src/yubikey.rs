@@ -285,7 +285,7 @@ impl YubiKey {
         // get a challenge from the card
         let challenge = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
-            .data(&[TAG_DYN_AUTH, 0x02, 0x80, 0x00])
+            .data([TAG_DYN_AUTH, 0x02, 0x80, 0x00])
             .transmit(&txn, 261)?;
 
         if !challenge.is_success() || challenge.data().len() < 12 {
@@ -310,7 +310,7 @@ impl YubiKey {
 
         let authentication = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
-            .data(&data)
+            .data(data)
             .transmit(&txn, 261)?;
 
         if !authentication.is_success() {
@@ -568,7 +568,7 @@ impl YubiKey {
 
         let response = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
-            .data(&[0x7c, 0x02, 0x81, 0x00])
+            .data([0x7c, 0x02, 0x81, 0x00])
             .transmit(&txn, 261)?;
 
         if !response.is_success() {
@@ -594,7 +594,7 @@ impl YubiKey {
         // send the response to the card and a challenge of our own.
         let status_words = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
-            .data(&data)
+            .data(data)
             .transmit(&txn, 261)?
             .status_words();
 

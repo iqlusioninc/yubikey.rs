@@ -82,7 +82,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.60.0 # MSRV
+          toolchain: 1.65.0
           components: clippy
           override: true
       - run: sudo apt-get install libpcsclite-dev
