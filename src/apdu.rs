@@ -195,6 +195,9 @@ pub enum Ins {
     /// Get device serial
     GetSerial,
 
+    /// Get slot metadata
+    GetMetadata,
+
     /// Other/unrecognized instruction codes
     Other(u8),
 }
@@ -219,6 +222,7 @@ impl Ins {
             Ins::SetPinRetries => 0xfa,
             Ins::Attest => 0xf9,
             Ins::GetSerial => 0xf8,
+            Ins::GetMetadata => 0xf7,
             Ins::Other(code) => code,
         }
     }
@@ -243,6 +247,7 @@ impl From<u8> for Ins {
             0xfa => Ins::SetPinRetries,
             0xf9 => Ins::Attest,
             0xf8 => Ins::GetSerial,
+            0xf7 => Ins::GetMetadata,
             code => Ins::Other(code),
         }
     }

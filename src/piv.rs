@@ -45,6 +45,7 @@
 use crate::{
     apdu::{Ins, StatusWords},
     certificate::{self, Certificate, PublicKeyInfo},
+    consts::CB_OBJ_MAX,
     error::{Error, Result},
     policy::{PinPolicy, TouchPolicy},
     serialization::*,
@@ -64,7 +65,6 @@ use std::{
 
 #[cfg(feature = "untested")]
 use {
-    crate::consts::CB_OBJ_MAX,
     num_bigint_dig::traits::ModInverse,
     num_integer::Integer,
     num_traits::{FromPrimitive, One},
@@ -126,6 +126,9 @@ pub enum SlotId {
     /// attestation of other keys generated on device with instruction `f9`. This slot is
     /// not cleared on reset, but can be overwritten.
     Attestation,
+
+    /// Thse slots are used for management. PIN PUK and Management Key.
+    Management(ManagementSlotId),
 }
 
 impl TryFrom<u8> for SlotId {
@@ -138,7 +141,9 @@ impl TryFrom<u8> for SlotId {
             0x9d => Ok(SlotId::KeyManagement),
             0x9e => Ok(SlotId::CardAuthentication),
             0xf9 => Ok(SlotId::Attestation),
-            _ => RetiredSlotId::try_from(value).map(SlotId::Retired),
+            _ => RetiredSlotId::try_from(value)
+                .map(SlotId::Retired)
+                .or(ManagementSlotId::try_from(value).map(SlotId::Management)),
         }
     }
 }
@@ -152,6 +157,7 @@ impl From<SlotId> for u8 {
             SlotId::CardAuthentication => 0x9e,
             SlotId::Retired(retired) => retired.into(),
             SlotId::Attestation => 0xf9,
+            SlotId::Management(mgmt) => mgmt.into(),
         }
     }
 }
@@ -159,6 +165,7 @@ impl From<SlotId> for u8 {
 impl Display for SlotId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            SlotId::Management(r) => write!(f, "{:?}", r),
             SlotId::Retired(r) => write!(f, "{:?}", r),
             _ => write!(f, "{:?}", self),
         }
@@ -175,7 +182,10 @@ impl FromStr for SlotId {
             "9d" => Ok(SlotId::KeyManagement),
             "9e" => Ok(SlotId::CardAuthentication),
             "f9" => Ok(SlotId::Attestation),
-            _ => s.parse().map(SlotId::Retired),
+            _ => s
+                .parse()
+                .map(SlotId::Management)
+                .or(s.parse().map(SlotId::Retired)),
         }
     }
 }
@@ -189,6 +199,7 @@ impl SlotId {
             SlotId::KeyManagement => 0x005f_c10b,
             SlotId::CardAuthentication => 0x005f_c101,
             SlotId::Retired(retired) => retired.object_id(),
+            SlotId::Management(mgmt) => mgmt.object_id(),
             SlotId::Attestation => 0x005f_ff01,
         }
     }
@@ -341,8 +352,70 @@ impl RetiredSlotId {
     }
 }
 
+/// Management slot IDs.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ManagementSlotId {
+    PIN,
+    PUK,
+    Management,
+}
+
+impl TryFrom<u8> for ManagementSlotId {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self> {
+        match value {
+            0x80 => Ok(ManagementSlotId::PIN),
+            0x81 => Ok(ManagementSlotId::PUK),
+            0x9b => Ok(ManagementSlotId::Management),
+            _ => Err(Error::InvalidObject),
+        }
+    }
+}
+
+impl FromStr for ManagementSlotId {
+    type Err = Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value {
+            "80" => Ok(ManagementSlotId::PIN),
+            "81" => Ok(ManagementSlotId::PUK),
+            "9b" => Ok(ManagementSlotId::Management),
+            _ => Err(Error::InvalidObject),
+        }
+    }
+}
+
+impl From<ManagementSlotId> for u8 {
+    fn from(slot: ManagementSlotId) -> u8 {
+        match slot {
+            ManagementSlotId::PIN => 0x80,
+            ManagementSlotId::PUK => 0x81,
+            ManagementSlotId::Management => 0x9b,
+        }
+    }
+}
+
+impl Display for ManagementSlotId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl ManagementSlotId {
+    /// Returns the [`ObjectId`] that corresponds to a given [`ManagementSlotId`].
+    pub(crate) fn object_id(self) -> ObjectId {
+        match self {
+            ManagementSlotId::PIN => 0x005f_c10b, // TODO: no idea where to get those object_ids
+            ManagementSlotId::PUK => 0x005f_c10c, // TODO
+            ManagementSlotId::Management => 0x005f_c10f, // TODO
+        }
+    }
+}
+
 /// Personal Identity Verification (PIV) key slots
-pub const SLOTS: [SlotId; 24] = [
+pub const SLOTS: [SlotId; 27] = [
     SlotId::Authentication,
     SlotId::Signature,
     SlotId::KeyManagement,
@@ -367,6 +440,9 @@ pub const SLOTS: [SlotId; 24] = [
     SlotId::Retired(RetiredSlotId::R19),
     SlotId::Retired(RetiredSlotId::R20),
     SlotId::CardAuthentication,
+    SlotId::Management(ManagementSlotId::PIN),
+    SlotId::Management(ManagementSlotId::PUK),
+    SlotId::Management(ManagementSlotId::Management),
 ];
 
 /// Algorithm identifiers
@@ -594,101 +670,8 @@ pub fn generate(
         }
     }
 
-    // TODO(str4d): Response is wrapped in an ASN.1 TLV:
-    //
-    //    0x7f 0x49 -> Application | Constructed | 0x49
-    match algorithm {
-        AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
-            // It appears that the inner application-specific value returned by the
-            // YubiKey is constructed such that RSA pubkeys can be parsed in two ways:
-            //
-            // - Use a full ASN.1 parser on the entire datastructure:
-            //
-            //     RSA 1024:
-            //     [127, 73, 129, 136, 129, 129, 128, [ 128 octets ], 130,  3, 1, 0, 1]
-            //     | tag   | len:136 |0x81| len:128 |    modulus    |0x82|len3|  exp  |
-            //
-            //     RSA 2048:
-            //     [127, 73, 130, 1, 9, 129, 130, 1, 0, [ 256 octets ], 130,  3, 1, 0, 1]
-            //     | tag   | len:265  |0x81| len:256  |    modulus    |0x82|len3|  exp  |
-            //
-            // - Skip the first 5 bytes and use crate::serialize::get_length during TLV
-            //   parsing (which treats 128 as a single-byte definite length instead of an
-            //   indefinite length):
-            //
-            //     RSA 1024:
-            //     [127, 73, 129, 136, 129, 129, 128, [ 128 octets ], 130,  3, 1, 0, 1]
-            //     |                      |0x81|len128|   modulus   |0x82|len3|  exp  |
-            //
-            //     RSA 2048:
-            //     [127, 73, 130, 1, 9, 129, 130, 1, 0, [ 256 octets ], 130,  3, 1, 0, 1]
-            //     |                  |0x81| len:256  |    modulus    |0x82|len3|  exp  |
-            //
-            // Because of the above, treat this for now as a 2-byte ASN.1 tag with a
-            // 3-byte length.
-            let data = &response.data()[5..];
-
-            let (data, modulus_tlv) = Tlv::parse(data)?;
-            if modulus_tlv.tag != TAG_RSA_MODULUS {
-                error!("Failed to parse public key structure (modulus)");
-                return Err(Error::ParseError);
-            }
-            let modulus = modulus_tlv.value.to_vec();
-
-            let (_, exp_tlv) = Tlv::parse(data)?;
-            if exp_tlv.tag != TAG_RSA_EXP {
-                error!("failed to parse public key structure (public exponent)");
-                return Err(Error::ParseError);
-            }
-            let exp = exp_tlv.value.to_vec();
-
-            Ok(PublicKeyInfo::Rsa {
-                algorithm,
-                pubkey: RsaPublicKey::new(
-                    BigUint::from_bytes_be(&modulus),
-                    BigUint::from_bytes_be(&exp),
-                )
-                .map_err(|_| Error::InvalidObject)?,
-            })
-        }
-        AlgorithmId::EccP256 | AlgorithmId::EccP384 => {
-            // 2-byte ASN.1 tag, 1-byte length (because all supported EC pubkey lengths
-            // are shorter than 128 bytes, fitting into a definite short ASN.1 length).
-            let data = &response.data()[3..];
-
-            let len = if let AlgorithmId::EccP256 = algorithm {
-                CB_ECC_POINTP256
-            } else {
-                CB_ECC_POINTP384
-            };
-
-            let (_, tlv) = Tlv::parse(data)?;
-
-            if tlv.tag != TAG_ECC_POINT {
-                error!("failed to parse public key structure");
-                return Err(Error::ParseError);
-            }
-
-            // the curve point should always be determined by the curve
-            if tlv.value.len() != len {
-                error!("unexpected length");
-                return Err(Error::AlgorithmError);
-            }
-
-            let point = tlv.value.to_vec();
-
-            match algorithm {
-                AlgorithmId::EccP256 => {
-                    EcPublicKey::<NistP256>::from_bytes(point).map(PublicKeyInfo::EcP256)
-                }
-                AlgorithmId::EccP384 => {
-                    EcPublicKey::<NistP384>::from_bytes(point).map(PublicKeyInfo::EcP384)
-                }
-                _ => return Err(Error::AlgorithmError),
-            }
-            .map_err(|_| Error::InvalidObject)
-        }
-    }
+    let value = &response.data()[..];
+    read_public_key(algorithm, value, true)
 }
 
 #[cfg(feature = "untested")]
@@ -914,4 +897,320 @@ pub fn decrypt_data(
 
     // don't attempt to reselect in crypt operations to avoid problems with PIN_ALWAYS
     txn.authenticated_command(input, algorithm, key, true)
+}
+
+/// Read metadata
+pub fn metadata(yubikey: &mut YubiKey, slot: SlotId) -> Result<SlotMetadata> {
+    let txn = yubikey.begin_transaction()?;
+    let templ = [0, Ins::GetMetadata.code(), 0, slot.into()];
+
+    let response = txn.transfer_data(&templ, &[], CB_OBJ_MAX)?;
+
+    if !response.is_success() {
+        if response.status_words() == StatusWords::NotSupportedError {
+            return Err(Error::NotSupported); // Requires firmware 5.2.3
+        } else {
+            return Err(Error::GenericError);
+        }
+    }
+
+    let buf = Buffer::new(response.data().into());
+
+    SlotMetadata::try_from(buf)
+}
+
+/// Metadata from a slot
+#[derive(Debug)]
+pub struct SlotMetadata {
+    /// Algorithm / Type of key
+    pub algorithm: ManagementAlgorithmId,
+    /// PIN and touch policy
+    pub policy: Option<(PinPolicy, TouchPolicy)>,
+    /// Imported or generated key
+    pub origin: Option<Origin>,
+    /// Pub key of the key
+    pub public: Option<PublicKeyInfo>,
+    /// Whether PIN PUK and management key are default
+    pub default: Option<bool>,
+    /// Number of retries left
+    pub retries: Option<Retries>,
+}
+
+impl TryFrom<Buffer> for SlotMetadata {
+    type Error = Error;
+
+    fn try_from(buf: Buffer) -> Result<Self> {
+        use nom::{
+            combinator::{eof, map_res},
+            multi::fold_many1,
+            number::complete::u8,
+        };
+
+        let out = fold_many1(
+            |input| Tlv::parse(input).map_err(|_| nom::Err::Error(())),
+            || {
+                Ok(SlotMetadata {
+                    algorithm: ManagementAlgorithmId::PINPUK,
+                    policy: None,
+                    origin: None,
+                    public: None,
+                    default: None,
+                    retries: None,
+                })
+            },
+            |acc: Result<SlotMetadata>, tlv| match acc {
+                Ok(mut metadata) => match tlv.tag {
+                    1 => {
+                        metadata.algorithm = ManagementAlgorithmId::try_from(tlv.value[0])?;
+                        Ok(metadata)
+                    }
+                    2 => {
+                        fn policy_parser(
+                            i: &[u8],
+                        ) -> nom::IResult<&[u8], (PinPolicy, TouchPolicy)> {
+                            let (i, pin) = map_res(u8, PinPolicy::try_from)(i)?;
+                            let (i, touch) = map_res(u8, TouchPolicy::try_from)(i)?;
+                            let (i, _) = eof(i)?;
+
+                            Ok((i, (pin, touch)))
+                        }
+
+                        metadata.policy =
+                            Some(policy_parser(tlv.value).map_err(|_| Error::ParseError)?.1);
+                        Ok(metadata)
+                    }
+                    3 => {
+                        fn origin_parser(i: &[u8]) -> nom::IResult<&[u8], Origin> {
+                            let (i, origin) = map_res(u8, Origin::try_from)(i)?;
+                            let (i, _) = eof(i)?;
+
+                            Ok((i, origin))
+                        }
+
+                        metadata.origin =
+                            Some(origin_parser(tlv.value).map_err(|_| Error::ParseError)?.1);
+                        Ok(metadata)
+                    }
+                    4 => {
+                        match metadata.algorithm {
+                            ManagementAlgorithmId::Asymetric(alg) => {
+                                metadata.public = Some(read_public_key(alg, tlv.value, false)?);
+                            }
+                            _ => Err(Error::ParseError)?,
+                        }
+                        Ok(metadata)
+                    }
+                    5 => {
+                        fn default_parser(i: &[u8]) -> nom::IResult<&[u8], bool> {
+                            let (i, default) = u8(i)?;
+                            let (i, _) = eof(i)?;
+
+                            Ok((i, default == 1))
+                        }
+
+                        metadata.default =
+                            Some(default_parser(tlv.value).map_err(|_| Error::ParseError)?.1);
+                        Ok(metadata)
+                    }
+
+                    6 => {
+                        fn retries_parser(i: &[u8]) -> nom::IResult<&[u8], Retries> {
+                            let (i, retry_count) = u8(i)?;
+                            let (i, remaining_count) = u8(i)?;
+                            let (i, _) = eof(i)?;
+
+                            Ok((
+                                i,
+                                Retries {
+                                    retry_count,
+                                    remaining_count,
+                                },
+                            ))
+                        }
+
+                        metadata.retries =
+                            Some(retries_parser(tlv.value).map_err(|_| Error::ParseError)?.1);
+                        Ok(metadata)
+                    }
+
+                    _unsupported => {
+                        // New unsupported tags
+                        // https://docs.yubico.com/yesdk/users-manual/application-piv/apdu/metadata.html
+                        Ok(metadata)
+                    }
+                },
+                err => err,
+            },
+        )(buf.as_ref());
+
+        match out {
+            Ok((_, res)) => res,
+            _ => Err(Error::ParseError),
+        }
+    }
+}
+
+/// The number of retries used and remaining.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Retries {
+    /// TODO
+    pub retry_count: u8,
+    /// Remaining attempts
+    pub remaining_count: u8,
+}
+
+/// Origin of a slot
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum Origin {
+    /// The key has been imported
+    Imported,
+    /// The key has been generated on the YubiKey
+    Generated,
+}
+
+impl TryFrom<u8> for Origin {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self> {
+        match value {
+            1 => Ok(Origin::Generated),
+            2 => Ok(Origin::Imported),
+            _ => Err(Error::GenericError),
+        }
+    }
+}
+
+fn read_public_key(
+    algorithm: AlgorithmId,
+    input: &[u8],
+    skip_asn1_tag: bool,
+) -> Result<PublicKeyInfo> {
+    // TODO(str4d): Response is wrapped in an ASN.1 TLV:
+    //
+    //    0x7f 0x49 -> Application | Constructed | 0x49
+    match algorithm {
+        AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => {
+            // It appears that the inner application-specific value returned by the
+            // YubiKey is constructed such that RSA pubkeys can be parsed in two ways:
+            //
+            // - Use a full ASN.1 parser on the entire datastructure:
+            //
+            //     RSA 1024:
+            //     [127, 73, 129, 136, 129, 129, 128, [ 128 octets ], 130,  3, 1, 0, 1]
+            //     | tag   | len:136 |0x81| len:128 |    modulus    |0x82|len3|  exp  |
+            //
+            //     RSA 2048:
+            //     [127, 73, 130, 1, 9, 129, 130, 1, 0, [ 256 octets ], 130,  3, 1, 0, 1]
+            //     | tag   | len:265  |0x81| len:256  |    modulus    |0x82|len3|  exp  |
+            //
+            // - Skip the first 5 bytes and use crate::serialize::get_length during TLV
+            //   parsing (which treats 128 as a single-byte definite length instead of an
+            //   indefinite length):
+            //
+            //     RSA 1024:
+            //     [127, 73, 129, 136, 129, 129, 128, [ 128 octets ], 130,  3, 1, 0, 1]
+            //     |                      |0x81|len128|   modulus   |0x82|len3|  exp  |
+            //
+            //     RSA 2048:
+            //     [127, 73, 130, 1, 9, 129, 130, 1, 0, [ 256 octets ], 130,  3, 1, 0, 1]
+            //     |                  |0x81| len:256  |    modulus    |0x82|len3|  exp  |
+            //
+            // Because of the above, treat this for now as a 2-byte ASN.1 tag with a
+            // 3-byte length.
+            let data = if skip_asn1_tag { &input[5..] } else { input };
+
+            let (data, modulus_tlv) = Tlv::parse(data)?;
+            if modulus_tlv.tag != TAG_RSA_MODULUS {
+                error!("Failed to parse public key structure (modulus)");
+                return Err(Error::ParseError);
+            }
+            let modulus = modulus_tlv.value.to_vec();
+
+            let (_, exp_tlv) = Tlv::parse(data)?;
+            if exp_tlv.tag != TAG_RSA_EXP {
+                error!("failed to parse public key structure (public exponent)");
+                return Err(Error::ParseError);
+            }
+            let exp = exp_tlv.value.to_vec();
+
+            Ok(PublicKeyInfo::Rsa {
+                algorithm,
+                pubkey: RsaPublicKey::new(
+                    BigUint::from_bytes_be(&modulus),
+                    BigUint::from_bytes_be(&exp),
+                )
+                .map_err(|_| Error::InvalidObject)?,
+            })
+        }
+        AlgorithmId::EccP256 | AlgorithmId::EccP384 => {
+            // 2-byte ASN.1 tag, 1-byte length (because all supported EC pubkey lengths
+            // are shorter than 128 bytes, fitting into a definite short ASN.1 length).
+            let data = if skip_asn1_tag { &input[3..] } else { input };
+
+            let len = if let AlgorithmId::EccP256 = algorithm {
+                CB_ECC_POINTP256
+            } else {
+                CB_ECC_POINTP384
+            };
+
+            let (_, tlv) = Tlv::parse(data)?;
+
+            if tlv.tag != TAG_ECC_POINT {
+                error!("failed to parse public key structure");
+                return Err(Error::ParseError);
+            }
+
+            // the curve point should always be determined by the curve
+            if tlv.value.len() != len {
+                error!("unexpected length");
+                return Err(Error::AlgorithmError);
+            }
+
+            let point = tlv.value.to_vec();
+
+            match algorithm {
+                AlgorithmId::EccP256 => {
+                    EcPublicKey::<NistP256>::from_bytes(point).map(PublicKeyInfo::EcP256)
+                }
+                AlgorithmId::EccP384 => {
+                    EcPublicKey::<NistP384>::from_bytes(point).map(PublicKeyInfo::EcP384)
+                }
+                _ => return Err(Error::AlgorithmError),
+            }
+            .map_err(|_| Error::InvalidObject)
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Algorithms as reported by the metadata command.
+pub enum ManagementAlgorithmId {
+    /// Used on PIN and PUK slots.
+    PINPUK,
+    /// Used on the key management slot.
+    ThreeDES,
+    /// Used on all other slots.
+    Asymetric(AlgorithmId),
+}
+
+impl TryFrom<u8> for ManagementAlgorithmId {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self> {
+        match value {
+            0xff => Ok(ManagementAlgorithmId::PINPUK),
+            0x03 => Ok(ManagementAlgorithmId::ThreeDES),
+            oth => AlgorithmId::try_from(oth).map(ManagementAlgorithmId::Asymetric),
+        }
+    }
+}
+
+impl From<ManagementAlgorithmId> for u8 {
+    fn from(id: ManagementAlgorithmId) -> u8 {
+        match id {
+            ManagementAlgorithmId::PINPUK => 0xff,
+            ManagementAlgorithmId::ThreeDES => 0x03,
+            ManagementAlgorithmId::Asymetric(oth) => oth.into(),
+        }
+    }
 }

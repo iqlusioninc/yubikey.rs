@@ -1,6 +1,6 @@
 //! Enums representing key policies.
 
-use crate::{serialization::Tlv, Result};
+use crate::{serialization::Tlv, Error, Result};
 
 /// Specifies how often the PIN needs to be entered for access to the credential in a
 /// given slot.
@@ -31,6 +31,20 @@ impl From<PinPolicy> for u8 {
             PinPolicy::Never => 1,
             PinPolicy::Once => 2,
             PinPolicy::Always => 3,
+        }
+    }
+}
+
+impl TryFrom<u8> for PinPolicy {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self> {
+        match value {
+            0 => Ok(PinPolicy::Default),
+            1 => Ok(PinPolicy::Never),
+            2 => Ok(PinPolicy::Once),
+            3 => Ok(PinPolicy::Always),
+            _ => Err(Error::GenericError),
         }
     }
 }
@@ -87,6 +101,20 @@ impl TouchPolicy {
         match self {
             TouchPolicy::Default => Ok(0),
             _ => Tlv::write(buf, 0xab, &[self.into()]),
+        }
+    }
+}
+
+impl TryFrom<u8> for TouchPolicy {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self> {
+        match value {
+            0 => Ok(TouchPolicy::Default),
+            1 => Ok(TouchPolicy::Never),
+            2 => Ok(TouchPolicy::Always),
+            3 => Ok(TouchPolicy::Cached),
+            _ => Err(Error::GenericError),
         }
     }
 }
