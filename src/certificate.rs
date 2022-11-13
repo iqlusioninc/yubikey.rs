@@ -47,7 +47,10 @@ use p256::NistP256;
 use p384::NistP384;
 use rsa::{PublicKeyParts, RsaPublicKey};
 use sha2::{Digest, Sha256};
-use std::{fmt, Display, ops::DerefMut};
+use std::{
+    fmt::{self, Display},
+    ops::DerefMut
+};
 use x509::{der::Oid, RelativeDistinguishedName};
 use x509_parser::{parse_x509_certificate, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
@@ -91,7 +94,7 @@ impl TryFrom<&[u8]> for Serial {
 }
 
 impl Display for Serial {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.as_x509_hex())
     }
 }
