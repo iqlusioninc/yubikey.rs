@@ -9,7 +9,6 @@ use rand_core::{OsRng, RngCore};
 use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
 use std::{env, str::FromStr, sync::Mutex};
-use x509::RelativeDistinguishedName;
 use x509::{write::certificate, RelativeDistinguishedName};
 use yubikey::{
     certificate::{self, Certificate, PublicKeyInfo, Serial},
