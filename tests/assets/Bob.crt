@@ -1,0 +1,85 @@
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            d4:29:8f:df:8a:af:7b:c0:d7:bf:19:9d:90:d5:ef:ca
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: CN=Ferdinand Linnenberg CA
+        Validity
+            Not Before: Feb 10 12:25:37 2022 GMT
+            Not After : May 15 12:25:37 2024 GMT
+        Subject: CN=Bob
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:d5:27:9b:99:1b:3a:36:64:36:c8:e5:78:64:b6:
+                    9d:70:9d:29:6c:0e:85:91:4b:78:3b:dc:16:c3:09:
+                    8c:d3:74:20:8c:6f:ed:c3:90:c9:1b:4d:80:d5:46:
+                    da:52:7f:d2:2f:bc:b2:f7:40:8d:ad:dd:24:b9:5c:
+                    dc:a2:21:2f:48:ec:06:93:8b:89:f0:cd:63:ff:a1:
+                    fd:ce:36:d5:07:7a:1e:0e:cf:68:a8:c1:b3:7f:62:
+                    84:b7:e1:cf:25:7b:3f:a8:3c:ac:07:1a:fd:c2:e1:
+                    e0:9e:26:24:c1:0d:6d:9d:c6:57:6a:b4:39:28:3d:
+                    88:3e:c9:6a:89:90:72:4a:7b:75:c5:5e:1b:5e:5c:
+                    32:54:a3:ff:eb:01:68:7f:89:b4:4c:01:3f:08:8e:
+                    6c:61:49:60:26:0b:26:58:81:d7:1a:57:ee:52:5c:
+                    05:47:de:da:eb:b5:92:9d:5b:ce:26:18:44:59:3e:
+                    27:d0:61:86:e2:f4:c6:d9:c7:2b:1f:cb:ea:78:f0:
+                    a1:a9:57:d7:98:4c:c1:2f:ae:6a:38:b4:34:53:2e:
+                    5a:9e:f8:58:c7:51:e7:fd:b8:27:cd:87:72:26:c1:
+                    7d:14:c7:cd:fb:f2:04:8a:c4:8f:61:cf:a8:78:bd:
+                    21:be:28:cb:e8:a8:65:29:28:82:46:2f:18:e6:ff:
+                    6f:53
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            X509v3 Subject Key Identifier: 
+                B5:A5:F0:37:25:97:AD:BE:F1:43:52:45:4D:8B:A0:5E:E9:78:21:B8
+            X509v3 Authority Key Identifier: 
+                keyid:26:4E:EB:B0:A5:1B:08:A8:90:2A:85:04:73:84:B5:A5:2C:61:D6:91
+                DirName:/CN=Ferdinand Linnenberg CA
+                serial:8C:E0:40:D9:D8:60:E5:77
+
+            X509v3 Extended Key Usage: 
+                TLS Web Client Authentication
+            X509v3 Key Usage: 
+                Digital Signature
+    Signature Algorithm: sha256WithRSAEncryption
+         19:f3:eb:c1:95:e6:d5:a9:33:d7:2e:02:d8:3a:91:84:81:14:
+         93:fc:03:4d:b1:4b:9d:0b:9b:94:93:9f:1a:0d:87:31:a1:fa:
+         a6:c7:3a:6b:18:24:12:ab:28:fb:c8:e3:09:a2:5d:50:49:00:
+         d9:18:e6:4a:09:18:e0:1c:da:d3:19:96:3d:74:72:fe:e0:8f:
+         ee:59:54:66:2e:57:72:b8:91:55:06:13:e5:9e:89:a2:3a:13:
+         3b:45:30:d3:cd:15:0e:81:eb:4f:b0:6a:a4:6d:00:7d:5b:c0:
+         4a:7f:97:d0:27:27:31:ae:3e:72:f1:74:fe:86:8e:29:a9:42:
+         23:26:22:db:08:8b:df:e9:d3:83:8d:81:10:36:d7:33:68:5e:
+         cb:93:cb:1e:12:c8:cb:be:5e:5c:8e:58:b0:1d:06:5e:c9:98:
+         b7:f1:49:fe:c4:03:de:b4:2b:da:9d:2c:7d:98:37:1c:6c:a8:
+         95:21:6f:23:e3:2e:09:bc:6c:e5:ed:e2:50:d8:f7:da:45:39:
+         d8:34:8a:57:0c:4f:d0:0d:80:06:d6:34:63:72:27:d1:50:d1:
+         d2:21:2c:97:57:17:98:02:95:3a:96:ed:75:9f:cc:f3:b8:f1:
+         3a:85:f9:58:08:9b:a0:75:fd:9b:fd:31:dd:08:dc:14:3d:f4:
+         68:aa:d4:30
+-----BEGIN CERTIFICATE-----
+MIIDXzCCAkegAwIBAgIRANQpj9+Kr3vA178ZnZDV78owDQYJKoZIhvcNAQELBQAw
+IjEgMB4GA1UEAwwXRmVyZGluYW5kIExpbm5lbmJlcmcgQ0EwHhcNMjIwMjEwMTIy
+NTM3WhcNMjQwNTE1MTIyNTM3WjAOMQwwCgYDVQQDDANCb2IwggEiMA0GCSqGSIb3
+DQEBAQUAA4IBDwAwggEKAoIBAQDVJ5uZGzo2ZDbI5Xhktp1wnSlsDoWRS3g73BbD
+CYzTdCCMb+3DkMkbTYDVRtpSf9IvvLL3QI2t3SS5XNyiIS9I7AaTi4nwzWP/of3O
+NtUHeh4Oz2iowbN/YoS34c8lez+oPKwHGv3C4eCeJiTBDW2dxldqtDkoPYg+yWqJ
+kHJKe3XFXhteXDJUo//rAWh/ibRMAT8IjmxhSWAmCyZYgdcaV+5SXAVH3trrtZKd
+W84mGERZPifQYYbi9MbZxysfy+p48KGpV9eYTMEvrmo4tDRTLlqe+FjHUef9uCfN
+h3ImwX0Ux8378gSKxI9hz6h4vSG+KMvoqGUpKIJGLxjm/29TAgMBAAGjgaMwgaAw
+CQYDVR0TBAIwADAdBgNVHQ4EFgQUtaXwNyWXrb7xQ1JFTYugXul4IbgwUgYDVR0j
+BEswSYAUJk7rsKUbCKiQKoUEc4S1pSxh1pGhJqQkMCIxIDAeBgNVBAMMF0ZlcmRp
+bmFuZCBMaW5uZW5iZXJnIENBggkAjOBA2dhg5XcwEwYDVR0lBAwwCgYIKwYBBQUH
+AwIwCwYDVR0PBAQDAgeAMA0GCSqGSIb3DQEBCwUAA4IBAQAZ8+vBlebVqTPXLgLY
+OpGEgRST/ANNsUudC5uUk58aDYcxofqmxzprGCQSqyj7yOMJol1QSQDZGOZKCRjg
+HNrTGZY9dHL+4I/uWVRmLldyuJFVBhPlnomiOhM7RTDTzRUOgetPsGqkbQB9W8BK
+f5fQJycxrj5y8XT+ho4pqUIjJiLbCIvf6dODjYEQNtczaF7Lk8seEsjLvl5cjliw
+HQZeyZi38Un+xAPetCvanSx9mDccbKiVIW8j4y4JvGzl7eJQ2PfaRTnYNIpXDE/Q
+DYAG1jRjcifRUNHSISyXVxeYApU6lu11n8zzuPE6hflYCJugdf2b/THdCNwUPfRo
+qtQw
+-----END CERTIFICATE-----

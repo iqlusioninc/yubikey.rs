@@ -9,9 +9,9 @@ use rand_core::{OsRng, RngCore};
 use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
 use std::{env, str::FromStr, sync::Mutex};
-use x509::RelativeDistinguishedName;
+use x509::{write::certificate, RelativeDistinguishedName};
 use yubikey::{
-    certificate::{Certificate, PublicKeyInfo},
+    certificate::{self, Certificate, PublicKeyInfo},
     piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
     Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
 };
@@ -245,6 +245,59 @@ fn generate_self_signed_ec_cert() {
 
     use p256::ecdsa::signature::Verifier;
     assert!(vk.verify(msg, &sig).is_ok());
+}
+
+#[test]
+#[ignore]
+fn test_serial_string_conversions() {
+    //2^152+1
+    let serial: [u8; 20] = [
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x01,
+    ];
+
+    let s = certificate::Serial::from(serial);
+    assert_eq!(
+        s.as_x509_int(),
+        "5708990770823839524233143877797980545530986497"
+    );
+    assert_eq!(
+        s.as_x509_hex(),
+        "01:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:01"
+    );
+
+    let serial2: [u8; 20] = [
+        0xA1, 0xF3, 0x02, 0x30, 0x76, 0x01, 0x32, 0x48, 0x09, 0x9C, 0x10, 0xAA, 0x3F, 0xA0, 0x54,
+        0x0D, 0xC0, 0xB7, 0x65, 0x01,
+    ];
+
+    let s2: Serial = certificate::Serial::from(serial2);
+    assert_eq!(
+        s2.as_x509_int(),
+        "924566785900861696177829411010986812227211191553"
+    );
+    assert_eq!(
+        s2.as_x509_hex(),
+        "a1:f3:02:30:76:01:32:48:09:9c:10:aa:3f:a0:54:0d:c0:b7:65:01"
+    );
+
+    let serial3: [u8; 20] = [
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0x3F, 0xA0, 0x54,
+        0x0D, 0xC0, 0xB7, 0x65, 0x01,
+    ];
+
+    let s3: Serial = certificate::Serial::from(serial3);
+    assert_eq!(s3.as_x509_int(), "3140531249369331492097");
+    assert_eq!(s3.as_x509_hex(), "aa:3f:a0:54:0d:c0:b7:65:01");
+}
+
+#[test]
+#[ignore]
+fn test_parse_cert_from_der(){
+    let bob_der = std::fs::read("tests/assets/Bob.der").expect(".der file not found");
+    let cert = certificate::Certificate::from_bytes(bob_der).expect("Failed to parse valid certificate");
+    assert_eq!(cert.subject(), "CN=Bob");
+    assert_eq!(cert.issuer(), "CN=Ferdinand Linnenberg CA")
 }
 
 #[test]
