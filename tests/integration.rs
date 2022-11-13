@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 use std::{env, str::FromStr, sync::Mutex};
 use x509::{write::certificate, RelativeDistinguishedName};
 use yubikey::{
-    certificate::{self, Certificate, PublicKeyInfo, Serial},
+    certificate::{self, Certificate, PublicKeyInfo},
     piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
     Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
 };
@@ -256,7 +256,7 @@ fn test_serial_string_conversions() {
         0x00, 0x00, 0x00, 0x00, 0x01,
     ];
 
-    let s: Serial = Serial::from(serial);
+    let s = certificate::Serial::from(serial);
     assert_eq!(
         s.as_x509_int(),
         "5708990770823839524233143877797980545530986497"
@@ -271,7 +271,7 @@ fn test_serial_string_conversions() {
         0x0D, 0xC0, 0xB7, 0x65, 0x01,
     ];
 
-    let s2: Serial = Serial::from(serial2);
+    let s2: Serial = certificate::Serial::from(serial2);
     assert_eq!(
         s2.as_x509_int(),
         "924566785900861696177829411010986812227211191553"
@@ -286,7 +286,7 @@ fn test_serial_string_conversions() {
         0x0D, 0xC0, 0xB7, 0x65, 0x01,
     ];
 
-    let s3: Serial = Serial::from(serial3);
+    let s3: Serial = certificate::Serial::from(serial3);
     assert_eq!(s3.as_x509_int(), "3140531249369331492097");
     assert_eq!(s3.as_x509_hex(), "aa:3f:a0:54:0d:c0:b7:65:01");
 }
