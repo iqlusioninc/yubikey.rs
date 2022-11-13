@@ -48,6 +48,7 @@ use p384::NistP384;
 use rsa::{PublicKeyParts, RsaPublicKey};
 use sha2::{Digest, Sha256};
 use std::{fmt, ops::DerefMut};
+use std::fmt::Display;
 use x509::{der::Oid, RelativeDistinguishedName};
 use x509_parser::{parse_x509_certificate, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
@@ -93,6 +94,27 @@ impl TryFrom<&[u8]> for Serial {
 impl Serial {
     fn to_bytes(&self) -> Vec<u8> {
         self.0.to_bytes_be()
+    }
+    /// Returns itself formatted as x509 compatible hex string
+    pub fn as_x509_hex(&self) -> String {
+        let data = self.to_bytes();
+        let raw_hex_string = format!("{:02X?}", data);
+        raw_hex_string
+            .replace(", ", ":")
+            .replace("]", "")
+            .replace("[", "")
+            .to_lowercase()
+    }
+    /// Returns itself formatted as x509 compatible int string
+    pub fn as_x509_int(&self) -> String {
+        let Serial(buint) = self;
+        format!("{}", buint)
+    }
+}
+
+impl Display for Serial {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.as_x509_hex())
     }
 }
 
@@ -512,7 +534,7 @@ impl Certificate {
 
     /// Returns the Issuer field of the certificate.
     pub fn issuer(&self) -> &str {
-        &self.subject
+        &self.issuer
     }
 
     /// Returns the SubjectName field of the certificate.
