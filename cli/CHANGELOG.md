@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.7.0 (2022-11-14)
+### Changed
+- Bump `clap` to v4.0 ([#438])
+- Bump `x509-parser` to v0.14 ([#441])
+- Switch from `lazy_static` to `once_cell` ([#442])
+- Switch from `subtle-encoding` to `base16ct` ([#443])
+- Bump `yubikey` dependency to v0.7 ([#444])
+
+[#438]: https://github.com/iqlusioninc/yubikey.rs/pull/438
+[#441]: https://github.com/iqlusioninc/yubikey.rs/pull/441
+[#442]: https://github.com/iqlusioninc/yubikey.rs/pull/442
+[#443]: https://github.com/iqlusioninc/yubikey.rs/pull/443
+[#444]: https://github.com/iqlusioninc/yubikey.rs/pull/444
+
 ## 0.6.0 (2022-08-10)
 ### Changed
 - 2021 edition upgrade; MSRV 1.57 ([#343])
