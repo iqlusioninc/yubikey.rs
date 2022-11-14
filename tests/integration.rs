@@ -3,8 +3,8 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
 
-use lazy_static::lazy_static;
 use log::trace;
+use once_cell::sync::Lazy;
 use rand_core::{OsRng, RngCore};
 use rsa::pkcs1v15;
 use sha2::{Digest, Sha256};
@@ -18,13 +18,7 @@ use yubikey::{
     Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
 };
 
-lazy_static! {
-    /// Provide thread-safe access to a YubiKey
-    static ref YUBIKEY: Mutex<YubiKey> = init_yubikey();
-}
-
-/// One-time test initialization and setup
-fn init_yubikey() -> Mutex<YubiKey> {
+static YUBIKEY: Lazy<Mutex<YubiKey>> = Lazy::new(|| {
     // Only show logs if `RUST_LOG` is set
     if env::var("RUST_LOG").is_ok() {
         env_logger::builder().format_timestamp(None).init();
@@ -36,11 +30,12 @@ fn init_yubikey() -> Mutex<YubiKey> {
     } else {
         YubiKey::open().unwrap()
     };
+
     trace!("serial: {}", yubikey.serial());
     trace!("version: {}", yubikey.version());
 
     Mutex::new(yubikey)
-}
+});
 
 //
 // CCCID support
