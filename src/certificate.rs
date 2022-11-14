@@ -47,8 +47,8 @@ use p256::NistP256;
 use p384::NistP384;
 use rsa::{PublicKeyParts, RsaPublicKey};
 use sha2::{Digest, Sha256};
-use std::{fmt, ops::DerefMut};
 use std::fmt::Display;
+use std::{fmt, ops::DerefMut};
 use x509::{der::Oid, RelativeDistinguishedName};
 use x509_parser::{parse_x509_certificate, x509::SubjectPublicKeyInfo};
 use zeroize::Zeroizing;
@@ -101,8 +101,7 @@ impl Serial {
         let raw_hex_string = format!("{:02X?}", data);
         raw_hex_string
             .replace(", ", ":")
-            .replace("]", "")
-            .replace("[", "")
+            .replace([']', '['], "")
             .to_lowercase()
     }
     /// Returns itself formatted as x509 compatible int string

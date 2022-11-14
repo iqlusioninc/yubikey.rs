@@ -10,7 +10,12 @@ use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
 use sha2::{Digest, Sha256};
 use std::{env, str::FromStr, sync::Mutex};
 use x509::RelativeDistinguishedName;
-use yubikey::{certificate::{Certificate, PublicKeyInfo}, piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId}, Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey, certificate};
+use yubikey::{
+    certificate,
+    certificate::{Certificate, PublicKeyInfo},
+    piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
+    Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
+};
 
 lazy_static! {
     /// Provide thread-safe access to a YubiKey
@@ -364,9 +369,21 @@ fn test_serial_string_conversions() {
 
 #[test]
 #[ignore]
-fn test_parse_cert_from_der(){
+fn test_parse_cert_from_der() {
     let bob_der = std::fs::read("tests/assets/Bob.der").expect(".der file not found");
-    let cert = certificate::Certificate::from_bytes(bob_der).expect("Failed to parse valid certificate");
-    assert_eq!(cert.subject(), "CN=Bob", "Subject is {} should be CN=Bob", cert.subject());
-    assert_eq!(cert.issuer(), "CN=Ferdinand Linnenberg CA", "Issuer is {} should be {}", cert.issuer(), "CN=Ferdinand Linnenberg CA");
+    let cert =
+        certificate::Certificate::from_bytes(bob_der).expect("Failed to parse valid certificate");
+    assert_eq!(
+        cert.subject(),
+        "CN=Bob",
+        "Subject is {} should be CN=Bob",
+        cert.subject()
+    );
+    assert_eq!(
+        cert.issuer(),
+        "CN=Ferdinand Linnenberg CA",
+        "Issuer is {} should be {}",
+        cert.issuer(),
+        "CN=Ferdinand Linnenberg CA"
+    );
 }
