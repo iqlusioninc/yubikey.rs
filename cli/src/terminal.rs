@@ -1,7 +1,7 @@
 //! Status messages
 
-use lazy_static::lazy_static;
 use log::debug;
+use once_cell::sync::Lazy;
 use sha2::{Digest, Sha256};
 use std::{
     io::{self, Write},
@@ -59,16 +59,14 @@ macro_rules! status_err {
     };
 }
 
-lazy_static! {
-    /// Color configuration
-    static ref COLOR_CHOICE: Mutex<Option<ColorChoice>> = Mutex::new(None);
+/// Color configuration
+static COLOR_CHOICE: Lazy<Mutex<Option<ColorChoice>>> = Lazy::new(|| Mutex::new(None));
 
-    /// Standard output
-    pub static ref STDOUT: StandardStream = StandardStream::stdout(get_color_choice());
+/// Standard output
+pub static STDOUT: Lazy<StandardStream> = Lazy::new(|| StandardStream::stdout(get_color_choice()));
 
-    /// Standard error
-    pub static ref STDERR: StandardStream = StandardStream::stderr(get_color_choice());
-}
+/// Standard error
+pub static STDERR: Lazy<StandardStream> = Lazy::new(|| StandardStream::stderr(get_color_choice()));
 
 /// Obtain the color configuration.
 ///
