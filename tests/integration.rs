@@ -6,8 +6,9 @@
 use lazy_static::lazy_static;
 use log::trace;
 use rand_core::{OsRng, RngCore};
-use rsa::{hash::Hash::SHA2_256, PaddingScheme, PublicKey};
+use rsa::pkcs1v15;
 use sha2::{Digest, Sha256};
+use signature::{hazmat::PrehashVerifier, Signature as _};
 use std::{env, str::FromStr, sync::Mutex};
 use x509::RelativeDistinguishedName;
 use yubikey::{
@@ -200,26 +201,17 @@ fn generate_self_signed_rsa_cert() {
     //
 
     let pubkey = match cert.subject_pki() {
-        PublicKeyInfo::Rsa { pubkey, .. } => pubkey,
+        PublicKeyInfo::Rsa { pubkey, .. } => pkcs1v15::VerifyingKey::<Sha256>::from(pubkey.clone()),
         _ => unreachable!(),
     };
 
     let data = cert.as_ref();
     let tbs_cert_len = u16::from_be_bytes(data[6..8].try_into().unwrap()) as usize;
     let msg = &data[4..8 + tbs_cert_len];
-    let sig = &data[data.len() - 128..];
-
+    let sig = pkcs1v15::Signature::from_bytes(&data[data.len() - 128..]).unwrap();
     let hash = Sha256::digest(msg);
 
-    assert!(pubkey
-        .verify(
-            PaddingScheme::PKCS1v15Sign {
-                hash: Some(SHA2_256)
-            },
-            &hash,
-            sig
-        )
-        .is_ok());
+    assert!(pubkey.verify_prehash(&hash, &sig).is_ok());
 }
 
 #[test]

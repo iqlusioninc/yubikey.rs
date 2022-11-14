@@ -36,10 +36,10 @@ p256 = "0.11"
 p384 = "0.11"
 pcsc = "2"
 rand_core = { version = "0.6", features = ["std"] }
-rsa = "0.6"
+rsa = "0.7"
 secrecy = "0.8"
-sha1 = "0.10"
-sha2 = "0.10"
+sha1 = { version = "0.10", features = ["oid"] }
+sha2 = { version = "0.10", features = ["oid"] }
 subtle = "2"
 subtle-encoding = "0.5"
 uuid = { version = "1.2", features = ["v4"] }
@@ -50,6 +50,8 @@ zeroize = "1"
 [dev-dependencies]
 env_logger = "0.9"
 lazy_static = "1"
+rsa = { version = "0.7.1", features = ["hazmat"] }
+signature = { version = "1.6.4", features = ["hazmat-preview"] }
 
 [features]
 untested = []
