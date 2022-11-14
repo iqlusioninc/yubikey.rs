@@ -207,12 +207,20 @@ pub fn print_cert_info(
                 print_cert_attr(
                     stream,
                     "Not Before",
-                    cert.tbs_certificate.validity.not_before.to_rfc2822(),
+                    cert.tbs_certificate
+                        .validity
+                        .not_before
+                        .to_rfc2822()
+                        .unwrap(),
                 )?;
                 print_cert_attr(
                     stream,
                     "Not After",
-                    cert.tbs_certificate.validity.not_after.to_rfc2822(),
+                    cert.tbs_certificate
+                        .validity
+                        .not_after
+                        .to_rfc2822()
+                        .unwrap(),
                 )?;
             }
             _ => {
