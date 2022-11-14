@@ -1,6 +1,6 @@
 [package]
 name = "yubikey"
-version = "0.6.0"
+version = "0.7.0"
 description = """
 Pure Rust cross-platform host-side driver for YubiKey devices from Yubico with
 support for hardware-backed public-key decryption and digital signatures using
@@ -11,10 +11,10 @@ authors = ["Tony Arcieri <tony@iqlusion.io>", "Yubico AB"]
 license = "BSD-2-Clause"
 repository = "https://github.com/iqlusioninc/yubikey.rs"
 readme = "README.md"
-categories = ["api-bindings", "cryptography", "hardware-support"]
+categories = ["api-bindings", "authentication", "cryptography", "hardware-support"]
 keywords = ["ecdsa", "encryption", "rsa", "piv", "signature"]
 edition = "2021"
-rust-version = "1.57"
+rust-version = "1.60"
 
 [workspace]
 members = [".", "cli"]

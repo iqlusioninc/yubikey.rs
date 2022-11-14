@@ -4,15 +4,18 @@
 
 [![crate][crate-image]][crate-link]
 [![Docs][docs-image]][docs-link]
+[![Build Status][build-image]][build-link]
+[![Safety Dance][safety-image]][safety-link]
+[![Dependency Status][deps-image]][deps-link]
 [![2-Clause BSD Licensed][license-image]][license-link]
 ![MSRV][msrv-image]
-[![Safety Dance][safety-image]][safety-link]
-[![Build Status][build-image]][build-link]
-[![dependency status][deps-image]][deps-link]
 
 Pure Rust cross-platform host-side driver for [YubiKey] devices from [Yubico]
 with support for public-key encryption and digital signatures using the
 [Personal Identity Verification (PIV)][PIV] application.
+
+Uses the Personal Computer/Smart Card ([PC/SC]) interface with cross-platform
+access provided by the [`pcsc` crate].
 
 [Documentation][docs-link]
 
@@ -34,9 +37,36 @@ Note that while this project started as a fork of a [Yubico] project,
 this fork is **NOT** an official Yubico project and is in no way supported or
 endorsed by Yubico.
 
+## Features
+
+### Personal Identity Verification (PIV)
+
+[PIV] is a [NIST] standard for both *signing* and *encryption*
+using SmartCards and SmartCard-based hardware tokens like YubiKeys.
+
+PIV-related functionality can be found in the [`piv`] module.
+
+This library natively implements the protocol used to manage and
+utilize PIV encryption and signing keys which can be generated, imported,
+and stored on YubiKey devices.
+
+See [Yubico's guide to PIV-enabled YubiKeys][yk-guide] for more information
+on which devices support PIV and the available functionality.
+
+### Supported Algorithms
+- **Authentication**: `3DES`
+- **Encryption**:
+  - RSA: `RSA1024`, `RSA2048`
+  - ECC: `ECCP256`, `ECCP384` (NIST curves: P-256, P-384)
+- **Signatures**:
+  - RSASSA-PKCS#1v1.5: `RSA1024`, `RSA2048`
+  - ECDSA: `ECCP256`, `ECCP384` (NIST curves: P-256, P-384)
+
+NOTE: RSASSA-PSS signatures and RSA-OAEP encryption may be supportable (TBD)
+
 ## Minimum Supported Rust Version
 
-Rust **1.57** or newer.
+Rust **1.60** or newer.
 
 ## Supported YubiKeys
 
@@ -59,6 +89,17 @@ an experimental stage and may still contain high-severity issues.
 
 USE AT YOUR OWN RISK!
 
+## Status
+
+Functionality which has been successfully tested is available by default.
+
+Any functionality which is gated on the `untested` feature has not been
+properly tested and is not known to function correctly.
+
+Please see the [`untested` functionality tracking issue] for current status.
+We would appreciate any help testing this functionality and removing the
+`untested` gating as well as writing more automated tests.
+
 ## Testing
 
 To run the full test suite, you'll need a connected YubiKey NEO/4/5 device in
@@ -68,7 +109,7 @@ Tests which run live against a YubiKey device are marked as `#[ignore]` by
 default in order to pass when running in a CI environment. To run these
 tests locally, invoke the following command:
 
-```
+```shell
 cargo test -- --ignored
 ```
 
@@ -77,14 +118,14 @@ information about what is happening. If you'd like to print this logging
 information while running the tests, set the `RUST_LOG` environment variable
 to a relevant loglevel (e.g. `error`, `warn`, `info`, `debug`, `trace`):
 
-```
+```shell
 RUST_LOG=info cargo test -- --ignored
 ```
 
 To trace every message sent to/from the card i.e. the raw
 Application Protocol Data Unit (APDU) messages, use the `trace` log level:
 
-```
+```text
 running 1 test
 [INFO  yubikey::yubikey] trying to connect to reader 'Yubico YubiKey OTP+FIDO+CCID'
 [INFO  yubikey::yubikey] connected to 'Yubico YubiKey OTP+FIDO+CCID' successfully
@@ -109,6 +150,14 @@ This library is a Rust translation of the [yubico-piv-tool] utility by
 Yubico, which was originally written in C. It was mechanically translated
 from C into Rust using [Corrode], and then subsequently heavily
 refactored into safer, more idiomatic Rust.
+
+For more information on [yubico-piv-tool] and background information on how
+the YubiKey implementation of PIV works in general, see the
+[Yubico PIV Tool Command Line Guide][piv-tool-guide].
+
+## ⚠️ Security Warning
+
+No security audits of this crate have ever been performed.
 
 ## Code of Conduct
 
@@ -159,13 +208,13 @@ or conditions.
 
 [//]: # (badges)
 
-[crate-image]: https://img.shields.io/crates/v/yubikey.svg
+[crate-image]:  https://buildstats.info/crate/yubikey
 [crate-link]: https://crates.io/crates/yubikey
 [docs-image]: https://docs.rs/yubikey/badge.svg
 [docs-link]: https://docs.rs/yubikey/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-link]: https://github.com/iqlusioninc/yubikey.rs/blob/main/COPYING
-[msrv-image]: https://img.shields.io/badge/rustc-1.57+-blue.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.60+-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
 [build-image]: https://github.com/iqlusioninc/yubikey.rs/workflows/CI/badge.svg?branch=main&event=push
@@ -176,9 +225,12 @@ or conditions.
 [//]: # (general links)
 
 [YubiKey]: https://www.yubico.com/products/yubikey-hardware/
-[PIV]: https://piv.idmanagement.gov/
-[yk-guide]: https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html
 [Yubico]: https://www.yubico.com/
+[PIV]: https://piv.idmanagement.gov/
+[NIST]: https://www.nist.gov/
+[PC/SC]: https://en.wikipedia.org/wiki/PC/SC
+[`pcsc` crate]: https://github.com/bluetech/pcsc-rust
+[yk-guide]: https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html
 [YubiKey NEO]: https://support.yubico.com/support/solutions/articles/15000006494-yubikey-neo
 [YubiKey 4]: https://support.yubico.com/support/solutions/articles/15000006486-yubikey-4
 [YubiKey 5]: https://www.yubico.com/products/yubikey-5-overview/
@@ -187,6 +239,7 @@ or conditions.
 [cc-web]: https://contributor-covenant.org/
 [cc-md]: https://github.com/iqlusioninc/yubikey.rs/blob/main/CODE_OF_CONDUCT.md
 [BSDL]: https://opensource.org/licenses/BSD-2-Clause
+[`untested` functionality tracking issue]: https://github.com/iqlusioninc/yubikey.rs/issues/280
 
 [//]: # (github issues)
 
