@@ -8,7 +8,6 @@ use std::{
     str,
     sync::Mutex,
 };
-use subtle_encoding::hex;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, StandardStreamLock, WriteColor};
 use x509_parser::parse_x509_certificate;
 use yubikey::{certificate::Certificate, piv::*, YubiKey};
@@ -200,7 +199,7 @@ pub fn print_cert_info(
                 print_cert_attr(
                     stream,
                     "Fingerprint",
-                    str::from_utf8(hex::encode(fingerprint).as_slice()).unwrap(),
+                    &hex::upper::encode_string(&fingerprint),
                 )?;
                 print_cert_attr(
                     stream,

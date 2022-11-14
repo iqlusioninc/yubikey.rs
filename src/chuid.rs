@@ -31,11 +31,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{Error, Result, YubiKey};
-use std::{
-    fmt::{self, Debug, Display},
-    str,
-};
-use subtle_encoding::hex;
+use std::fmt::{self, Debug, Display};
 use uuid::Uuid;
 
 /// FASC-N offset
@@ -130,8 +126,14 @@ impl ChuId {
     }
 }
 
+impl AsRef<[u8]> for ChuId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl Display for ChuId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(str::from_utf8(&hex::encode(&self.0[..])).unwrap())
+        f.write_str(&hex::upper::encode_string(self.as_ref()))
     }
 }

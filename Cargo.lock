@@ -1004,15 +1004,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
-name = "subtle-encoding"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dcb1ed7b8330c5eed5441052651dd7a12c75e2ed88f2ec024ae1fa3a5e59945"
-dependencies = [
- "zeroize",
-]
-
-[[package]]
 name = "syn"
 version = "1.0.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1270,6 +1261,7 @@ dependencies = [
 name = "yubikey"
 version = "0.6.0"
 dependencies = [
+ "base16ct",
  "chrono",
  "cookie-factory",
  "der-parser",
@@ -1294,7 +1286,6 @@ dependencies = [
  "sha2",
  "signature",
  "subtle",
- "subtle-encoding",
  "uuid",
  "x509",
  "x509-parser",
@@ -1305,12 +1296,12 @@ dependencies = [
 name = "yubikey-cli"
 version = "0.6.0"
 dependencies = [
+ "base16ct",
  "clap",
  "env_logger",
  "log",
  "once_cell",
  "sha2",
- "subtle-encoding",
  "termcolor",
  "x509-parser",
  "yubikey",

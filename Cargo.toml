@@ -25,6 +25,7 @@ cookie-factory = "0.3"
 der-parser = "8"
 des = "0.8"
 elliptic-curve = "0.12"
+hex = { package = "base16ct", version = "0.1", features = ["alloc"] }
 hmac = "0.12"
 log = "0.4"
 nom = "7"
@@ -41,7 +42,6 @@ secrecy = "0.8"
 sha1 = { version = "0.10", features = ["oid"] }
 sha2 = { version = "0.10", features = ["oid"] }
 subtle = "2"
-subtle-encoding = "0.5"
 uuid = { version = "1.2", features = ["v4"] }
 x509 = "0.2"
 x509-parser = "0.14"
