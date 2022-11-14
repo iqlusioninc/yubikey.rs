@@ -32,11 +32,7 @@
 
 use crate::{Error, Result, YubiKey};
 use rand_core::{OsRng, RngCore};
-use std::{
-    fmt::{self, Debug, Display},
-    str,
-};
-use subtle_encoding::hex;
+use std::fmt::{self, Debug, Display};
 
 /// CCCID offset
 const CCC_ID_OFFS: usize = 9;
@@ -114,8 +110,14 @@ impl CccId {
     }
 }
 
+impl AsRef<[u8]> for CccId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl Display for CccId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(str::from_utf8(&hex::encode(&self.0[..])).unwrap())
+        f.write_str(&hex::upper::encode_string(self.as_ref()))
     }
 }
