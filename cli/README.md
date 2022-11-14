@@ -18,7 +18,7 @@ utility with general-purpose public-key encryption and signing support.
 
 ## Minimum Supported Rust Version
 
-Rust **1.57** or newer.
+Rust **1.60** or newer.
 
 ## Supported YubiKeys
 
@@ -84,7 +84,7 @@ or conditions.
 [docs-image]: https://docs.rs/yubikey-cli/badge.svg
 [docs-link]: https://docs.rs/yubikey-cli/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
-[rustc-image]: https://img.shields.io/badge/rustc-1.57+-blue.svg
+[rustc-image]: https://img.shields.io/badge/rustc-1.60+-blue.svg
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
