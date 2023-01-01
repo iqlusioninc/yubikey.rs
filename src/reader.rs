@@ -4,6 +4,7 @@ use crate::{Result, YubiKey};
 use std::{
     borrow::Cow,
     ffi::CStr,
+    fmt,
     sync::{Arc, Mutex},
 };
 
@@ -17,6 +18,12 @@ pub struct Context {
 
     /// Buffer for storing reader names
     reader_names: Vec<u8>,
+}
+
+impl fmt::Debug for Context {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Context").finish_non_exhaustive()
+    }
 }
 
 impl Context {

@@ -156,6 +156,16 @@ pub struct YubiKey {
     pub(crate) serial: Serial,
 }
 
+impl fmt::Debug for YubiKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("YubiKey")
+            .field("name", &self.name)
+            .field("version", &self.version)
+            .field("serial", &self.serial)
+            .finish_non_exhaustive()
+    }
+}
+
 impl YubiKey {
     /// Open a connection to a YubiKey.
     ///
