@@ -42,7 +42,7 @@ use crate::{
     transaction::Transaction,
 };
 use log::{error, info};
-use pcsc::Card;
+use pcsc::{Card, Disposition};
 use rand_core::{OsRng, RngCore};
 use std::{
     fmt::{self, Display},
@@ -246,6 +246,38 @@ impl YubiKey {
         }
 
         Ok(())
+    }
+
+    /// Disconnect from the YubiKey.
+    ///
+    /// In case of error, ownership of the YubiKey is returned to the caller.
+    ///
+    /// # Note
+    ///
+    /// `YubiKey` implements `Drop` which automatically disconnects the card using
+    /// `Disposition::ResetCard`; you only need to call this function if you want to
+    /// handle errors or use a different disposition method.
+    pub fn disconnect(self, disposition: Disposition) -> core::result::Result<(), (Self, Error)> {
+        let Self {
+            card,
+            name,
+            pin,
+            version,
+            serial,
+        } = self;
+
+        card.disconnect(disposition).map_err(|(card, e)| {
+            (
+                Self {
+                    card,
+                    name,
+                    pin,
+                    version,
+                    serial,
+                },
+                e.into(),
+            )
+        })
     }
 
     /// Begin a transaction.
