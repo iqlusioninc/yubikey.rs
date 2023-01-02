@@ -770,9 +770,9 @@ dependencies = [
 
 [[package]]
 name = "pcsc"
-version = "2.7.0"
+version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e29e4de78a433aeecd06fb5bd55a0f9fde11dc85a14c22d482972c7edc4fdc4"
+checksum = "37cab0be9d04e808a8d8059fa54befcd71dc8b168f9f0c04bdb7e59832abbab4"
 dependencies = [
  "bitflags",
  "pcsc-sys",
