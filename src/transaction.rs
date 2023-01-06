@@ -105,61 +105,60 @@ impl<'tx> Transaction<'tx> {
 
     /// Get YubiKey device serial number.
     pub fn get_serial(&self, version: Version) -> Result<Serial> {
-        let response = if version.major < 5 {
-            // YK4 requires switching to the yk applet to retrieve the serial
-            let sw = Apdu::new(Ins::SelectApplication)
-                .p1(0x04)
-                .data(YK_AID)
-                .transmit(self, 0xFF)?
-                .status_words();
+        match version.major {
+            4 => {
+                // YK4 requires switching to the yk applet to retrieve the serial
+                let sw = Apdu::new(Ins::SelectApplication)
+                    .p1(0x04)
+                    .data(YK_AID)
+                    .transmit(self, 0xFF)?
+                    .status_words();
 
-            if !sw.is_success() {
-                error!("failed selecting yk application: {:04x}", sw.code());
-                return Err(Error::GenericError);
+                if !sw.is_success() {
+                    error!("failed selecting yk application: {:04x}", sw.code());
+                    return Err(Error::GenericError);
+                }
+
+                let response = Apdu::new(0x01).p1(0x10).transmit(self, 0xFF)?;
+
+                if !response.is_success() {
+                    error!(
+                        "failed retrieving serial number: {:04x}",
+                        response.status_words().code()
+                    );
+                    return Err(Error::GenericError);
+                }
+
+                // reselect the PIV applet
+                let sw = Apdu::new(Ins::SelectApplication)
+                    .p1(0x04)
+                    .data(PIV_AID)
+                    .transmit(self, 0xFF)?
+                    .status_words();
+
+                if !sw.is_success() {
+                    error!("failed selecting application: {:04x}", sw.code());
+                    return Err(Error::GenericError);
+                }
+
+                response.data().try_into()
             }
+            5 => {
+                // YK5 implements getting the serial as a PIV applet command (0xf8)
+                let response = Apdu::new(Ins::GetSerial).transmit(self, 0xFF)?;
 
-            let resp = Apdu::new(0x01).p1(0x10).transmit(self, 0xFF)?;
+                if !response.is_success() {
+                    error!(
+                        "failed retrieving serial number: {:04x}",
+                        response.status_words().code()
+                    );
+                    return Err(Error::GenericError);
+                }
 
-            if !resp.is_success() {
-                error!(
-                    "failed retrieving serial number: {:04x}",
-                    resp.status_words().code()
-                );
-                return Err(Error::GenericError);
+                response.data().try_into()
             }
-
-            // reselect the PIV applet
-            let sw = Apdu::new(Ins::SelectApplication)
-                .p1(0x04)
-                .data(PIV_AID)
-                .transmit(self, 0xFF)?
-                .status_words();
-
-            if !sw.is_success() {
-                error!("failed selecting application: {:04x}", sw.code());
-                return Err(Error::GenericError);
-            }
-
-            resp
-        } else {
-            // YK5 implements getting the serial as a PIV applet command (0xf8)
-            let resp = Apdu::new(Ins::GetSerial).transmit(self, 0xFF)?;
-
-            if !resp.is_success() {
-                error!(
-                    "failed retrieving serial number: {:04x}",
-                    resp.status_words().code()
-                );
-                return Err(Error::GenericError);
-            }
-
-            resp
-        };
-
-        response.data()[..4]
-            .try_into()
-            .map(|serial| Serial::from(u32::from_be_bytes(serial)))
-            .map_err(|_| Error::SizeError)
+            _ => Err(Error::NotSupported),
+        }
     }
 
     /// Verify device PIN.
