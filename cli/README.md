@@ -43,7 +43,7 @@ For more information, please see [CODE_OF_CONDUCT.md][cc-md].
 
 ## License
 
-Copyright (c) 2014-2022 Yubico AB, Tony Arcieri
+Copyright (c) 2014-2023 Yubico AB, Tony Arcieri
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
