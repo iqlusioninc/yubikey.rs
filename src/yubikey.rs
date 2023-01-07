@@ -98,6 +98,20 @@ impl From<Serial> for u32 {
     }
 }
 
+impl TryFrom<&[u8]> for Serial {
+    type Error = Error;
+
+    fn try_from(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() > 4 {
+            return Err(Error::SizeError);
+        }
+
+        let mut arr = [0u8; 4];
+        arr[(4 - bytes.len())..].copy_from_slice(bytes);
+        Ok(Self(u32::from_be_bytes(arr)))
+    }
+}
+
 impl FromStr for Serial {
     type Err = Error;
 
