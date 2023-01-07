@@ -106,8 +106,8 @@ impl<'tx> Transaction<'tx> {
     /// Get YubiKey device serial number.
     pub fn get_serial(&self, version: Version) -> Result<Serial> {
         match version.major {
+            // YK4 requires switching to the YK applet to retrieve the serial
             4 => {
-                // YK4 requires switching to the yk applet to retrieve the serial
                 let sw = Apdu::new(Ins::SelectApplication)
                     .p1(0x04)
                     .data(YK_AID)
@@ -122,6 +122,7 @@ impl<'tx> Transaction<'tx> {
                 let response = Apdu::new(0x01).p1(0x10).transmit(self, 0xFF)?;
 
                 if !response.is_success() {
+                    // TODO(tarcieri): still reselect the PIV applet in this case?
                     error!(
                         "failed retrieving serial number: {:04x}",
                         response.status_words().code()
@@ -143,8 +144,9 @@ impl<'tx> Transaction<'tx> {
 
                 response.data().try_into()
             }
+
+            // YK5 implements getting the serial as a PIV applet command (0xf8)
             5 => {
-                // YK5 implements getting the serial as a PIV applet command (0xf8)
                 let response = Apdu::new(Ins::GetSerial).transmit(self, 0xFF)?;
 
                 if !response.is_success() {
@@ -157,6 +159,8 @@ impl<'tx> Transaction<'tx> {
 
                 response.data().try_into()
             }
+
+            // Other versions unsupported
             _ => Err(Error::NotSupported),
         }
     }
