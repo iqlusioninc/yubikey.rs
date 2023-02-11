@@ -45,6 +45,12 @@ pub enum Error {
     /// Applet error
     AppletError,
 
+    /// We tried to select an applet that could not be found.
+    AppletNotFound {
+        /// Human-readable name of the applet.
+        applet_name: &'static str,
+    },
+
     /// Argument error
     ArgumentError,
 
@@ -125,6 +131,9 @@ impl Error {
         match self {
             Error::AlgorithmError => f.write_str("algorithm error"),
             Error::AppletError => f.write_str("applet error"),
+            Error::AppletNotFound { applet_name } => {
+                f.write_str(&format!("{} applet not found", applet_name))
+            }
             Error::ArgumentError => f.write_str("argument error"),
             Error::AuthenticationError => f.write_str("authentication error"),
             Error::GenericError => f.write_str("generic error"),

@@ -49,6 +49,7 @@ mod mgm;
 mod mscmap;
 #[cfg(feature = "untested")]
 mod msroots;
+mod otp;
 pub mod piv;
 mod policy;
 pub mod reader;

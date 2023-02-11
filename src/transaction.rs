@@ -5,7 +5,8 @@ use crate::{
     apdu::{Apdu, Ins, StatusWords},
     consts::{CB_BUF_MAX, CB_OBJ_MAX},
     error::{Error, Result},
-    piv::{AlgorithmId, SlotId},
+    otp,
+    piv::{self, AlgorithmId, SlotId},
     serialization::*,
     yubikey::*,
     Buffer, ObjectId,
@@ -15,12 +16,6 @@ use zeroize::Zeroizing;
 
 #[cfg(feature = "untested")]
 use crate::mgm::{MgmKey, DES_LEN_3DES};
-
-/// PIV Applet ID
-const PIV_AID: [u8; 5] = [0xa0, 0x00, 0x00, 0x03, 0x08];
-
-/// YubiKey OTP Applet ID. Needed to query serial on YK4.
-const YK_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x20, 0x01, 0x01];
 
 const CB_PIN_MAX: usize = 8;
 
@@ -69,7 +64,7 @@ impl<'tx> Transaction<'tx> {
     pub fn select_application(&self) -> Result<()> {
         let response = Apdu::new(Ins::SelectApplication)
             .p1(0x04)
-            .data(PIV_AID)
+            .data(piv::APPLET_ID)
             .transmit(self, 0xFF)
             .map_err(|e| {
                 error!("failed communicating with card: '{}'", e);
@@ -81,7 +76,12 @@ impl<'tx> Transaction<'tx> {
                 "failed selecting application: {:04x}",
                 response.status_words().code()
             );
-            return Err(Error::GenericError);
+            return Err(match response.status_words() {
+                StatusWords::NotFoundError => Error::AppletNotFound {
+                    applet_name: piv::APPLET_NAME,
+                },
+                _ => Error::GenericError,
+            });
         }
 
         Ok(())
@@ -110,13 +110,18 @@ impl<'tx> Transaction<'tx> {
             4 => {
                 let sw = Apdu::new(Ins::SelectApplication)
                     .p1(0x04)
-                    .data(YK_AID)
+                    .data(otp::APPLET_ID)
                     .transmit(self, 0xFF)?
                     .status_words();
 
                 if !sw.is_success() {
                     error!("failed selecting yk application: {:04x}", sw.code());
-                    return Err(Error::GenericError);
+                    return Err(match sw {
+                        StatusWords::NotFoundError => Error::AppletNotFound {
+                            applet_name: otp::APPLET_NAME,
+                        },
+                        _ => Error::GenericError,
+                    });
                 }
 
                 let response = Apdu::new(0x01).p1(0x10).transmit(self, 0xFF)?;
@@ -133,13 +138,18 @@ impl<'tx> Transaction<'tx> {
                 // reselect the PIV applet
                 let sw = Apdu::new(Ins::SelectApplication)
                     .p1(0x04)
-                    .data(PIV_AID)
+                    .data(piv::APPLET_ID)
                     .transmit(self, 0xFF)?
                     .status_words();
 
                 if !sw.is_success() {
                     error!("failed selecting application: {:04x}", sw.code());
-                    return Err(Error::GenericError);
+                    return Err(match sw {
+                        StatusWords::NotFoundError => Error::AppletNotFound {
+                            applet_name: piv::APPLET_NAME,
+                        },
+                        _ => Error::GenericError,
+                    });
                 }
 
                 response.data().try_into()

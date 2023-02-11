@@ -55,6 +55,7 @@ use {
         apdu::StatusWords,
         consts::{TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP},
         metadata::AdminData,
+        mgm,
         transaction::ChangeRefAction,
         Buffer, ObjectId,
     },
@@ -70,12 +71,6 @@ pub(crate) const ALGO_3DES: u8 = 0x03;
 
 /// Card management key
 pub(crate) const KEY_CARDMGM: u8 = 0x9b;
-
-/// MGMT Applet ID.
-///
-/// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
-#[cfg(feature = "untested")]
-const MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
 
 const TAG_DYN_AUTH: u8 = 0x7c;
 
@@ -397,7 +392,7 @@ impl YubiKey {
 
         let status_words = Apdu::new(Ins::SelectApplication)
             .p1(0x04)
-            .data(MGMT_AID)
+            .data(mgm::APPLET_ID)
             .transmit(&txn, 255)?
             .status_words();
 
@@ -406,7 +401,12 @@ impl YubiKey {
                 "Failed selecting mgmt application: {:04x}",
                 status_words.code()
             );
-            return Err(Error::GenericError);
+            return Err(match status_words {
+                StatusWords::NotFoundError => Error::AppletNotFound {
+                    applet_name: mgm::APPLET_NAME,
+                },
+                _ => Error::GenericError,
+            });
         }
 
         Ok(())
