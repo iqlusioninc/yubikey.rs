@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   if the PIV applet is not present on the device. This is returned by non-PIV
   virtual smart cards like Windows Hello for Business, as well as some smart
   card readers when no card is present.
+- `Reader::open` now avoids resetting the card if an error occurs (equivalent to
+  calling `YubiKey::disconnect(pcsc::Disposition::LeaveCard)` if `Reader::open`
+  succeeds).
 
 ## 0.7.0 (2022-11-14)
 ### Added

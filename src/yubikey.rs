@@ -692,23 +692,40 @@ impl<'a> TryFrom<&'a Reader<'_>> for YubiKey {
 
         info!("connected to reader: {}", reader.name());
 
-        let (version, serial) = {
+        let mut app_version_serial = || -> Result<(Version, Serial)> {
             let txn = Transaction::new(&mut card)?;
             txn.select_application()?;
 
             let v = txn.get_version()?;
             let s = txn.get_serial(v)?;
-            (v, s)
+            Ok((v, s))
         };
 
-        let yubikey = YubiKey {
-            card,
-            name: String::from(reader.name()),
-            pin: None,
-            version,
-            serial,
-        };
+        match app_version_serial() {
+            Err(e) => {
+                error!("Could not use reader: {}", e);
 
-        Ok(yubikey)
+                // We were unable to use the card, so we've effectively only connected as
+                // a side-effect of determining this. Avoid disrupting its internal state
+                // any further (e.g. preserve the PIN cache of whatever applet is selected
+                // currently).
+                if let Err((_, e)) = card.disconnect(pcsc::Disposition::LeaveCard) {
+                    error!("Failed to disconnect gracefully from card: {}", e);
+                }
+
+                Err(e)
+            }
+            Ok((version, serial)) => {
+                let yubikey = YubiKey {
+                    card,
+                    name: String::from(reader.name()),
+                    pin: None,
+                    version,
+                    serial,
+                };
+
+                Ok(yubikey)
+            }
+        }
     }
 }
