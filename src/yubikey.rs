@@ -55,6 +55,7 @@ use {
         apdu::StatusWords,
         consts::{TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP},
         metadata::AdminData,
+        mgm,
         transaction::ChangeRefAction,
         Buffer, ObjectId,
     },
@@ -70,12 +71,6 @@ pub(crate) const ALGO_3DES: u8 = 0x03;
 
 /// Card management key
 pub(crate) const KEY_CARDMGM: u8 = 0x9b;
-
-/// MGMT Applet ID.
-///
-/// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
-#[cfg(feature = "untested")]
-const MGMT_AID: [u8; 8] = [0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
 
 const TAG_DYN_AUTH: u8 = 0x7c;
 
@@ -387,7 +382,7 @@ impl YubiKey {
 
         let status_words = Apdu::new(Ins::SelectApplication)
             .p1(0x04)
-            .data(MGMT_AID)
+            .data(mgm::APPLET_ID)
             .transmit(&txn, 255)?
             .status_words();
 
@@ -396,7 +391,12 @@ impl YubiKey {
                 "Failed selecting mgmt application: {:04x}",
                 status_words.code()
             );
-            return Err(Error::GenericError);
+            return Err(match status_words {
+                StatusWords::NotFoundError => Error::AppletNotFound {
+                    applet_name: mgm::APPLET_NAME,
+                },
+                _ => Error::GenericError,
+            });
         }
 
         Ok(())
@@ -682,23 +682,40 @@ impl<'a> TryFrom<&'a Reader<'_>> for YubiKey {
 
         info!("connected to reader: {}", reader.name());
 
-        let (version, serial) = {
+        let mut app_version_serial = || -> Result<(Version, Serial)> {
             let txn = Transaction::new(&mut card)?;
             txn.select_application()?;
 
             let v = txn.get_version()?;
             let s = txn.get_serial(v)?;
-            (v, s)
+            Ok((v, s))
         };
 
-        let yubikey = YubiKey {
-            card,
-            name: String::from(reader.name()),
-            pin: None,
-            version,
-            serial,
-        };
+        match app_version_serial() {
+            Err(e) => {
+                error!("Could not use reader: {}", e);
 
-        Ok(yubikey)
+                // We were unable to use the card, so we've effectively only connected as
+                // a side-effect of determining this. Avoid disrupting its internal state
+                // any further (e.g. preserve the PIN cache of whatever applet is selected
+                // currently).
+                if let Err((_, e)) = card.disconnect(pcsc::Disposition::LeaveCard) {
+                    error!("Failed to disconnect gracefully from card: {}", e);
+                }
+
+                Err(e)
+            }
+            Ok((version, serial)) => {
+                let yubikey = YubiKey {
+                    card,
+                    name: String::from(reader.name()),
+                    pin: None,
+                    version,
+                    serial,
+                };
+
+                Ok(yubikey)
+            }
+        }
     }
 }

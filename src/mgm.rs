@@ -48,6 +48,16 @@ use des::{
 #[cfg(feature = "untested")]
 use {hmac::Hmac, pbkdf2::pbkdf2, sha1::Sha1};
 
+/// YubiKey MGMT Applet Name
+#[cfg(feature = "untested")]
+pub(crate) const APPLET_NAME: &str = "YubiKey MGMT";
+
+/// MGMT Applet ID.
+///
+/// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
+#[cfg(feature = "untested")]
+pub(crate) const APPLET_ID: &[u8] = &[0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
+
 pub(crate) const ADMIN_FLAGS_1_PROTECTED_MGM: u8 = 0x02;
 
 #[cfg(feature = "untested")]
