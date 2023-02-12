@@ -411,7 +411,7 @@ impl StatusWords {
         match self {
             StatusWords::None => 0,
             StatusWords::NoInputDataError => 0x6285,
-            StatusWords::VerifyFailError { tries } => 0x63c0 & tries as u16,
+            StatusWords::VerifyFailError { tries } => 0x63c0 | tries as u16,
             StatusWords::WrongLengthError => 0x6700,
             StatusWords::SecurityStatusError => 0x6982,
             StatusWords::AuthBlockedError => 0x6983,
@@ -464,5 +464,39 @@ impl From<u16> for StatusWords {
 impl From<StatusWords> for u16 {
     fn from(sw: StatusWords) -> u16 {
         sw.code()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StatusWords;
+
+    #[test]
+    fn status_words_round_trip() {
+        let round_trip = |sw: StatusWords| {
+            assert_eq!(StatusWords::from(sw.code()), sw);
+        };
+
+        round_trip(StatusWords::None);
+        round_trip(StatusWords::Success);
+        round_trip(StatusWords::NoInputDataError);
+        round_trip(StatusWords::VerifyFailError { tries: 0x0F });
+        round_trip(StatusWords::VerifyFailError { tries: 3 });
+        round_trip(StatusWords::VerifyFailError { tries: 2 });
+        round_trip(StatusWords::VerifyFailError { tries: 1 });
+        round_trip(StatusWords::VerifyFailError { tries: 0 });
+        round_trip(StatusWords::WrongLengthError);
+        round_trip(StatusWords::SecurityStatusError);
+        round_trip(StatusWords::AuthBlockedError);
+        round_trip(StatusWords::DataInvalidError);
+        round_trip(StatusWords::ConditionsNotSatisfiedError);
+        round_trip(StatusWords::CommandNotAllowedError);
+        round_trip(StatusWords::IncorrectParamError);
+        round_trip(StatusWords::NotFoundError);
+        round_trip(StatusWords::NoSpaceError);
+        round_trip(StatusWords::IncorrectSlotError);
+        round_trip(StatusWords::NotSupportedError);
+        round_trip(StatusWords::CommandAbortedError);
+        round_trip(StatusWords::Other(0x1337));
     }
 }
