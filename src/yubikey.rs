@@ -220,10 +220,24 @@ impl YubiKey {
             other => other,
         })?;
 
+        let mut open_error = None;
+
         for reader in readers.iter()? {
             let yubikey = match reader.open() {
                 Ok(yk) => yk,
-                Err(_) => continue,
+                Err(e) => {
+                    // Save the first error we see that indicates we might have been able
+                    // to find a matching YubiKey.
+                    if open_error.is_none() {
+                        if let Error::PcscError {
+                            inner: Some(pcsc::Error::SharingViolation),
+                        } = e
+                        {
+                            open_error = Some(e);
+                        }
+                    }
+                    continue;
+                }
             };
 
             if serial == yubikey.serial() {
@@ -231,8 +245,12 @@ impl YubiKey {
             }
         }
 
-        error!("no YubiKey detected with serial: {}", serial);
-        Err(Error::NotFound)
+        Err(if let Some(e) = open_error {
+            e
+        } else {
+            error!("no YubiKey detected with serial: {}", serial);
+            Error::NotFound
+        })
     }
 
     /// Reconnect to a YubiKey.
