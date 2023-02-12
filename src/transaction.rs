@@ -400,11 +400,12 @@ impl<'tx> Transaction<'tx> {
                 .data(&in_data[in_offset..(in_offset + this_size)])
                 .transmit(self, 261)?;
 
-            sw = response.status_words().code();
+            sw = response.status_words();
 
-            if !response.is_success() && (sw >> 8 != 0x61) {
+            match sw {
+                StatusWords::Success | StatusWords::BytesRemaining { .. } => (),
                 // TODO(tarcieri): is this really OK?
-                return Ok(Response::new(sw.into(), out_data));
+                _ => return Ok(Response::new(sw, out_data)),
             }
 
             if !out_data.is_empty() && (out_data.len() - response.data().len() > max_out) {
@@ -425,17 +426,15 @@ impl<'tx> Transaction<'tx> {
             }
         }
 
-        while sw >> 8 == 0x61 {
-            trace!(
-                "The card indicates there is {} bytes more data for us",
-                sw & 0xff
-            );
+        while let StatusWords::BytesRemaining { len } = sw {
+            trace!("The card indicates there is {} bytes more data for us", len);
 
             let response = Apdu::new(Ins::GetResponseApdu).transmit(self, 261)?;
-            sw = response.status_words().code();
+            sw = response.status_words();
 
-            if sw != StatusWords::Success.code() && (sw >> 8 != 0x61) {
-                return Ok(Response::new(sw.into(), vec![]));
+            match sw {
+                StatusWords::Success | StatusWords::BytesRemaining { .. } => (),
+                _ => return Ok(Response::new(sw, vec![])),
             }
 
             if out_data.len() + response.data().len() > max_out {
@@ -451,7 +450,7 @@ impl<'tx> Transaction<'tx> {
             out_data.extend_from_slice(&response.data()[..response.data().len()]);
         }
 
-        Ok(Response::new(sw.into(), out_data))
+        Ok(Response::new(sw, out_data))
     }
 
     /// Fetch an object.
