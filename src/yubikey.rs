@@ -242,6 +242,9 @@ impl YubiKey {
 
             if serial == yubikey.serial() {
                 return Ok(yubikey);
+            } else {
+                // We didn't want this YubiKey; don't reset it.
+                let _ = yubikey.disconnect(pcsc::Disposition::LeaveCard);
             }
         }
 
