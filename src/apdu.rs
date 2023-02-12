@@ -353,6 +353,12 @@ pub(crate) enum StatusWords {
     /// Successful execution
     Success,
 
+    /// The requested data was too large for the response, and there is data remaining.
+    BytesRemaining {
+        /// The number of bytes remaining, as indicated in the response.
+        len: u8,
+    },
+
     /// https://github.com/Yubico/yubikey-manager/blob/1f22620b623c6b345dd9f9193ec765a542dddc80/ykman/driver_ccid.py#L53
     NoInputDataError,
 
@@ -410,8 +416,9 @@ impl StatusWords {
     pub fn code(self) -> u16 {
         match self {
             StatusWords::None => 0,
+            StatusWords::BytesRemaining { len } => 0x6100 | len as u16,
             StatusWords::NoInputDataError => 0x6285,
-            StatusWords::VerifyFailError { tries } => 0x63c0 & tries as u16,
+            StatusWords::VerifyFailError { tries } => 0x63c0 | tries as u16,
             StatusWords::WrongLengthError => 0x6700,
             StatusWords::SecurityStatusError => 0x6982,
             StatusWords::AuthBlockedError => 0x6983,
@@ -439,6 +446,9 @@ impl From<u16> for StatusWords {
     fn from(sw: u16) -> Self {
         match sw {
             0x0000 => StatusWords::None,
+            sw if sw & 0xff00 == 0x6100 => Self::BytesRemaining {
+                len: (sw & 0x00ff) as u8,
+            },
             0x6285 => StatusWords::NoInputDataError,
             sw if sw & 0xfff0 == 0x63c0 => StatusWords::VerifyFailError {
                 tries: (sw & 0x000f) as u8,
@@ -464,5 +474,42 @@ impl From<u16> for StatusWords {
 impl From<StatusWords> for u16 {
     fn from(sw: StatusWords) -> u16 {
         sw.code()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StatusWords;
+
+    #[test]
+    fn status_words_round_trip() {
+        let round_trip = |sw: StatusWords| {
+            assert_eq!(StatusWords::from(sw.code()), sw);
+        };
+
+        round_trip(StatusWords::None);
+        round_trip(StatusWords::BytesRemaining { len: 1 });
+        round_trip(StatusWords::BytesRemaining { len: 10 });
+        round_trip(StatusWords::BytesRemaining { len: 0xFF });
+        round_trip(StatusWords::Success);
+        round_trip(StatusWords::NoInputDataError);
+        round_trip(StatusWords::VerifyFailError { tries: 0x0F });
+        round_trip(StatusWords::VerifyFailError { tries: 3 });
+        round_trip(StatusWords::VerifyFailError { tries: 2 });
+        round_trip(StatusWords::VerifyFailError { tries: 1 });
+        round_trip(StatusWords::VerifyFailError { tries: 0 });
+        round_trip(StatusWords::WrongLengthError);
+        round_trip(StatusWords::SecurityStatusError);
+        round_trip(StatusWords::AuthBlockedError);
+        round_trip(StatusWords::DataInvalidError);
+        round_trip(StatusWords::ConditionsNotSatisfiedError);
+        round_trip(StatusWords::CommandNotAllowedError);
+        round_trip(StatusWords::IncorrectParamError);
+        round_trip(StatusWords::NotFoundError);
+        round_trip(StatusWords::NoSpaceError);
+        round_trip(StatusWords::IncorrectSlotError);
+        round_trip(StatusWords::NotSupportedError);
+        round_trip(StatusWords::CommandAbortedError);
+        round_trip(StatusWords::Other(0x1337));
     }
 }

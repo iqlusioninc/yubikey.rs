@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calling `YubiKey::disconnect(pcsc::Disposition::LeaveCard)` if `Reader::open`
   succeeds).
 
+### Fixed
+- `StatusWords::code` now returns the correct code (including embedded `tries`
+  count) for `StatusWords::VerifyFailError`. Previously the returned code lost
+  information and was not round-trip compatible with `StatusWords::from(u16)`.
+
 ## 0.7.0 (2022-11-14)
 ### Added
 - Display inner PC/SC errors ([#420])
