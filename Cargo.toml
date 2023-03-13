@@ -24,7 +24,7 @@ chrono = "0.4.23"
 cookie-factory = "0.3"
 der-parser = "8"
 des = "0.8"
-elliptic-curve = "0.12"
+elliptic-curve = "0.13"
 hex = { package = "base16ct", version = "0.1", features = ["alloc"] }
 hmac = "0.12"
 log = "0.4"
