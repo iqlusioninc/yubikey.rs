@@ -214,7 +214,7 @@ or conditions.
 [docs-link]: https://docs.rs/yubikey/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-link]: https://github.com/iqlusioninc/yubikey.rs/blob/main/COPYING
-[msrv-image]: https://img.shields.io/badge/rustc-1.60+-blue.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.65+-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
 [build-image]: https://github.com/iqlusioninc/yubikey.rs/workflows/CI/badge.svg?branch=main&event=push

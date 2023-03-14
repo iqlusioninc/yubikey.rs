@@ -14,7 +14,7 @@ readme = "README.md"
 categories = ["api-bindings", "authentication", "cryptography", "hardware-support"]
 keywords = ["ecdsa", "encryption", "rsa", "piv", "signature"]
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.65"
 
 [workspace]
 members = [".", "cli"]
@@ -24,20 +24,20 @@ chrono = "0.4.23"
 cookie-factory = "0.3"
 der-parser = "8"
 des = "0.8"
-elliptic-curve = "0.12"
-hex = { package = "base16ct", version = "0.1", features = ["alloc"] }
+elliptic-curve = "0.13"
+hex = { package = "base16ct", version = "0.2", features = ["alloc"] }
 hmac = "0.12"
 log = "0.4"
 nom = "7"
 num-bigint-dig = { version = "0.8", features = ["rand"] }
 num-traits = "0.2"
 num-integer = "0.1"
-pbkdf2 = { version = "0.11", default-features = false }
-p256 = "0.11"
-p384 = "0.11"
+p256 = "0.13"
+p384 = "0.13"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 pcsc = "2.3.1"
 rand_core = { version = "0.6", features = ["std"] }
-rsa = "0.7"
+rsa = "=0.9.0-pre.0"
 secrecy = "0.8"
 sha1 = { version = "0.10", features = ["oid"] }
 sha2 = { version = "0.10", features = ["oid"] }
@@ -50,8 +50,7 @@ zeroize = "1"
 [dev-dependencies]
 env_logger = "0.10"
 once_cell = "1"
-rsa = { version = "0.7.1", features = ["hazmat"] }
-signature = { version = "1.6.4", features = ["hazmat-preview"] }
+signature = "2"
 
 [features]
 untested = []

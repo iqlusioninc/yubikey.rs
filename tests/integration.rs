@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use rand_core::{OsRng, RngCore};
 use rsa::pkcs1v15;
 use sha2::{Digest, Sha256};
-use signature::{hazmat::PrehashVerifier, Signature as _};
+use signature::hazmat::PrehashVerifier;
 use std::{env, str::FromStr, sync::Mutex};
 use x509::RelativeDistinguishedName;
 use yubikey::{
@@ -203,7 +203,7 @@ fn generate_self_signed_rsa_cert() {
     let data = cert.as_ref();
     let tbs_cert_len = u16::from_be_bytes(data[6..8].try_into().unwrap()) as usize;
     let msg = &data[4..8 + tbs_cert_len];
-    let sig = pkcs1v15::Signature::from_bytes(&data[data.len() - 128..]).unwrap();
+    let sig = pkcs1v15::Signature::try_from(&data[data.len() - 128..]).unwrap();
     let hash = Sha256::digest(msg);
 
     assert!(pubkey.verify_prehash(&hash, &sig).is_ok());
