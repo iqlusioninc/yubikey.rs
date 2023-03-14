@@ -46,7 +46,7 @@ use des::{
     TdesEde3,
 };
 #[cfg(feature = "untested")]
-use {hmac::Hmac, pbkdf2::pbkdf2, sha1::Sha1};
+use {pbkdf2::pbkdf2_hmac, sha1::Sha1};
 
 /// YubiKey MGMT Applet Name
 #[cfg(feature = "untested")]
@@ -147,7 +147,7 @@ impl MgmKey {
         }
 
         let mut mgm = [0u8; DES_LEN_3DES];
-        pbkdf2::<Hmac<Sha1>>(pin, salt, ITER_MGM_PBKDF2, &mut mgm);
+        pbkdf2_hmac::<Sha1>(pin, salt, ITER_MGM_PBKDF2, &mut mgm);
         MgmKey::from_bytes(mgm)
     }
 
