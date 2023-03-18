@@ -36,6 +36,7 @@ use crate::{
     chuid::ChuId,
     config::Config,
     error::{Error, Result},
+    hsmauth::HsmAuth,
     mgm::MgmKey,
     piv,
     reader::{Context, Reader},
@@ -743,6 +744,11 @@ impl YubiKey {
         }
 
         Ok(())
+    }
+
+    /// Creates a client for the YubiHSM AUth
+    pub fn hsmauth(self) -> Result<HsmAuth> {
+        HsmAuth::new(self)
     }
 }
 
