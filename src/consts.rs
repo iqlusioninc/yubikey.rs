@@ -18,3 +18,8 @@ pub(crate) const TAG_ADMIN_TIMESTAMP: u8 = 0x83;
 // Protected tags
 pub(crate) const TAG_PROTECTED_FLAGS_1: u8 = 0x81;
 pub(crate) const TAG_PROTECTED_MGM: u8 = 0x89;
+
+// YubiHSM Auth
+pub(crate) const TAG_LABEL: u8 = 0x71;
+pub(crate) const TAG_PW: u8 = 0x73;
+pub(crate) const TAG_CONTEXT: u8 = 0x77;

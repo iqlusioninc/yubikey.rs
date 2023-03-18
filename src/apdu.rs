@@ -198,6 +198,15 @@ pub enum Ins {
     /// Get slot metadata
     GetMetadata,
 
+    /// YubiHSM Auth // Calculate session keys
+    Calculate,
+
+    /// YubiHSM Auth // Get challenge
+    GetHostChallenge,
+
+    /// YubiHSM Auth // List credentials
+    ListCredentials,
+
     /// Other/unrecognized instruction codes
     Other(u8),
 }
@@ -223,6 +232,10 @@ impl Ins {
             Ins::Attest => 0xf9,
             Ins::GetSerial => 0xf8,
             Ins::GetMetadata => 0xf7,
+            // Yubihsm auth
+            Ins::Calculate => 0x03,
+            Ins::GetHostChallenge => 0x04,
+            Ins::ListCredentials => 0x05,
             Ins::Other(code) => code,
         }
     }
@@ -231,6 +244,9 @@ impl Ins {
 impl From<u8> for Ins {
     fn from(code: u8) -> Self {
         match code {
+            0x03 => Ins::Calculate,
+            0x04 => Ins::GetHostChallenge,
+            0x05 => Ins::ListCredentials,
             0x20 => Ins::Verify,
             0x24 => Ins::ChangeReference,
             0x2c => Ins::ResetRetry,

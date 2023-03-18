@@ -3,8 +3,9 @@
 use crate::{
     apdu::Response,
     apdu::{Apdu, Ins, StatusWords},
-    consts::{CB_BUF_MAX, CB_OBJ_MAX},
+    consts::{CB_BUF_MAX, CB_OBJ_MAX, TAG_CONTEXT, TAG_LABEL, TAG_PW},
     error::{Error, Result},
+    hsmauth::{self, Challenge, Context, Credential, Label, SessionKeys},
     otp,
     piv::{self, AlgorithmId, SlotId},
     serialization::*,
@@ -61,22 +62,31 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Select application.
-    pub fn select_application(&self) -> Result<()> {
+    pub fn select_piv_application(&self) -> Result<()> {
+        self.select_application(
+            piv::APPLET_ID,
+            piv::APPLET_NAME,
+            "failed selecting application",
+        )
+    }
+
+    /// Select application.
+    pub(crate) fn select_application(
+        &self,
+        applet: &[u8],
+        applet_name: &'static str,
+        error: &'static str,
+    ) -> Result<()> {
         let response = Apdu::new(Ins::SelectApplication)
             .p1(0x04)
-            .data(piv::APPLET_ID)
+            .data(applet)
             .transmit(self, 0xFF)
             .inspect_err(|e| error!("failed communicating with card: '{}'", e))?;
 
         if !response.is_success() {
-            error!(
-                "failed selecting application: {:04x}",
-                response.status_words().code()
-            );
+            error!("{}: {:04x}", error, response.status_words().code());
             return Err(match response.status_words() {
-                StatusWords::NotFoundError => Error::AppletNotFound {
-                    applet_name: piv::APPLET_NAME,
-                },
+                StatusWords::NotFoundError => Error::AppletNotFound { applet_name },
                 _ => Error::GenericError,
             });
         }
@@ -101,21 +111,11 @@ impl<'tx> Transaction<'tx> {
         match version.major {
             // YK4 requires switching to the YK applet to retrieve the serial
             4 => {
-                let sw = Apdu::new(Ins::SelectApplication)
-                    .p1(0x04)
-                    .data(otp::APPLET_ID)
-                    .transmit(self, 0xFF)?
-                    .status_words();
-
-                if !sw.is_success() {
-                    error!("failed selecting yk application: {:04x}", sw.code());
-                    return Err(match sw {
-                        StatusWords::NotFoundError => Error::AppletNotFound {
-                            applet_name: otp::APPLET_NAME,
-                        },
-                        _ => Error::GenericError,
-                    });
-                }
+                self.select_application(
+                    otp::APPLET_ID,
+                    otp::APPLET_NAME,
+                    "failed selecting yk application",
+                )?;
 
                 let response = Apdu::new(0x01).p1(0x10).transmit(self, 0xFF)?;
 
@@ -129,21 +129,11 @@ impl<'tx> Transaction<'tx> {
                 }
 
                 // reselect the PIV applet
-                let sw = Apdu::new(Ins::SelectApplication)
-                    .p1(0x04)
-                    .data(piv::APPLET_ID)
-                    .transmit(self, 0xFF)?
-                    .status_words();
-
-                if !sw.is_success() {
-                    error!("failed selecting application: {:04x}", sw.code());
-                    return Err(match sw {
-                        StatusWords::NotFoundError => Error::AppletNotFound {
-                            applet_name: piv::APPLET_NAME,
-                        },
-                        _ => Error::GenericError,
-                    });
-                }
+                self.select_application(
+                    piv::APPLET_ID,
+                    piv::APPLET_NAME,
+                    "failed selecting application",
+                )?;
 
                 response.data().try_into()
             }
@@ -504,5 +494,140 @@ impl<'tx> Transaction<'tx> {
             StatusWords::SecurityStatusError => Err(Error::AuthenticationError),
             _ => Err(Error::GenericError),
         }
+    }
+
+    /// Get YubiKey Host challenge
+    pub fn get_host_challenge(&mut self, version: Version, label: Label) -> Result<Challenge> {
+        // YubiHSM was introduced by firmware 5.4.3
+        // https://docs.yubico.com/yesdk/users-manual/application-yubihsm-auth/yubihsm-auth-overview.html
+        if version
+            < (Version {
+                major: 5,
+                minor: 4,
+                patch: 3,
+            })
+        {
+            return Err(Error::NotSupported);
+        }
+
+        let mut data = [0u8; CB_BUF_MAX];
+        let mut len = data.len();
+        let mut data_remaining = &mut data[..];
+
+        let offset = Tlv::write(data_remaining, TAG_LABEL, &label.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        len -= data_remaining.len();
+        let response = Apdu::new(Ins::GetHostChallenge)
+            .params(0x00, 0x00)
+            .data(&data[..len])
+            .transmit(self, (Challenge::SIZE) + 2)?;
+
+        // TODO: do we need to check response.data() is the size we asked?
+        let data = response.data();
+        let mut host_challenge = Challenge::default();
+
+        host_challenge.copy_from_slice(data)?;
+
+        Ok(host_challenge)
+    }
+
+    /// Get AES-128 session keys
+    ///
+    /// Get the SCP03 session keys from an AES-128 credential.
+    pub fn calculate(
+        &mut self,
+        version: Version,
+        label: Label,
+        context: Context,
+        password: &[u8],
+    ) -> Result<SessionKeys> {
+        // YubiHSM was introduced by firmware 5.4.3
+        // https://docs.yubico.com/yesdk/users-manual/application-yubihsm-auth/yubihsm-auth-overview.html
+        if version
+            < (Version {
+                major: 5,
+                minor: 4,
+                patch: 3,
+            })
+        {
+            return Err(Error::NotSupported);
+        }
+
+        let mut data = [0u8; CB_BUF_MAX];
+        let mut len = data.len();
+        let mut data_remaining = &mut data[..];
+
+        let offset = Tlv::write(data_remaining, TAG_LABEL, &label.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let offset = Tlv::write(data_remaining, TAG_CONTEXT, &context.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let mut password = password.to_vec();
+        password.resize(hsmauth::PW_LEN, 0);
+
+        let offset = Tlv::write(data_remaining, TAG_PW, &password)?;
+        data_remaining = &mut data_remaining[offset..];
+        len -= data_remaining.len();
+
+        let response = Apdu::new(Ins::Calculate)
+            .params(0x00, 0x00)
+            .data(&data[..len])
+            .transmit(self, (hsmauth::KEY_SIZE * 3) + 2)?;
+
+        if !response.is_success() {
+            error!(
+                "failed calculating the session secret: {:04x}",
+                response.status_words().code()
+            );
+            return Err(Error::GenericError);
+        }
+
+        let data = response.data();
+
+        // TODO: check length is long enough (KEY_SIZE*3)
+        let mut session_keys = SessionKeys::default();
+        session_keys
+            .enc_key
+            .copy_from_slice(&data[..hsmauth::KEY_SIZE]);
+        session_keys
+            .mac_key
+            .copy_from_slice(&data[hsmauth::KEY_SIZE..hsmauth::KEY_SIZE * 2]);
+        session_keys
+            .rmac_key
+            .copy_from_slice(&data[hsmauth::KEY_SIZE * 2..]);
+
+        Ok(session_keys)
+    }
+
+    /// Get AES-128 session keys
+    ///
+    /// Get the SCP03 session keys from an AES-128 credential.
+    pub fn list_credentials(&mut self, version: Version) -> Result<Vec<Credential>> {
+        // YubiHSM was introduced by firmware 5.4.3
+        // https://docs.yubico.com/yesdk/users-manual/application-yubihsm-auth/yubihsm-auth-overview.html
+        if version
+            < (Version {
+                major: 5,
+                minor: 4,
+                patch: 3,
+            })
+        {
+            return Err(Error::NotSupported);
+        }
+
+        let mut data = [0u8; CB_BUF_MAX];
+        let mut len = data.len();
+        let data_remaining = &mut data[..];
+
+        len -= data_remaining.len();
+        let response = Apdu::new(Ins::ListCredentials)
+            .params(0x00, 0x00)
+            .data(&data[..len])
+            .transmit(self, (Challenge::SIZE) + 2)?;
+
+        let data = response.data();
+        Credential::parse_list(data)
     }
 }
