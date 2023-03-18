@@ -3,8 +3,12 @@
 use crate::{
     apdu::Response,
     apdu::{Apdu, Ins, StatusWords},
-    consts::{CB_BUF_MAX, CB_OBJ_MAX},
+    consts::{
+        CB_BUF_MAX, CB_OBJ_MAX, TAG_ALGO, TAG_CONTEXT, TAG_KEY_ENC, TAG_KEY_MAC, TAG_LABEL,
+        TAG_MGMKEY, TAG_PW, TAG_TOUCH,
+    },
     error::{Error, Result},
+    hsmauth::{self, Algorithm, Challenge, Context, Credential, Label, SessionKeys},
     mgm::MgmKey,
     otp,
     piv::{self, AlgorithmId, SlotId},
@@ -71,7 +75,7 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Select application.
-    pub fn select_application(
+    pub(crate) fn select_application(
         &self,
         applet: &[u8],
         applet_name: &'static str,
@@ -582,5 +586,257 @@ impl<'tx> Transaction<'tx> {
 
         let data = response.data();
         DeviceInfo::parse(data)
+    }
+
+    /// Get YubiKey Host challenge
+    pub fn get_host_challenge(&mut self, version: Version, label: Label) -> Result<Challenge> {
+        // YubiHSM was introduced by firmware 5.4.3
+        // https://docs.yubico.com/yesdk/users-manual/application-yubihsm-auth/yubihsm-auth-overview.html
+        if version
+            < (Version {
+                major: 5,
+                minor: 4,
+                patch: 3,
+            })
+        {
+            return Err(Error::NotSupported);
+        }
+
+        let mut data = [0u8; CB_BUF_MAX];
+        let mut len = data.len();
+        let mut data_remaining = &mut data[..];
+
+        let offset = Tlv::write(data_remaining, TAG_LABEL, &label.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        len -= data_remaining.len();
+        let response = Apdu::new(Ins::GetHostChallenge)
+            .params(0x00, 0x00)
+            .data(&data[..len])
+            .transmit(self, (Challenge::SIZE) + 2)?;
+
+        // TODO: do we need to check response.data() is the size we asked?
+        let data = response.data();
+        let mut host_challenge = Challenge::default();
+
+        host_challenge.copy_from_slice(data)?;
+
+        Ok(host_challenge)
+    }
+
+    /// Get AES-128 session keys
+    ///
+    /// Get the SCP03 session keys from an AES-128 credential.
+    pub fn calculate(
+        &mut self,
+        version: Version,
+        label: Label,
+        context: Context,
+        password: &[u8],
+    ) -> Result<SessionKeys> {
+        // YubiHSM was introduced by firmware 5.4.3
+        // https://docs.yubico.com/yesdk/users-manual/application-yubihsm-auth/yubihsm-auth-overview.html
+        if version
+            < (Version {
+                major: 5,
+                minor: 4,
+                patch: 3,
+            })
+        {
+            return Err(Error::NotSupported);
+        }
+
+        let mut data = [0u8; CB_BUF_MAX];
+        let mut len = data.len();
+        let mut data_remaining = &mut data[..];
+
+        let offset = Tlv::write(data_remaining, TAG_LABEL, &label.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let offset = Tlv::write(data_remaining, TAG_CONTEXT, &context.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let mut password = password.to_vec();
+        password.resize(hsmauth::PW_LEN, 0);
+
+        let offset = Tlv::write(data_remaining, TAG_PW, &password)?;
+        data_remaining = &mut data_remaining[offset..];
+        len -= data_remaining.len();
+
+        let response = Apdu::new(Ins::Calculate)
+            .params(0x00, 0x00)
+            .data(&data[..len])
+            .transmit(self, (hsmauth::KEY_SIZE * 3) + 2)?;
+
+        if !response.is_success() {
+            error!(
+                "failed calculating the session secret: {:04x}",
+                response.status_words().code()
+            );
+            return Err(Error::GenericError);
+        }
+
+        let data = response.data();
+
+        // TODO: check length is long enough (KEY_SIZE*3)
+        let mut session_keys = SessionKeys::default();
+        session_keys
+            .enc_key
+            .copy_from_slice(&data[..hsmauth::KEY_SIZE]);
+        session_keys
+            .mac_key
+            .copy_from_slice(&data[hsmauth::KEY_SIZE..hsmauth::KEY_SIZE * 2]);
+        session_keys
+            .rmac_key
+            .copy_from_slice(&data[hsmauth::KEY_SIZE * 2..]);
+
+        Ok(session_keys)
+    }
+
+    /// Get AES-128 session keys
+    ///
+    /// Get the SCP03 session keys from an AES-128 credential.
+    pub fn list_credentials(&mut self, version: Version) -> Result<Vec<Credential>> {
+        // YubiHSM was introduced by firmware 5.4.3
+        // https://docs.yubico.com/yesdk/users-manual/application-yubihsm-auth/yubihsm-auth-overview.html
+        if version
+            < (Version {
+                major: 5,
+                minor: 4,
+                patch: 3,
+            })
+        {
+            return Err(Error::NotSupported);
+        }
+
+        let mut data = [0u8; CB_BUF_MAX];
+        let mut len = data.len();
+        let data_remaining = &mut data[..];
+
+        len -= data_remaining.len();
+        let response = Apdu::new(Ins::ListCredentials)
+            .params(0x00, 0x00)
+            .data(&data[..len])
+            .transmit(self, ((Credential::SIZE) * 32) + 2)?;
+
+        let data = response.data();
+        Credential::parse_list(data)
+    }
+
+    /// Adds a credential to YubiHSM Auth applet
+    #[allow(clippy::too_many_arguments)] // One argument over the limit of 7
+    pub fn put_credential(
+        &mut self,
+        version: Version,
+        mgmkey: hsmauth::MgmKey,
+        label: Label,
+        password: &[u8],
+        enc_key: [u8; hsmauth::KEY_SIZE],
+        mac_key: [u8; hsmauth::KEY_SIZE],
+        touch: bool,
+    ) -> Result<()> {
+        // YubiHSM was introduced by firmware 5.4.3
+        // https://docs.yubico.com/yesdk/users-manual/application-yubihsm-auth/yubihsm-auth-overview.html
+        if version
+            < (Version {
+                major: 5,
+                minor: 4,
+                patch: 3,
+            })
+        {
+            return Err(Error::NotSupported);
+        }
+
+        let mut data = [0u8; CB_BUF_MAX];
+        let mut len = data.len();
+        let mut data_remaining = &mut data[..];
+
+        let offset = Tlv::write(data_remaining, TAG_MGMKEY, &mgmkey.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let offset = Tlv::write(data_remaining, TAG_LABEL, &label.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let offset = Tlv::write(data_remaining, TAG_ALGO, &[Algorithm::Aes128 as u8])?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let offset = Tlv::write(data_remaining, TAG_KEY_ENC, &enc_key)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let offset = Tlv::write(data_remaining, TAG_KEY_MAC, &mac_key)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let mut password = password.to_vec();
+        password.resize(hsmauth::PW_LEN, 0);
+
+        let offset = Tlv::write(data_remaining, TAG_PW, &password)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let offset = Tlv::write(data_remaining, TAG_TOUCH, &[touch as u8])?;
+        data_remaining = &mut data_remaining[offset..];
+
+        len -= data_remaining.len();
+
+        let response = Apdu::new(Ins::PutCredential)
+            .params(0x00, 0x00)
+            .data(&data[..len])
+            .transmit(self, 2)?;
+
+        if !response.is_success() {
+            error!(
+                "Unable to store credential: {:04x}",
+                response.status_words().code()
+            );
+            return Err(Error::GenericError);
+        }
+
+        Ok(())
+    }
+
+    /// Delete a credential to YubiHSM Auth applet
+    pub fn delete_credential(
+        &mut self,
+        version: Version,
+        mgmkey: hsmauth::MgmKey,
+        label: Label,
+    ) -> Result<()> {
+        // YubiHSM was introduced by firmware 5.4.3
+        // https://docs.yubico.com/yesdk/users-manual/application-yubihsm-auth/yubihsm-auth-overview.html
+        if version
+            < (Version {
+                major: 5,
+                minor: 4,
+                patch: 3,
+            })
+        {
+            return Err(Error::NotSupported);
+        }
+
+        let mut data = [0u8; CB_BUF_MAX];
+        let mut len = data.len();
+        let mut data_remaining = &mut data[..];
+
+        let offset = Tlv::write(data_remaining, TAG_MGMKEY, &mgmkey.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let offset = Tlv::write(data_remaining, TAG_LABEL, &label.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        len -= data_remaining.len();
+
+        let response = Apdu::new(Ins::DeleteCredential)
+            .params(0x00, 0x00)
+            .data(&data[..len])
+            .transmit(self, 2)?;
+
+        if !response.is_success() {
+            error!(
+                "Unable to delete credential: {:04x}",
+                response.status_words().code()
+            );
+            return Err(Error::GenericError);
+        }
+
+        Ok(())
     }
 }
