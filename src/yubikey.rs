@@ -31,7 +31,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    apdu::{Apdu, Ins},
+    apdu::{Apdu, Ins, NoLE},
     cccid::CccId,
     chuid::ChuId,
     config::Config,
@@ -418,7 +418,7 @@ impl YubiKey {
         let challenge = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
             .data([TAG_DYN_AUTH, 0x02, 0x80, 0x00])
-            .transmit(&txn, 261)?;
+            .transmit::<NoLE>(&txn, 261)?;
 
         if !challenge.is_success() || challenge.data().len() < 12 {
             return Err(Error::AuthenticationError);
@@ -443,7 +443,7 @@ impl YubiKey {
         let authentication = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
             .data(data)
-            .transmit(&txn, 261)?;
+            .transmit::<NoLE>(&txn, 261)?;
 
         if !authentication.is_success() {
             return Err(Error::AuthenticationError);

@@ -2,7 +2,7 @@
 
 use crate::{
     apdu::Response,
-    apdu::{Apdu, Ins, StatusWords},
+    apdu::{Apdu, Ins, NoLE, StatusWords, LE},
     consts::{
         CB_BUF_MAX, CB_OBJ_MAX, TAG_ALGO, TAG_CONTEXT, TAG_KEY_ENC, TAG_KEY_MAC, TAG_LABEL,
         TAG_MGMKEY, TAG_PW, TAG_TOUCH,
@@ -83,7 +83,7 @@ impl<'tx> Transaction<'tx> {
         let response = Apdu::new(Ins::SelectApplication)
             .p1(0x04)
             .data(applet)
-            .transmit(self, 0xFF)
+            .transmit::<NoLE>(self, 0xFF)
             .inspect_err(|e| error!("failed communicating with card: '{}'", e))?;
 
         if !response.is_success() {
@@ -100,7 +100,7 @@ impl<'tx> Transaction<'tx> {
     /// Get the version of the PIV application installed on the YubiKey.
     pub fn get_version(&self) -> Result<Version> {
         // get version from device
-        let response = Apdu::new(Ins::GetVersion).transmit(self, 261)?;
+        let response = Apdu::new(Ins::GetVersion).transmit::<NoLE>(self, 261)?;
 
         if !response.is_success() || response.data().is_empty() {
             return Err(Error::GenericError);
@@ -120,7 +120,7 @@ impl<'tx> Transaction<'tx> {
                     "failed selecting yk application",
                 )?;
 
-                let response = Apdu::new(0x01).p1(0x10).transmit(self, 0xFF)?;
+                let response = Apdu::new(0x01).p1(0x10).transmit::<NoLE>(self, 0xFF)?;
 
                 if !response.is_success() {
                     // TODO(tarcieri): still reselect the PIV applet in this case?
@@ -143,7 +143,7 @@ impl<'tx> Transaction<'tx> {
 
             // YK5 implements getting the serial as a PIV applet command (0xf8)
             5 => {
-                let response = Apdu::new(Ins::GetSerial).transmit(self, 0xFF)?;
+                let response = Apdu::new(Ins::GetSerial).transmit::<NoLE>(self, 0xFF)?;
 
                 if !response.is_success() {
                     error!(
@@ -165,7 +165,7 @@ impl<'tx> Transaction<'tx> {
     pub(crate) fn get_metadata(&self, slot: SlotId) -> Result<piv::SlotMetadata> {
         let response = Apdu::new(Ins::GetMetadata)
             .p2(slot.into())
-            .transmit(self, CB_OBJ_MAX)?;
+            .transmit::<NoLE>(self, CB_OBJ_MAX)?;
 
         if !response.is_success() {
             if response.status_words() == StatusWords::NotSupportedError {
@@ -198,7 +198,7 @@ impl<'tx> Transaction<'tx> {
             query.data(data.as_slice());
         }
 
-        let response = query.transmit(self, 261)?;
+        let response = query.transmit::<NoLE>(self, 261)?;
 
         match response.status_words() {
             StatusWords::Success => Ok(()),
@@ -409,7 +409,7 @@ impl<'tx> Transaction<'tx> {
                 .cla(cla)
                 .params(templ[2], templ[3])
                 .data(&in_data[in_offset..(in_offset + this_size)])
-                .transmit(self, 261)?;
+                .transmit::<NoLE>(self, 261)?;
 
             sw = response.status_words();
 
@@ -440,7 +440,7 @@ impl<'tx> Transaction<'tx> {
         while let StatusWords::BytesRemaining { len } = sw {
             trace!("The card indicates there is {} bytes more data for us", len);
 
-            let response = Apdu::new(Ins::GetResponseApdu).transmit(self, 261)?;
+            let response = Apdu::new(Ins::GetResponseApdu).transmit::<NoLE>(self, 261)?;
             sw = response.status_words();
 
             match sw {
@@ -614,7 +614,7 @@ impl<'tx> Transaction<'tx> {
         let response = Apdu::new(Ins::GetHostChallenge)
             .params(0x00, 0x00)
             .data(&data[..len])
-            .transmit(self, (Challenge::SIZE) + 2)?;
+            .transmit::<NoLE>(self, (Challenge::SIZE) + 2)?;
 
         // TODO: do we need to check response.data() is the size we asked?
         let data = response.data();
@@ -667,7 +667,7 @@ impl<'tx> Transaction<'tx> {
         let response = Apdu::new(Ins::Calculate)
             .params(0x00, 0x00)
             .data(&data[..len])
-            .transmit(self, (hsmauth::KEY_SIZE * 3) + 2)?;
+            .transmit::<NoLE>(self, (hsmauth::KEY_SIZE * 3) + 2)?;
 
         if !response.is_success() {
             error!(
@@ -718,7 +718,7 @@ impl<'tx> Transaction<'tx> {
         let response = Apdu::new(Ins::ListCredentials)
             .params(0x00, 0x00)
             .data(&data[..len])
-            .transmit(self, ((Credential::SIZE) * 32) + 2)?;
+            .transmit::<LE>(self, ((Credential::SIZE) * 32) + 2)?;
 
         let data = response.data();
         Credential::parse_list(data)
@@ -781,7 +781,7 @@ impl<'tx> Transaction<'tx> {
         let response = Apdu::new(Ins::PutCredential)
             .params(0x00, 0x00)
             .data(&data[..len])
-            .transmit(self, 2)?;
+            .transmit::<NoLE>(self, 2)?;
 
         if !response.is_success() {
             error!(
@@ -828,7 +828,7 @@ impl<'tx> Transaction<'tx> {
         let response = Apdu::new(Ins::DeleteCredential)
             .params(0x00, 0x00)
             .data(&data[..len])
-            .transmit(self, 2)?;
+            .transmit::<NoLE>(self, 2)?;
 
         if !response.is_success() {
             error!(
