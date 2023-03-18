@@ -34,6 +34,17 @@ use crate::{transaction::Transaction, Buffer, Result};
 use log::trace;
 use zeroize::{Zeroize, Zeroizing};
 
+pub(crate) trait UseLE {
+    const LE: bool = false;
+}
+
+pub(crate) struct NoLE;
+impl UseLE for NoLE {}
+pub(crate) struct LE;
+impl UseLE for LE {
+    const LE: bool = true;
+}
+
 /// Maximum amount of command data that can be included in an APDU
 const APDU_DATA_MAX: usize = 0xFF;
 
@@ -115,15 +126,15 @@ impl Apdu {
     }
 
     /// Transmit this APDU using the given card transaction
-    pub fn transmit(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response> {
+    pub fn transmit<L: UseLE>(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response> {
         trace!(">>> {:?}", self);
-        let response = Response::from(txn.transmit(&self.to_bytes(), recv_len)?);
+        let response = Response::from(txn.transmit(&self.to_bytes::<L>(), recv_len)?);
         trace!("<<< {:?}", &response);
         Ok(response)
     }
 
     /// Serialize this APDU as a self-zeroizing byte buffer
-    pub fn to_bytes(&self) -> Buffer {
+    pub fn to_bytes<L: UseLE>(&self) -> Buffer {
         let mut bytes = Vec::with_capacity(5 + self.data.len());
         bytes.push(self.cla);
         bytes.push(self.ins.code());
@@ -131,6 +142,11 @@ impl Apdu {
         bytes.push(self.p2);
         bytes.push(self.data.len() as u8);
         bytes.extend_from_slice(self.data.as_ref());
+        // We should advertise we request extended payload
+        if L::LE {
+            bytes.push(0);
+            bytes.push(0);
+        }
         Zeroizing::new(bytes)
     }
 }
