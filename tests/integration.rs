@@ -6,14 +6,15 @@
 use log::trace;
 use once_cell::sync::Lazy;
 use rand_core::{OsRng, RngCore};
-use rsa::pkcs1v15;
+use rsa::{pkcs1v15, RsaPublicKey};
 use sha2::{Digest, Sha256};
 use signature::hazmat::PrehashVerifier;
-use std::{env, str::FromStr, sync::Mutex};
-use x509::RelativeDistinguishedName;
+use std::{env, str::FromStr, sync::Mutex, time::Duration};
+use x509_cert::{der::Encode, name::Name, serial_number::SerialNumber, time::Validity};
 use yubikey::{
     certificate,
-    certificate::{Certificate, PublicKeyInfo},
+    certificate::yubikey_signer,
+    certificate::Certificate,
     piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
     Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
 };
@@ -147,7 +148,7 @@ fn test_set_mgmkey() {
 // Certificate support
 //
 
-fn generate_self_signed_cert(algorithm: AlgorithmId) -> Certificate {
+fn generate_self_signed_cert<KT: yubikey_signer::KeyType>() -> Certificate {
     let mut yubikey = YUBIKEY.lock().unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
@@ -159,25 +160,28 @@ fn generate_self_signed_cert(algorithm: AlgorithmId) -> Certificate {
     let generated = piv::generate(
         &mut yubikey,
         slot,
-        algorithm,
+        KT::ALGORITHM,
         PinPolicy::Default,
         TouchPolicy::Default,
     )
     .unwrap();
 
-    let mut serial = [0u8; 20];
+    // 0x80 0x00 ... (20bytes) is invalid because of high MSB (serial will keep the sign)
+    // we'll limit ourselves to 19 bytes serial.
+    let mut serial = [0u8; 19];
     OsRng.fill_bytes(&mut serial);
+    let serial = SerialNumber::new(&serial[..]).expect("serial can't be more than 20 bytes long");
+    let validity = Validity::from_now(Duration::new(500000, 0)).unwrap();
 
     // Generate a self-signed certificate for the new key.
-    let extensions: &[x509::Extension<'_, &[u64]>] = &[];
-    let cert_result = Certificate::generate_self_signed(
+    let cert_result = Certificate::generate_self_signed::<_, KT>(
         &mut yubikey,
         slot,
         serial,
-        None,
-        &[RelativeDistinguishedName::common_name("testSubject")],
+        validity,
+        Name::from_str("CN=testSubject").expect("parse name"),
         generated,
-        extensions,
+        |_builder| Ok(()),
     );
 
     assert!(cert_result.is_ok());
@@ -189,18 +193,16 @@ fn generate_self_signed_cert(algorithm: AlgorithmId) -> Certificate {
 #[test]
 #[ignore]
 fn generate_self_signed_rsa_cert() {
-    let cert = generate_self_signed_cert(AlgorithmId::Rsa1024);
+    let cert = generate_self_signed_cert::<yubikey_signer::YubiRsa<yubikey_signer::Rsa1024>>();
 
     //
     // Verify that the certificate is signed correctly
     //
 
-    let pubkey = match cert.subject_pki() {
-        PublicKeyInfo::Rsa { pubkey, .. } => pkcs1v15::VerifyingKey::<Sha256>::from(pubkey.clone()),
-        _ => unreachable!(),
-    };
+    let pubkey = RsaPublicKey::try_from(cert.subject_pki()).expect("valid rsa key");
+    let pubkey = pkcs1v15::VerifyingKey::<Sha256>::new_with_prefix(pubkey);
 
-    let data = cert.as_ref();
+    let data = cert.cert.to_der().expect("serialize certificate");
     let tbs_cert_len = u16::from_be_bytes(data[6..8].try_into().unwrap()) as usize;
     let msg = &data[4..8 + tbs_cert_len];
     let sig = pkcs1v15::Signature::try_from(&data[data.len() - 128..]).unwrap();
@@ -212,24 +214,20 @@ fn generate_self_signed_rsa_cert() {
 #[test]
 #[ignore]
 fn generate_self_signed_ec_cert() {
-    let cert = generate_self_signed_cert(AlgorithmId::EccP256);
+    let cert = generate_self_signed_cert::<p256::NistP256>();
 
     //
     // Verify that the certificate is signed correctly
     //
 
-    let pubkey = match cert.subject_pki() {
-        PublicKeyInfo::EcP256(pubkey) => pubkey,
-        _ => unreachable!(),
-    };
+    let vk = p256::ecdsa::VerifyingKey::try_from(cert.subject_pki()).expect("ecdsa key expected");
 
-    let data = cert.as_ref();
+    let data = cert.cert.to_der().expect("serialize certificate");
     let tbs_cert_len = data[6] as usize;
     let sig_algo_len = data[7 + tbs_cert_len + 1] as usize;
     let sig_start = 7 + tbs_cert_len + 2 + sig_algo_len + 3;
     let msg = &data[4..7 + tbs_cert_len];
     let sig = p256::ecdsa::Signature::from_der(&data[sig_start..]).unwrap();
-    let vk = p256::ecdsa::VerifyingKey::from_sec1_bytes(pubkey.as_bytes()).unwrap();
 
     use p256::ecdsa::signature::Verifier;
     assert!(vk.verify(msg, &sig).is_ok());
@@ -269,11 +267,11 @@ fn test_slot_id_display() {
 
     assert_eq!(
         format!("{}", SlotId::Management(ManagementSlotId::Pin)),
-        "PIN"
+        "Pin"
     );
     assert_eq!(
         format!("{}", SlotId::Management(ManagementSlotId::Puk)),
-        "PUK"
+        "Puk"
     );
     assert_eq!(
         format!("{}", SlotId::Management(ManagementSlotId::Management)),
@@ -308,50 +306,6 @@ fn test_read_metadata() {
     let metadata = piv::metadata(&mut yubikey, slot).unwrap();
 
     assert_eq!(metadata.public, Some(generated));
-}
-
-#[test]
-#[ignore]
-fn test_serial_string_conversions() {
-    //2^152+1
-    let serial: [u8; 20] = [
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x01,
-    ];
-
-    let s = certificate::Serial::from(serial);
-    assert_eq!(
-        s.as_x509_int(),
-        "5708990770823839524233143877797980545530986497"
-    );
-    assert_eq!(
-        s.as_x509_hex(),
-        "01:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:01"
-    );
-
-    let serial2: [u8; 20] = [
-        0xA1, 0xF3, 0x02, 0x30, 0x76, 0x01, 0x32, 0x48, 0x09, 0x9C, 0x10, 0xAA, 0x3F, 0xA0, 0x54,
-        0x0D, 0xC0, 0xB7, 0x65, 0x01,
-    ];
-
-    let s2 = certificate::Serial::from(serial2);
-    assert_eq!(
-        s2.as_x509_int(),
-        "924566785900861696177829411010986812227211191553"
-    );
-    assert_eq!(
-        s2.as_x509_hex(),
-        "a1:f3:02:30:76:01:32:48:09:9c:10:aa:3f:a0:54:0d:c0:b7:65:01"
-    );
-
-    let serial3: [u8; 20] = [
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0x3F, 0xA0, 0x54,
-        0x0D, 0xC0, 0xB7, 0x65, 0x01,
-    ];
-
-    let s3 = certificate::Serial::from(serial3);
-    assert_eq!(s3.as_x509_int(), "3140531249369331492097");
-    assert_eq!(s3.as_x509_hex(), "aa:3f:a0:54:0d:c0:b7:65:01");
 }
 
 #[test]

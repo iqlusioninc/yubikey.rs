@@ -21,9 +21,9 @@ members = [".", "cli"]
 
 [dependencies]
 chrono = "0.4.23"
-cookie-factory = "0.3"
-der-parser = "8"
+const-oid = "0.9.2"
 des = "0.8"
+der = "0.7.1"
 elliptic-curve = "0.13"
 hex = { package = "base16ct", version = "0.2", features = ["alloc"] }
 hmac = "0.12"
@@ -32,6 +32,7 @@ nom = "7"
 num-bigint-dig = { version = "0.8", features = ["rand"] }
 num-traits = "0.2"
 num-integer = "0.1"
+ecdsa = { version = "0.16.2", features = ["digest", "pem"] }
 p256 = "0.13"
 p384 = "0.13"
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
@@ -43,8 +44,7 @@ sha1 = { version = "0.10", features = ["oid"] }
 sha2 = { version = "0.10", features = ["oid"] }
 subtle = "2"
 uuid = { version = "1.2", features = ["v4"] }
-x509 = "0.2"
-x509-parser = "0.14"
+x509-cert = { git = "https://github.com/RustCrypto/formats", features = [ "builder", "hazmat" ] }
 zeroize = "1"
 
 [dev-dependencies]
