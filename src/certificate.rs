@@ -42,7 +42,6 @@ use crate::{
 use log::error;
 use x509_cert::{
     builder::{CertificateBuilder, Profile},
-    certificate::Version,
     der::{self, referenced::OwnedToRef, Decode, Encode},
     name::Name,
     serial_number::SerialNumber,
@@ -112,15 +111,14 @@ impl Certificate {
     where
         F: FnOnce(&mut CertificateBuilder<'_, yubikey_signer::Signer<'_, KT>>) -> der::Result<()>,
     {
-        let mut signer = yubikey_signer::Signer::new(yubikey, key, subject_pki.owned_to_ref())?;
+        let signer = yubikey_signer::Signer::new(yubikey, key, subject_pki.owned_to_ref())?;
         let mut builder = CertificateBuilder::new(
             Profile::Manual { issuer: None },
-            Version::V3,
             serial,
             validity,
             subject,
             subject_pki,
-            &mut signer,
+            &signer,
         )
         .map_err(|_| Error::KeyError)?;
 
@@ -436,6 +434,12 @@ pub mod yubikey_signer {
         type VerifyingKey = KT::VerifyingKey;
         fn verifying_key(&self) -> <Self as Keypair>::VerifyingKey {
             self.public_key.clone()
+        }
+    }
+
+    impl<'y, KT: KeyType> DynSignatureAlgorithmIdentifier for Signer<'y, KT> {
+        fn signature_algorithm_identifier(&self) -> spki::Result<AlgorithmIdentifierOwned> {
+            self.verifying_key().signature_algorithm_identifier()
         }
     }
 

@@ -19,6 +19,9 @@ rust-version = "1.65"
 [workspace]
 members = [".", "cli"]
 
+[workspace.dependencies]
+x509-cert = { git = "https://github.com/RustCrypto/formats", features = [ "builder", "hazmat" ] }
+
 [dependencies]
 chrono = "0.4.23"
 const-oid = "0.9.2"
@@ -44,7 +47,7 @@ sha1 = { version = "0.10", features = ["oid"] }
 sha2 = { version = "0.10", features = ["oid"] }
 subtle = "2"
 uuid = { version = "1.2", features = ["v4"] }
-x509-cert = { git = "https://github.com/RustCrypto/formats", features = [ "builder", "hazmat" ] }
+x509-cert.workspace = true
 zeroize = "1"
 
 [dev-dependencies]
