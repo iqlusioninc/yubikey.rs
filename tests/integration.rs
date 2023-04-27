@@ -200,7 +200,7 @@ fn generate_self_signed_rsa_cert() {
     //
 
     let pubkey = RsaPublicKey::try_from(cert.subject_pki()).expect("valid rsa key");
-    let pubkey = pkcs1v15::VerifyingKey::<Sha256>::new_with_prefix(pubkey);
+    let pubkey = pkcs1v15::VerifyingKey::<Sha256>::new(pubkey);
 
     let data = cert.cert.to_der().expect("serialize certificate");
     let tbs_cert_len = u16::from_be_bytes(data[6..8].try_into().unwrap()) as usize;

@@ -41,7 +41,7 @@ use crate::{
 };
 use log::error;
 use x509_cert::{
-    builder::{CertificateBuilder, Profile},
+    builder::{Builder, CertificateBuilder, Profile},
     der::{self, referenced::OwnedToRef, Decode, Encode},
     name::Name,
     serial_number::SerialNumber,
@@ -255,11 +255,11 @@ pub mod yubikey_signer {
         Encode, Sequence,
     };
     use sha2::{Digest, Sha256, Sha384};
-    use signature::{Keypair, SignatureEncoding};
+    use signature::Keypair;
     use std::{cell::RefCell, fmt, io::Write, marker::PhantomData};
     use x509_cert::spki::{
         self, AlgorithmIdentifierOwned, DynSignatureAlgorithmIdentifier, EncodePublicKey,
-        SubjectPublicKeyInfoRef,
+        SignatureBitStringEncoding, SubjectPublicKeyInfoRef,
     };
 
     type SigResult<T> = core::result::Result<T, signature::Error>;
@@ -269,7 +269,7 @@ pub mod yubikey_signer {
         /// Error returned when working with signature
         type Error: Into<signature::Error> + fmt::Debug;
         /// The signature type returned by the signer
-        type Signature: SignatureEncoding
+        type Signature: SignatureBitStringEncoding
             + for<'s> TryFrom<&'s [u8], Error = Self::Error>
             + fmt::Debug;
         /// The public key used to verify signature
