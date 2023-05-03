@@ -45,7 +45,7 @@ use log::error;
 use num_bigint_dig::BigUint;
 use p256::NistP256;
 use p384::NistP384;
-use rsa::{PublicKeyParts, RsaPublicKey};
+use rsa::{traits::PublicKeyParts, RsaPublicKey};
 use sha2::{Digest, Sha256};
 use std::fmt::Display;
 use std::{fmt, ops::DerefMut};
@@ -675,7 +675,7 @@ mod read_pki {
 
 mod write_pki {
     use cookie_factory::{SerializeFn, WriteContext};
-    use rsa::{BigUint, PublicKeyParts, RsaPublicKey};
+    use rsa::{traits::PublicKeyParts, BigUint, RsaPublicKey};
     use std::io::Write;
     use x509::der::write::{der_integer, der_sequence};
 
