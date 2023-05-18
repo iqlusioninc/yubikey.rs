@@ -180,25 +180,42 @@ impl YubiKey {
     ///
     /// Returns an error if there is more than one YubiKey detected.
     ///
+    /// NOTE: If multiple YubiKeys are connected, but we are only able to
+    /// open one of them (e.g. because the other one is in use, and the
+    /// connection doesn't allow sharing), the YubiKey that we were able to
+    /// open is returned.
+    ///
     /// If you need to operate in environments with more than one YubiKey
     /// attached to the same system, use [`YubiKey::open_by_serial`] or
     /// [`yubikey::reader::Context`][`Context`] to select from the available
     /// PC/SC readers.
     pub fn open() -> Result<Self> {
+        let mut yubikey: Option<Self> = None;
+
         let mut readers = Context::open()?;
-        let mut reader_iter = readers.iter()?;
+        for reader in readers.iter()? {
+            if let Ok(yk_found) = reader.open() {
+                if let Some(yk_stored) = yubikey {
+                    // We found two YubiKeys, so we won't use either.
+                    // Don't reset them.
+                    let _ = yk_stored.disconnect(pcsc::Disposition::LeaveCard);
+                    let _ = yk_found.disconnect(pcsc::Disposition::LeaveCard);
 
-        if let Some(reader) = reader_iter.next() {
-            if reader_iter.next().is_some() {
-                error!("multiple YubiKeys detected!");
-                return Err(Error::PcscError { inner: None });
+                    error!("multiple YubiKeys detected!");
+                    return Err(Error::PcscError { inner: None });
+                } else {
+                    yubikey = Some(yk_found);
+                }
             }
-
-            return reader.open();
         }
 
-        error!("no YubiKey detected!");
-        Err(Error::NotFound)
+        if let Some(yubikey) = yubikey {
+            // We found exactly one YubiKey that we could open, so we return it.
+            Ok(yubikey)
+        } else {
+            error!("no YubiKey detected!");
+            Err(Error::NotFound)
+        }
     }
 
     /// Open a YubiKey with a specific serial number.
