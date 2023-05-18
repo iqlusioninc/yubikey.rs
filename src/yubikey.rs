@@ -178,7 +178,7 @@ impl fmt::Debug for YubiKey {
 impl YubiKey {
     /// Open a connection to a YubiKey.
     ///
-    /// Returns an error if there is more than one YubiKey detected.
+    /// Returns an error if more than one YubiKey is detected (or none at all).
     ///
     /// NOTE: If multiple YubiKeys are connected, but we are only able to
     /// open one of them (e.g. because the other one is in use, and the
