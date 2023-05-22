@@ -59,9 +59,11 @@ use {
         transaction::ChangeRefAction,
         Buffer, ObjectId,
     },
-    secrecy::ExposeSecret,
     std::time::{SystemTime, UNIX_EPOCH},
 };
+
+#[cfg(all(feature = "untested", feature = "cache-pin"))]
+use secrecy::ExposeSecret;
 
 /// Flag for PUK blocked
 pub(crate) const ADMIN_FLAGS_1_PUK_BLOCKED: u8 = 0x01;
@@ -75,6 +77,7 @@ pub(crate) const KEY_CARDMGM: u8 = 0x9b;
 const TAG_DYN_AUTH: u8 = 0x7c;
 
 /// Cached YubiKey PIN.
+#[cfg(feature = "cache-pin")]
 pub type CachedPin = secrecy::SecretVec<u8>;
 
 /// YubiKey serial number.
@@ -160,6 +163,7 @@ impl Display for Version {
 pub struct YubiKey {
     pub(crate) card: Card,
     pub(crate) name: String,
+    #[cfg(feature = "cache-pin")]
     pub(crate) pin: Option<CachedPin>,
     pub(crate) version: Version,
     pub(crate) serial: Serial,
@@ -242,7 +246,7 @@ impl YubiKey {
     }
 
     /// Reconnect to a YubiKey.
-    #[cfg(feature = "untested")]
+    #[cfg(all(feature = "untested", feature = "cache-pin"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn reconnect(&mut self) -> Result<()> {
         info!("trying to reconnect to current reader");
@@ -281,6 +285,7 @@ impl YubiKey {
         let Self {
             card,
             name,
+            #[cfg(feature = "cache-pin")]
             pin,
             version,
             serial,
@@ -291,6 +296,7 @@ impl YubiKey {
                 Self {
                     card,
                     name,
+                    #[cfg(feature = "cache-pin")]
                     pin,
                     version,
                     serial,
@@ -430,6 +436,7 @@ impl YubiKey {
             txn.verify_pin(pin)?;
         }
 
+        #[cfg(feature = "cache-pin")]
         if !pin.is_empty() {
             self.pin = Some(CachedPin::new(pin.into()))
         }
@@ -488,6 +495,7 @@ impl YubiKey {
             txn.change_ref(ChangeRefAction::ChangePin, current_pin, new_pin)?;
         }
 
+        #[cfg(feature = "cache-pin")]
         if !new_pin.is_empty() {
             self.pin = Some(CachedPin::new(new_pin.into()));
         }
@@ -730,6 +738,7 @@ impl<'a> TryFrom<&'a Reader<'_>> for YubiKey {
                 let yubikey = YubiKey {
                     card,
                     name: String::from(reader.name()),
+                    #[cfg(feature = "cache-pin")]
                     pin: None,
                     version,
                     serial,
