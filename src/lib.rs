@@ -69,8 +69,11 @@ pub use crate::{
     policy::{PinPolicy, TouchPolicy},
     reader::Context,
     setting::{Setting, SettingSource},
-    yubikey::{CachedPin, Serial, Version, YubiKey},
+    yubikey::{Serial, Version, YubiKey},
 };
+
+#[cfg(feature = "cache-pin")]
+pub use crate::yubikey::CachedPin;
 
 #[cfg(feature = "untested")]
 pub use crate::{mscmap::MsContainer, msroots::MsRoots};
