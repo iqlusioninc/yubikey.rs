@@ -1220,7 +1220,6 @@ version = "0.8.0-pre.0"
 dependencies = [
  "base16ct",
  "chrono",
- "const-oid",
  "der",
  "des",
  "ecdsa",
