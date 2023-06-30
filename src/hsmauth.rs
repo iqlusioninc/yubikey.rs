@@ -32,6 +32,18 @@ pub(crate) const KEY_SIZE: usize = 16;
 /// Password to authenticate to the Yubikey HSM Auth Applet has a max length of 16
 pub(crate) const PW_LEN: usize = 16;
 
+/// Management key used to manipulate secrets (add/delete)
+pub struct MgmKey(pub [u8; PW_LEN]);
+
+impl Default for MgmKey {
+    fn default() -> Self {
+        // https://docs.yubico.com/yesdk/users-manual/application-yubihsm-auth/commands/change-management-key.html
+        // The default value of the management key is all zeros:
+        // 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+        Self([0; PW_LEN])
+    }
+}
+
 /// Label associated with a secret on the Yubikey.
 #[derive(Clone)]
 pub struct Label(pub(crate) Vec<u8>);
@@ -116,6 +128,27 @@ impl HsmAuth {
         Transaction::new(&mut self.client.card)?.list_credentials(self.client.version)
     }
 
+    /// Put credential
+    pub fn put_credential(
+        &mut self,
+        mgmkey: Option<MgmKey>,
+        label: Label,
+        password: &[u8],
+        enc_key: [u8; KEY_SIZE],
+        mac_key: [u8; KEY_SIZE],
+        touch: bool,
+    ) -> Result<()> {
+        Transaction::new(&mut self.client.card)?.put_credential(
+            self.client.version,
+            mgmkey.unwrap_or_default(),
+            label,
+            password,
+            enc_key,
+            mac_key,
+            touch,
+        )
+    }
+
     /// Retun the inner `YubiKey`
     pub fn into_inner(mut self) -> Result<YubiKey> {
         Transaction::new(&mut self.client.card)?.select_piv_application()?;
@@ -124,12 +157,13 @@ impl HsmAuth {
 }
 
 #[derive(Debug)]
+#[repr(u8)]
 /// Algorithm for the credentials
 pub enum Algorithm {
     /// AES 128 keys
-    Aes128,
+    Aes128 = 38,
     /// EC P256
-    EcP256,
+    EcP256 = 39,
 }
 
 impl fmt::Display for Algorithm {
