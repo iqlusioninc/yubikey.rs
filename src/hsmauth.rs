@@ -149,6 +149,15 @@ impl HsmAuth {
         )
     }
 
+    /// Delete credential
+    pub fn delete_credential(&mut self, mgmkey: Option<MgmKey>, label: Label) -> Result<()> {
+        Transaction::new(&mut self.client.card)?.delete_credential(
+            self.client.version,
+            mgmkey.unwrap_or_default(),
+            label,
+        )
+    }
+
     /// Retun the inner `YubiKey`
     pub fn into_inner(mut self) -> Result<YubiKey> {
         Transaction::new(&mut self.client.card)?.select_piv_application()?;

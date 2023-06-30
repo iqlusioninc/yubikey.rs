@@ -703,4 +703,51 @@ impl<'tx> Transaction<'tx> {
 
         Ok(())
     }
+
+    /// Delete a credential to YubiHSM Auth applet
+    pub fn delete_credential(
+        &mut self,
+        version: Version,
+        mgmkey: hsmauth::MgmKey,
+        label: Label,
+    ) -> Result<()> {
+        // YubiHSM was introduced by firmware 5.4.3
+        // https://docs.yubico.com/yesdk/users-manual/application-yubihsm-auth/yubihsm-auth-overview.html
+        if version
+            < (Version {
+                major: 5,
+                minor: 4,
+                patch: 3,
+            })
+        {
+            return Err(Error::NotSupported);
+        }
+
+        let mut data = [0u8; CB_BUF_MAX];
+        let mut len = data.len();
+        let mut data_remaining = &mut data[..];
+
+        let offset = Tlv::write(data_remaining, TAG_MGMKEY, &mgmkey.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        let offset = Tlv::write(data_remaining, TAG_LABEL, &label.0)?;
+        data_remaining = &mut data_remaining[offset..];
+
+        len -= data_remaining.len();
+
+        let response = Apdu::new(Ins::DeleteCredential)
+            .params(0x00, 0x00)
+            .data(&data[..len])
+            .transmit(self, 2)?;
+
+        if !response.is_success() {
+            error!(
+                "Unable to delete credential: {:04x}",
+                response.status_words().code()
+            );
+            return Err(Error::GenericError);
+        }
+
+        Ok(())
+    }
 }

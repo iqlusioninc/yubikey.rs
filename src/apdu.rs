@@ -210,6 +210,9 @@ pub enum Ins {
     /// YubiHSM Auth // Put credential
     PutCredential,
 
+    /// YubiHSM Auth // Delete credential
+    DeleteCredential,
+
     /// Other/unrecognized instruction codes
     Other(u8),
 }
@@ -237,6 +240,7 @@ impl Ins {
             Ins::GetMetadata => 0xf7,
             // Yubihsm auth
             Ins::PutCredential => 0x01,
+            Ins::DeleteCredential => 0x02,
             Ins::Calculate => 0x03,
             Ins::GetHostChallenge => 0x04,
             Ins::ListCredentials => 0x05,
@@ -249,6 +253,7 @@ impl From<u8> for Ins {
     fn from(code: u8) -> Self {
         match code {
             0x01 => Ins::PutCredential,
+            0x02 => Ins::DeleteCredential,
             0x03 => Ins::Calculate,
             0x04 => Ins::GetHostChallenge,
             0x05 => Ins::ListCredentials,
