@@ -442,10 +442,11 @@ impl ManagementSlotId {
 }
 
 /// Personal Identity Verification (PIV) key slots
-pub const SLOTS: [SlotId; 27] = [
+pub const SLOTS: [SlotId; 28] = [
     SlotId::Authentication,
     SlotId::Signature,
     SlotId::KeyManagement,
+    SlotId::Attestation,
     SlotId::Retired(RetiredSlotId::R1),
     SlotId::Retired(RetiredSlotId::R2),
     SlotId::Retired(RetiredSlotId::R3),

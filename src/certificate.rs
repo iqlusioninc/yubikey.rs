@@ -414,7 +414,8 @@ pub mod yubikey_signer {
     }
 
     impl<'y, KT: KeyType> Signer<'y, KT> {
-        pub(crate) fn new(
+        /// Create new Signer
+        pub fn new(
             yubikey: &'y mut YubiKey,
             key: SlotId,
             subject_pki: SubjectPublicKeyInfoRef<'_>,
