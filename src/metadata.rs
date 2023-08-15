@@ -88,7 +88,6 @@ impl<T: MetadataType> Metadata<T> {
 
     /// Write metadata
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub(crate) fn write(&self, txn: &Transaction<'_>) -> Result<()> {
         if self.inner.len() > CB_OBJ_MAX - CB_OBJ_TAG_MAX {
             return Err(Error::GenericError);
@@ -106,7 +105,6 @@ impl<T: MetadataType> Metadata<T> {
 
     /// Delete metadata
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub(crate) fn delete(txn: &Transaction<'_>) -> Result<()> {
         txn.save_object(T::obj_id(), &[])
     }
@@ -130,7 +128,6 @@ impl<T: MetadataType> Metadata<T> {
 
     /// Set metadata item
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub(crate) fn set_item(&mut self, tag: u8, item: &[u8]) -> Result<()> {
         let mut cb_temp: usize = 0;
         let mut tag_temp: u8 = 0;

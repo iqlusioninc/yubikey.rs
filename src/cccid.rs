@@ -100,7 +100,6 @@ impl CccId {
 
     /// Set Cardholder Capability Container (CCC) ID
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn set(&self, yubikey: &mut YubiKey) -> Result<()> {
         let mut buf = CCC_TMPL.to_vec();
         buf[0..self.0.len()].copy_from_slice(&self.0);
