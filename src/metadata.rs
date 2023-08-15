@@ -71,7 +71,7 @@ impl<T: MetadataType> Default for Metadata<T> {
     fn default() -> Self {
         Metadata {
             inner: Zeroizing::new(vec![]),
-            _marker: PhantomData::default(),
+            _marker: PhantomData,
         }
     }
 }
@@ -82,7 +82,7 @@ impl<T: MetadataType> Metadata<T> {
         let data = txn.fetch_object(T::obj_id())?;
         Ok(Metadata {
             inner: Tlv::parse_single(data, T::tag())?,
-            _marker: PhantomData::default(),
+            _marker: PhantomData,
         })
     }
 
