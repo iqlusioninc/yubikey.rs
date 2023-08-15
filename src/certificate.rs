@@ -153,7 +153,6 @@ impl Certificate {
 
     /// Delete a certificate located at the given slot of the given YubiKey
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn delete(yubikey: &mut YubiKey, slot: SlotId) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
         write_certificate(&txn, slot, None, CertInfo::Uncompressed)

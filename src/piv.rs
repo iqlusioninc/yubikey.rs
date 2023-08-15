@@ -521,7 +521,6 @@ impl AlgorithmId {
     }
 
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     fn get_elem_len(self) -> usize {
         match self {
             AlgorithmId::Rsa1024 => 64,
@@ -532,7 +531,6 @@ impl AlgorithmId {
     }
 
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     fn get_param_tag(self) -> u8 {
         match self {
             AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => 0x01,
@@ -703,7 +701,6 @@ pub fn generate(
 }
 
 #[cfg(feature = "untested")]
-#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 fn write_key(
     yubikey: &mut YubiKey,
     slot: SlotId,
@@ -752,7 +749,6 @@ fn write_key(
 
 /// The key data that makes up an RSA key.
 #[cfg(feature = "untested")]
-#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub struct RsaKeyData {
     /// The secret prime `p`.
     p: Buffer,
@@ -814,7 +810,6 @@ impl RsaKeyData {
 ///
 /// Errors if `algorithm` isn't `AlgorithmId::Rsa1024` or `AlgorithmId::Rsa2048`.
 #[cfg(feature = "untested")]
-#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub fn import_rsa_key(
     yubikey: &mut YubiKey,
     slot: SlotId,
@@ -849,7 +844,6 @@ pub fn import_rsa_key(
 ///
 /// Errors if `algorithm` isn't `AlgorithmId::EccP256` or ` AlgorithmId::EccP384`.
 #[cfg(feature = "untested")]
-#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub fn import_ecc_key(
     yubikey: &mut YubiKey,
     slot: SlotId,
@@ -878,7 +872,6 @@ pub fn import_ecc_key(
 ///
 /// <https://developers.yubico.com/PIV/Introduction/PIV_attestation.html>
 #[cfg(feature = "untested")]
-#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub fn attest(yubikey: &mut YubiKey, key: SlotId) -> Result<Buffer> {
     let templ = [0, Ins::Attest.code(), key.into(), 0];
     let txn = yubikey.begin_transaction()?;
@@ -914,7 +907,6 @@ pub fn sign_data(
 
 /// Decrypt data using a PIV key.
 #[cfg(feature = "untested")]
-#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub fn decrypt_data(
     yubikey: &mut YubiKey,
     input: &[u8],

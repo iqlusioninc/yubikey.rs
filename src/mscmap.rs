@@ -41,7 +41,6 @@ const TAG_MSCMAP: u8 = 0x81;
 ///
 /// Defined in Microsoft's Smart Card Minidriver Specification:
 /// <https://docs.microsoft.com/en-us/previous-versions/windows/hardware/design/dn631754(v=vs.85)>
-#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 #[derive(Clone, Debug)]
 pub struct MsContainer {
     /// Container name.

@@ -260,7 +260,6 @@ impl YubiKey {
 
     /// Reconnect to a YubiKey.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn reconnect(&mut self) -> Result<()> {
         info!("trying to reconnect to current reader");
 
@@ -414,7 +413,6 @@ impl YubiKey {
 
     /// Deauthenticate.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn deauthenticate(&mut self) -> Result<()> {
         let txn = self.begin_transaction()?;
 
@@ -473,7 +471,6 @@ impl YubiKey {
 
     /// Set the number of PIN retries.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn set_pin_retries(&mut self, pin_tries: u8, puk_tries: u8) -> Result<()> {
         // Special case: if either retry count is 0, it's a successful no-op
         if pin_tries == 0 || puk_tries == 0 {
@@ -498,7 +495,6 @@ impl YubiKey {
     ///
     /// The default PIN code is `123456`.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn change_pin(&mut self, current_pin: &[u8], new_pin: &[u8]) -> Result<()> {
         {
             let txn = self.begin_transaction()?;
@@ -514,7 +510,6 @@ impl YubiKey {
 
     /// Set PIN last changed.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn set_pin_last_changed(yubikey: &mut YubiKey) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 
@@ -550,7 +545,6 @@ impl YubiKey {
     ///
     /// The default PUK code is `12345678`.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn change_puk(&mut self, current_puk: &[u8], new_puk: &[u8]) -> Result<()> {
         let txn = self.begin_transaction()?;
         txn.change_ref(ChangeRefAction::ChangePuk, current_puk, new_puk)
@@ -558,7 +552,6 @@ impl YubiKey {
 
     /// Block PUK: permanently prevent the PIN from becoming unblocked.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn block_puk(&mut self) -> Result<()> {
         let mut puk = [0x30, 0x42, 0x41, 0x44, 0x46, 0x30, 0x30, 0x44];
         let mut tries_remaining: i32 = -1;
@@ -622,7 +615,6 @@ impl YubiKey {
     /// Unblock a Personal Identification Number (PIN) using a previously
     /// configured PIN Unblocking Key (PUK).
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn unblock_pin(&mut self, puk: &[u8], new_pin: &[u8]) -> Result<()> {
         let txn = self.begin_transaction()?;
         txn.change_ref(ChangeRefAction::UnblockPin, puk, new_pin)
@@ -630,7 +622,6 @@ impl YubiKey {
 
     /// Fetch an object from the YubiKey.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn fetch_object(&mut self, object_id: ObjectId) -> Result<Buffer> {
         let txn = self.begin_transaction()?;
         txn.fetch_object(object_id)
@@ -638,7 +629,6 @@ impl YubiKey {
 
     /// Save an object.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn save_object(&mut self, object_id: ObjectId, indata: &mut [u8]) -> Result<()> {
         let txn = self.begin_transaction()?;
         txn.save_object(object_id, indata)
@@ -646,7 +636,6 @@ impl YubiKey {
 
     /// Get an auth challenge.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn get_auth_challenge(&mut self) -> Result<[u8; 8]> {
         let txn = self.begin_transaction()?;
 
@@ -664,7 +653,6 @@ impl YubiKey {
 
     /// Verify an auth response.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn verify_auth_response(&mut self, response: [u8; 8]) -> Result<()> {
         let mut data = [0u8; 12];
         data[0] = 0x7c;
@@ -695,7 +683,6 @@ impl YubiKey {
     ///
     /// The reset function is only available when both pins are blocked.
     #[cfg(feature = "untested")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
     pub fn reset_device(&mut self) -> Result<()> {
         let templ = [0, Ins::Reset.code(), 0, 0];
         let txn = self.begin_transaction()?;

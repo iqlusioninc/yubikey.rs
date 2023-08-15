@@ -57,7 +57,6 @@ const TAG_MSROOTS_MID: u8 = 0x83;
 ///
 /// For more information, see:
 /// <https://docs.microsoft.com/en-us/windows-hardware/drivers/smartcard/developer-guidelines#-interoperability-with-msroots>
-#[cfg_attr(docsrs, doc(cfg(feature = "untested")))]
 pub struct MsRoots(Vec<u8>);
 
 impl MsRoots {
