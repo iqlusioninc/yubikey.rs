@@ -223,20 +223,18 @@ pub(crate) fn write_certificate(
 ) -> Result<()> {
     let object_id = slot.object_id();
 
-    if data.is_none() {
-        return txn.save_object(object_id, &[]);
+    if let Some(data) = data {
+        let mut buf = [0u8; CB_OBJ_MAX];
+        let mut offset = Tlv::write(&mut buf, TAG_CERT, data)?;
+
+        // write compression info and LRC trailer
+        offset += Tlv::write(&mut buf[offset..], TAG_CERT_COMPRESS, &[certinfo.into()])?;
+        offset += Tlv::write(&mut buf[offset..], TAG_CERT_LRC, &[])?;
+
+        txn.save_object(object_id, &buf[..offset])
+    } else {
+        txn.save_object(object_id, &[])
     }
-
-    let data = data.unwrap();
-
-    let mut buf = [0u8; CB_OBJ_MAX];
-    let mut offset = Tlv::write(&mut buf, TAG_CERT, data)?;
-
-    // write compression info and LRC trailer
-    offset += Tlv::write(&mut buf[offset..], TAG_CERT_COMPRESS, &[certinfo.into()])?;
-    offset += Tlv::write(&mut buf[offset..], TAG_CERT_LRC, &[])?;
-
-    txn.save_object(object_id, &buf[..offset])
 }
 
 pub mod yubikey_signer {

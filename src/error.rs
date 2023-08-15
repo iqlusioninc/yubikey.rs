@@ -164,6 +164,18 @@ impl Display for Error {
     }
 }
 
+impl From<std::array::TryFromSliceError> for Error {
+    fn from(_: std::array::TryFromSliceError) -> Error {
+        Error::SizeError
+    }
+}
+
+impl From<std::time::SystemTimeError> for Error {
+    fn from(_: std::time::SystemTimeError) -> Error {
+        Error::GenericError
+    }
+}
+
 impl From<pcsc::Error> for Error {
     fn from(err: pcsc::Error) -> Error {
         Error::PcscError { inner: Some(err) }

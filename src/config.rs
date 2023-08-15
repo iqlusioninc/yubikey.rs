@@ -111,7 +111,7 @@ impl Config {
                     error!("pin timestamp in admin metadata is an invalid size");
                 } else {
                     // TODO(tarcieri): double-check endianness is correct
-                    let pin_last_changed = u32::from_le_bytes(item.try_into().unwrap());
+                    let pin_last_changed = u32::from_le_bytes([item[0], item[1], item[2], item[3]]);
 
                     if pin_last_changed != 0 {
                         config.pin_last_changed =

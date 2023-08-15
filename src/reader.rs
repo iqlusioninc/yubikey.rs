@@ -1,6 +1,6 @@
 //! Support for enumerating available PC/SC card readers.
 
-use crate::{Result, YubiKey};
+use crate::{Error, Result, YubiKey};
 use std::{
     borrow::Cow,
     ffi::CStr,
@@ -43,7 +43,8 @@ impl Context {
         let Self { ctx, reader_names } = self;
 
         let reader_cstrs: Vec<_> = {
-            let c = ctx.lock().unwrap();
+            // TODO(tarcieri): better error?
+            let c = ctx.lock().map_err(|_| Error::GenericError)?;
 
             // ensure PC/SC context is valid
             c.is_valid()?;
@@ -90,7 +91,8 @@ impl<'ctx> Reader<'ctx> {
 
     /// Connect to this reader, returning its `pcsc::Card`.
     pub(crate) fn connect(&self) -> Result<pcsc::Card> {
-        let ctx = self.ctx.lock().unwrap();
+        // TODO(tarcieri): better error?
+        let ctx = self.ctx.lock().map_err(|_| Error::GenericError)?;
         Ok(ctx.connect(self.name, pcsc::ShareMode::Shared, pcsc::Protocols::T1)?)
     }
 }

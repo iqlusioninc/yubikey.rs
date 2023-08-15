@@ -30,7 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{Error, Result, YubiKey};
+use crate::{Result, YubiKey};
 use rand_core::{OsRng, RngCore};
 use std::fmt::{self, Debug, Display};
 
@@ -48,6 +48,7 @@ const OBJ_CAPABILITY: u32 = 0x005f_c107;
 ///  - 0xff == Manufacturer ID (dummy)
 ///  - 0x02 == Card type (javaCard)
 ///  - next 14 bytes: card ID
+#[allow(dead_code)]
 const CCC_TMPL: &[u8] = &[
     0xf0, 0x15, 0xa0, 0x00, 0x00, 0x01, 0x16, 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf1, 0x01, 0x21, 0xf2, 0x01, 0x21, 0xf3, 0x00, 0xf4,
@@ -90,12 +91,7 @@ impl CccId {
     pub fn get(yubikey: &mut YubiKey) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
         let response = txn.fetch_object(OBJ_CAPABILITY)?;
-
-        if response.len() != CCC_TMPL.len() {
-            return Err(Error::GenericError);
-        }
-
-        Ok(Self(response[..Self::BYTE_SIZE].try_into().unwrap()))
+        Ok(response[..Self::BYTE_SIZE].try_into().map(Self)?)
     }
 
     /// Set Cardholder Capability Container (CCC) ID

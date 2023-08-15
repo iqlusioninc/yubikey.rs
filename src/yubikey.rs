@@ -371,7 +371,7 @@ impl YubiKey {
         }
 
         // send a response to the cards challenge and a challenge of our own.
-        let response = mgm_key.decrypt(challenge.data()[4..12].try_into().unwrap());
+        let response = mgm_key.decrypt(challenge.data()[4..12].try_into()?);
 
         let mut data = [0u8; 22];
         data[0] = TAG_DYN_AUTH;
@@ -517,8 +517,7 @@ impl YubiKey {
 
         // TODO(tarcieri): double check this is little endian
         let tnow = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .duration_since(UNIX_EPOCH)?
             .as_secs()
             .to_le_bytes();
 
@@ -648,7 +647,11 @@ impl YubiKey {
             return Err(Error::AuthenticationError);
         }
 
-        Ok(response.data()[4..12].try_into().unwrap())
+        Ok(response
+            .data()
+            .get(4..12)
+            .ok_or(Error::SizeError)?
+            .try_into()?)
     }
 
     /// Verify an auth response.
