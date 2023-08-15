@@ -33,89 +33,26 @@
 use crate::{
     consts::CB_OBJ_MAX,
     error::{Error, Result},
-    piv::{sign_data, AlgorithmId, SlotId},
+    piv::SlotId,
     serialization::*,
     transaction::Transaction,
     yubikey::YubiKey,
     Buffer,
 };
-use chrono::{DateTime, Utc};
-use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
 use log::error;
-use num_bigint_dig::BigUint;
-use p256::NistP256;
-use p384::NistP384;
-use rsa::{traits::PublicKeyParts, RsaPublicKey};
-use sha2::{Digest, Sha256};
-use std::fmt::Display;
-use std::{fmt, ops::DerefMut};
-use x509::{der::Oid, RelativeDistinguishedName};
-use x509_parser::{parse_x509_certificate, x509::SubjectPublicKeyInfo};
+use x509_cert::{
+    builder::{Builder, CertificateBuilder, Profile},
+    der::{self, referenced::OwnedToRef, Decode, Encode},
+    name::Name,
+    serial_number::SerialNumber,
+    spki::{SubjectPublicKeyInfoOwned, SubjectPublicKeyInfoRef},
+    time::Validity,
+};
 use zeroize::Zeroizing;
-
-// TODO: Make these der_parser::oid::Oid constants when it has const fn support.
-const OID_RSA_ENCRYPTION: &str = "1.2.840.113549.1.1.1";
-const OID_EC_PUBLIC_KEY: &str = "1.2.840.10045.2.1";
-const OID_NIST_P256: &str = "1.2.840.10045.3.1.7";
-const OID_NIST_P384: &str = "1.3.132.0.34";
 
 const TAG_CERT: u8 = 0x70;
 const TAG_CERT_COMPRESS: u8 = 0x71;
 const TAG_CERT_LRC: u8 = 0xFE;
-
-/// A serial number for a [`Certificate`].
-#[derive(Clone, Debug)]
-pub struct Serial(BigUint);
-
-impl From<BigUint> for Serial {
-    fn from(num: BigUint) -> Serial {
-        Serial(num)
-    }
-}
-
-impl From<[u8; 20]> for Serial {
-    fn from(bytes: [u8; 20]) -> Serial {
-        Serial(BigUint::from_bytes_be(&bytes))
-    }
-}
-
-impl TryFrom<&[u8]> for Serial {
-    type Error = Error;
-
-    fn try_from(bytes: &[u8]) -> Result<Serial> {
-        if bytes.len() <= 20 {
-            Ok(Serial(BigUint::from_bytes_be(bytes)))
-        } else {
-            Err(Error::ParseError)
-        }
-    }
-}
-
-impl Serial {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.0.to_bytes_be()
-    }
-    /// Returns itself formatted as x509 compatible hex string
-    pub fn as_x509_hex(&self) -> String {
-        let data = self.to_bytes();
-        let raw_hex_string = format!("{:02X?}", data);
-        raw_hex_string
-            .replace(", ", ":")
-            .replace([']', '['], "")
-            .to_lowercase()
-    }
-    /// Returns itself formatted as x509 compatible int string
-    pub fn as_x509_int(&self) -> String {
-        let Serial(buint) = self;
-        format!("{}", buint)
-    }
-}
-
-impl Display for Serial {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.as_x509_hex())
-    }
-}
 
 /// Information about how a [`Certificate`] is stored within a YubiKey.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -148,210 +85,11 @@ impl From<CertInfo> for u8 {
     }
 }
 
-impl x509::AlgorithmIdentifier for AlgorithmId {
-    type AlgorithmOid = &'static [u64];
-
-    fn algorithm(&self) -> Self::AlgorithmOid {
-        match self {
-            // RSA encryption
-            AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => &[1, 2, 840, 113_549, 1, 1, 1],
-            // EC Public Key
-            AlgorithmId::EccP256 | AlgorithmId::EccP384 => &[1, 2, 840, 10045, 2, 1],
-        }
-    }
-
-    fn parameters<W: std::io::Write>(
-        &self,
-        w: cookie_factory::WriteContext<W>,
-    ) -> cookie_factory::GenResult<W> {
-        use x509::der::write::der_oid;
-
-        // From [RFC 5480](https://tools.ietf.org/html/rfc5480#section-2.1.1):
-        // ```text
-        // ECParameters ::= CHOICE {
-        //   namedCurve         OBJECT IDENTIFIER
-        //   -- implicitCurve   NULL
-        //   -- specifiedCurve  SpecifiedECDomain
-        // }
-        // ```
-        match self {
-            AlgorithmId::EccP256 => der_oid(&[1, 2, 840, 10045, 3, 1, 7][..])(w),
-            AlgorithmId::EccP384 => der_oid(&[1, 3, 132, 0, 34][..])(w),
-            _ => Ok(w),
-        }
-    }
-}
-
-/// Information about a public key within a [`Certificate`].
-#[derive(Clone, Eq, PartialEq)]
-pub enum PublicKeyInfo {
-    /// RSA keys
-    Rsa {
-        /// RSA algorithm
-        algorithm: AlgorithmId,
-
-        /// Public key
-        pubkey: RsaPublicKey,
-    },
-
-    /// EC P-256 keys
-    EcP256(EcPublicKey<NistP256>),
-
-    /// EC P-384 keys
-    EcP384(EcPublicKey<NistP384>),
-}
-
-impl fmt::Debug for PublicKeyInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "PublicKeyInfo({:?})", self.algorithm())
-    }
-}
-
-impl PublicKeyInfo {
-    fn parse(subject_pki: &SubjectPublicKeyInfo<'_>) -> Result<Self> {
-        match subject_pki.algorithm.algorithm.to_string().as_str() {
-            OID_RSA_ENCRYPTION => {
-                let pubkey = read_pki::rsa_pubkey(&subject_pki.subject_public_key.data)?;
-
-                Ok(PublicKeyInfo::Rsa {
-                    algorithm: match pubkey.n().bits() {
-                        1024 => AlgorithmId::Rsa1024,
-                        2048 => AlgorithmId::Rsa2048,
-                        _ => return Err(Error::AlgorithmError),
-                    },
-                    pubkey,
-                })
-            }
-            OID_EC_PUBLIC_KEY => {
-                let key_bytes = &subject_pki.subject_public_key.data;
-                let algorithm_parameters = subject_pki
-                    .algorithm
-                    .parameters
-                    .as_ref()
-                    .ok_or(Error::InvalidObject)?;
-
-                match read_pki::ec_parameters(algorithm_parameters)? {
-                    AlgorithmId::EccP256 => EcPublicKey::<NistP256>::from_bytes(key_bytes)
-                        .map(PublicKeyInfo::EcP256)
-                        .map_err(|_| Error::InvalidObject),
-                    AlgorithmId::EccP384 => EcPublicKey::<NistP384>::from_bytes(key_bytes)
-                        .map(PublicKeyInfo::EcP384)
-                        .map_err(|_| Error::InvalidObject),
-                    _ => Err(Error::AlgorithmError),
-                }
-            }
-            _ => Err(Error::InvalidObject),
-        }
-    }
-
-    /// Returns the algorithm that this public key can be used with.
-    pub fn algorithm(&self) -> AlgorithmId {
-        match self {
-            PublicKeyInfo::Rsa { algorithm, .. } => *algorithm,
-            PublicKeyInfo::EcP256(_) => AlgorithmId::EccP256,
-            PublicKeyInfo::EcP384(_) => AlgorithmId::EccP384,
-        }
-    }
-}
-
-impl x509::SubjectPublicKeyInfo for PublicKeyInfo {
-    type AlgorithmId = AlgorithmId;
-    type SubjectPublicKey = Vec<u8>;
-
-    fn algorithm_id(&self) -> AlgorithmId {
-        self.algorithm()
-    }
-
-    fn public_key(&self) -> Vec<u8> {
-        match self {
-            PublicKeyInfo::Rsa { pubkey, .. } => {
-                cookie_factory::gen_simple(write_pki::rsa_pubkey(pubkey), vec![])
-                    .expect("can write to Vec")
-            }
-            PublicKeyInfo::EcP256(pubkey) => pubkey.as_bytes().to_vec(),
-            PublicKeyInfo::EcP384(pubkey) => pubkey.as_bytes().to_vec(),
-        }
-    }
-}
-
-/// Digest algorithms.
-///
-/// See RFC 4055 and RFC 8017.
-enum DigestId {
-    /// Secure Hash Algorithm 256 (SHA256)
-    Sha256,
-}
-
-impl x509::AlgorithmIdentifier for DigestId {
-    type AlgorithmOid = &'static [u64];
-
-    fn algorithm(&self) -> Self::AlgorithmOid {
-        match self {
-            // See https://tools.ietf.org/html/rfc4055#section-2.1
-            DigestId::Sha256 => &[2, 16, 840, 1, 101, 3, 4, 2, 1],
-        }
-    }
-
-    fn parameters<W: std::io::Write>(
-        &self,
-        w: cookie_factory::WriteContext<W>,
-    ) -> cookie_factory::GenResult<W> {
-        // Parameters are an explicit NULL
-        // See https://tools.ietf.org/html/rfc8017#appendix-A.2.4
-        x509::der::write::der_null()(w)
-    }
-}
-
-enum SignatureId {
-    /// Public-Key Cryptography Standards (PKCS) #1 version 1.5 signature algorithm with
-    /// Secure Hash Algorithm 256 (SHA256) and Rivest, Shamir and Adleman (RSA) encryption
-    ///
-    /// See RFC 4055 and RFC 8017.
-    Sha256WithRsaEncryption,
-
-    /// Elliptic Curve Digital Signature Algorithm (DSA) coupled with the Secure Hash
-    /// Algorithm 256 (SHA256) algorithm
-    ///
-    /// See RFC 5758.
-    EcdsaWithSha256,
-}
-
-impl x509::AlgorithmIdentifier for SignatureId {
-    type AlgorithmOid = &'static [u64];
-
-    fn algorithm(&self) -> Self::AlgorithmOid {
-        match self {
-            SignatureId::Sha256WithRsaEncryption => &[1, 2, 840, 113_549, 1, 1, 11],
-            SignatureId::EcdsaWithSha256 => &[1, 2, 840, 10045, 4, 3, 2],
-        }
-    }
-
-    fn parameters<W: std::io::Write>(
-        &self,
-        w: cookie_factory::WriteContext<W>,
-    ) -> cookie_factory::GenResult<W> {
-        // No parameters for any SignatureId
-        Ok(w)
-    }
-}
-
 /// Certificates
 #[derive(Clone, Debug)]
 pub struct Certificate {
-    serial: Serial,
-    #[allow(dead_code)]
-    issuer: String,
-    subject: String,
-    subject_pki: PublicKeyInfo,
-    data: Buffer,
-}
-
-impl<'a> TryFrom<&'a [u8]> for Certificate {
-    type Error = Error;
-
-    fn try_from(bytes: &'a [u8]) -> Result<Self> {
-        Self::from_bytes(bytes.to_vec())
-    }
+    /// Inner certificate
+    pub cert: x509_cert::Certificate,
 }
 
 impl Certificate {
@@ -360,112 +98,35 @@ impl Certificate {
     ///
     /// `extensions` is optional; if empty, no extensions will be included. Due to the
     /// need for an `O: Oid` type parameter, users who do not have any extensions should
-    /// use the workaround `let extensions: &[x509::Extension<'_, &[u64]>] = &[];`.
-    pub fn generate_self_signed<O: Oid>(
+    /// use the workaround `let extensions: &[x509_cert::Extension<'_, &[u64]>] = &[];`.
+    pub fn generate_self_signed<F, KT: yubikey_signer::KeyType>(
         yubikey: &mut YubiKey,
         key: SlotId,
-        serial: impl Into<Serial>,
-        not_after: Option<DateTime<Utc>>,
-        subject: &[RelativeDistinguishedName<'_>],
-        subject_pki: PublicKeyInfo,
-        extensions: &[x509::Extension<'_, O>],
-    ) -> Result<Self> {
-        let serial = serial.into();
-
-        let mut tbs_cert = Buffer::new(Vec::with_capacity(CB_OBJ_MAX));
-
-        let signature_algorithm = match subject_pki.algorithm() {
-            AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 => SignatureId::Sha256WithRsaEncryption,
-            AlgorithmId::EccP256 | AlgorithmId::EccP384 => SignatureId::EcdsaWithSha256,
-        };
-
-        cookie_factory::gen(
-            x509::write::tbs_certificate(
-                &serial.to_bytes(),
-                &signature_algorithm,
-                // Issuer and subject are the same in self-signed certificates.
-                subject,
-                Utc::now(),
-                not_after,
-                subject,
-                &subject_pki,
-                extensions,
-            ),
-            tbs_cert.deref_mut(),
-        )
-        .expect("can serialize to Vec");
-
-        let signature = match signature_algorithm {
-            SignatureId::Sha256WithRsaEncryption => {
-                use cookie_factory::{combinator::slice, sequence::tuple};
-                use x509::{
-                    der::write::{der_octet_string, der_sequence},
-                    write::algorithm_identifier,
-                };
-
-                let em_len = if let AlgorithmId::Rsa1024 = subject_pki.algorithm() {
-                    128
-                } else {
-                    256
-                };
-
-                let h = Sha256::digest(&tbs_cert);
-
-                let t = cookie_factory::gen_simple(
-                    der_sequence((
-                        algorithm_identifier(&DigestId::Sha256),
-                        der_octet_string(&h),
-                    )),
-                    vec![],
-                )
-                .expect("can serialize into Vec");
-
-                let em = cookie_factory::gen_simple(
-                    tuple((
-                        slice(&[0x00, 0x01]),
-                        slice(&vec![0xff; em_len - t.len() - 3]),
-                        slice(&[0x00]),
-                        slice(t),
-                    )),
-                    vec![],
-                )
-                .expect("can serialize to Vec");
-
-                sign_data(yubikey, &em, subject_pki.algorithm(), key)
-            }
-            SignatureId::EcdsaWithSha256 => sign_data(
-                yubikey,
-                &Sha256::digest(&tbs_cert),
-                subject_pki.algorithm(),
-                key,
-            ),
-        }?;
-
-        let mut data = Buffer::new(Vec::with_capacity(CB_OBJ_MAX));
-
-        cookie_factory::gen(
-            x509::write::certificate(&tbs_cert, &signature_algorithm, &signature),
-            data.deref_mut(),
-        )
-        .expect("can serialize to Vec");
-
-        let (issuer, subject) = parse_x509_certificate(&data)
-            .map(|(_, cert)| {
-                (
-                    cert.tbs_certificate.issuer.to_string(),
-                    cert.tbs_certificate.subject.to_string(),
-                )
-            })
-            .expect("We just serialized this correctly");
-
-        let cert = Certificate {
+        serial: SerialNumber,
+        validity: Validity,
+        subject: Name,
+        subject_pki: SubjectPublicKeyInfoOwned,
+        extensions: F,
+    ) -> Result<Self>
+    where
+        F: FnOnce(&mut CertificateBuilder<'_, yubikey_signer::Signer<'_, KT>>) -> der::Result<()>,
+    {
+        let signer = yubikey_signer::Signer::new(yubikey, key, subject_pki.owned_to_ref())?;
+        let mut builder = CertificateBuilder::new(
+            Profile::Manual { issuer: None },
             serial,
-            issuer,
+            validity,
             subject,
             subject_pki,
-            data,
-        };
+            &signer,
+        )
+        .map_err(|_| Error::KeyError)?;
 
+        // Add custom extensions
+        extensions(&mut builder)?;
+
+        let cert = builder.build().map_err(|_| Error::KeyError)?;
+        let cert = Self { cert };
         cert.write(yubikey, key, CertInfo::Uncompressed)?;
 
         Ok(cert)
@@ -480,13 +141,14 @@ impl Certificate {
             return Err(Error::InvalidObject);
         }
 
-        Certificate::from_bytes(buf)
+        Self::from_bytes(buf)
     }
 
     /// Write this certificate into the YubiKey in the given slot
     pub fn write(&self, yubikey: &mut YubiKey, slot: SlotId, certinfo: CertInfo) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
-        write_certificate(&txn, slot, Some(&self.data), certinfo)
+        let data = self.cert.to_der().map_err(|_| Error::InvalidObject)?;
+        write_certificate(&txn, slot, Some(&data), certinfo)
     }
 
     /// Delete a certificate located at the given slot of the given YubiKey
@@ -506,55 +168,27 @@ impl Certificate {
             return Err(Error::SizeError);
         }
 
-        let parsed_cert = match parse_x509_certificate(&cert) {
-            Ok((_, cert)) => cert,
-            _ => return Err(Error::InvalidObject),
-        };
-
-        let serial = Serial::try_from(parsed_cert.tbs_certificate.serial.to_bytes_be().as_slice())
-            .map_err(|_| Error::InvalidObject)?;
-        let issuer = parsed_cert.tbs_certificate.issuer.to_string();
-        let subject = parsed_cert.tbs_certificate.subject.to_string();
-        let subject_pki = PublicKeyInfo::parse(&parsed_cert.tbs_certificate.subject_pki)?;
-
-        Ok(Certificate {
-            serial,
-            issuer,
-            subject,
-            subject_pki,
-            data: cert,
-        })
-    }
-
-    /// Returns the serial number of the certificate.
-    pub fn serial(&self) -> &Serial {
-        &self.serial
+        x509_cert::Certificate::from_der(&cert)
+            .map(|cert| Self { cert })
+            .map_err(|_| Error::InvalidObject)
     }
 
     /// Returns the Issuer field of the certificate.
-    pub fn issuer(&self) -> &str {
-        &self.issuer
+    pub fn issuer(&self) -> String {
+        self.cert.tbs_certificate.issuer.to_string()
     }
 
     /// Returns the SubjectName field of the certificate.
-    pub fn subject(&self) -> &str {
-        &self.subject
+    pub fn subject(&self) -> String {
+        self.cert.tbs_certificate.subject.to_string()
     }
 
     /// Returns the SubjectPublicKeyInfo field of the certificate.
-    pub fn subject_pki(&self) -> &PublicKeyInfo {
-        &self.subject_pki
-    }
-
-    /// Extract the inner buffer
-    pub fn into_buffer(self) -> Buffer {
-        self.data
-    }
-}
-
-impl AsRef<[u8]> for Certificate {
-    fn as_ref(&self) -> &[u8] {
-        self.data.as_ref()
+    pub fn subject_pki(&self) -> SubjectPublicKeyInfoRef<'_> {
+        self.cert
+            .tbs_certificate
+            .subject_public_key_info
+            .owned_to_ref()
     }
 }
 
@@ -606,97 +240,223 @@ pub(crate) fn write_certificate(
     txn.save_object(object_id, &buf[..offset])
 }
 
-mod read_pki {
-    use der_parser::{
-        asn1_rs::Any,
-        ber::BerObjectContent,
-        der::{parse_der_integer, parse_der_sequence_defined_g, DerObject},
-        error::BerError,
+pub mod yubikey_signer {
+    //! Signer implementation for yubikey
+
+    use crate::{
+        error::{Error, Result},
+        piv::AlgorithmId,
+        piv::{sign_data, SlotId},
+        YubiKey,
     };
-    use nom::{combinator, sequence::pair, IResult};
-    use rsa::{BigUint, RsaPublicKey};
+    use der::{
+        asn1::{Any, OctetString},
+        oid::db::rfc5912,
+        Encode, Sequence,
+    };
+    use sha2::{Digest, Sha256, Sha384};
+    use signature::Keypair;
+    use std::{cell::RefCell, fmt, io::Write, marker::PhantomData};
+    use x509_cert::spki::{
+        self, AlgorithmIdentifierOwned, DynSignatureAlgorithmIdentifier, EncodePublicKey,
+        SignatureBitStringEncoding, SubjectPublicKeyInfoRef,
+    };
 
-    use super::{OID_NIST_P256, OID_NIST_P384};
-    use crate::{piv::AlgorithmId, Error, Result};
+    type SigResult<T> = core::result::Result<T, signature::Error>;
 
-    /// From [RFC 8017](https://tools.ietf.org/html/rfc8017#appendix-A.1.1):
-    /// ```text
-    /// RSAPublicKey ::= SEQUENCE {
-    ///     modulus           INTEGER,  -- n
-    ///     publicExponent    INTEGER   -- e
-    /// }
-    /// ```
-    pub(super) fn rsa_pubkey(encoded: &[u8]) -> Result<RsaPublicKey> {
-        fn parse_rsa_pubkey(i: &[u8]) -> IResult<&[u8], (DerObject<'_>, DerObject<'_>), BerError> {
-            parse_der_sequence_defined_g(|i, _| pair(parse_der_integer, parse_der_integer)(i))(i)
-        }
+    /// Key to be used to sign certificates
+    pub trait KeyType {
+        /// Error returned when working with signature
+        type Error: Into<signature::Error> + fmt::Debug;
+        /// The signature type returned by the signer
+        type Signature: SignatureBitStringEncoding
+            + for<'s> TryFrom<&'s [u8], Error = Self::Error>
+            + fmt::Debug;
+        /// The public key used to verify signature
+        type VerifyingKey: EncodePublicKey
+            + DynSignatureAlgorithmIdentifier
+            + Clone
+            + From<Self::PublicKey>;
+        /// Public key type used to load the SPKI formatted key
+        type PublicKey: for<'a> TryFrom<SubjectPublicKeyInfoRef<'a>, Error = spki::Error>;
 
-        fn rsa_pubkey_parts(i: &[u8]) -> IResult<&[u8], (BigUint, BigUint), BerError> {
-            combinator::map(parse_rsa_pubkey, |(modulus, public_exponent)| {
-                let n = match modulus.content {
-                    BerObjectContent::Integer(s) => BigUint::from_bytes_be(s),
-                    _ => panic!("expected DER integer"),
-                };
-                let e = match public_exponent.content {
-                    BerObjectContent::Integer(s) => BigUint::from_bytes_be(s),
-                    _ => panic!("expected DER integer"),
-                };
+        /// The algorithm used when talking with the yubikey
+        const ALGORITHM: AlgorithmId;
 
-                (n, e)
-            })(i)
-        }
-
-        let (n, e) = match rsa_pubkey_parts(encoded) {
-            Ok((_, res)) => res,
-            _ => return Err(Error::InvalidObject),
-        };
-
-        RsaPublicKey::new(n, e).map_err(|_| Error::InvalidObject)
+        /// Prepare buffer before submitting it for signature
+        fn prepare(input: &[u8]) -> SigResult<Vec<u8>>;
+        /// Read back the signature from the device
+        fn read_signature(input: &[u8]) -> SigResult<Self::Signature>;
     }
 
-    /// From [RFC 5480](https://tools.ietf.org/html/rfc5480#section-2.1.1):
-    /// ```text
-    /// ECParameters ::= CHOICE {
-    ///   namedCurve         OBJECT IDENTIFIER
-    ///   -- implicitCurve   NULL
-    ///   -- specifiedCurve  SpecifiedECDomain
-    /// }
-    /// ```
-    pub(super) fn ec_parameters(parameters: &Any<'_>) -> Result<AlgorithmId> {
-        let curve_oid = parameters.as_oid().map_err(|_| Error::InvalidObject)?;
+    impl KeyType for p256::NistP256 {
+        const ALGORITHM: AlgorithmId = AlgorithmId::EccP256;
+        type Error = ecdsa::Error;
+        type Signature = p256::ecdsa::DerSignature;
+        type VerifyingKey = p256::ecdsa::VerifyingKey;
+        type PublicKey = p256::ecdsa::VerifyingKey;
 
-        match curve_oid.to_string().as_str() {
-            OID_NIST_P256 => Ok(AlgorithmId::EccP256),
-            OID_NIST_P384 => Ok(AlgorithmId::EccP384),
-            _ => Err(Error::AlgorithmError),
+        fn prepare(input: &[u8]) -> SigResult<Vec<u8>> {
+            Ok(Sha256::digest(input).to_vec())
+        }
+
+        fn read_signature(input: &[u8]) -> SigResult<Self::Signature> {
+            Self::Signature::from_bytes(input)
         }
     }
-}
 
-mod write_pki {
-    use cookie_factory::{SerializeFn, WriteContext};
-    use rsa::{traits::PublicKeyParts, BigUint, RsaPublicKey};
-    use std::io::Write;
-    use x509::der::write::{der_integer, der_sequence};
+    impl KeyType for p384::NistP384 {
+        const ALGORITHM: AlgorithmId = AlgorithmId::EccP384;
+        type Error = ecdsa::Error;
+        type Signature = p384::ecdsa::DerSignature;
+        type VerifyingKey = p384::ecdsa::VerifyingKey;
+        type PublicKey = p384::ecdsa::VerifyingKey;
 
-    /// Encodes a usize as an ASN.1 integer using DER.
-    fn der_integer_biguint<'a, W: Write + 'a>(num: &'a BigUint) -> impl SerializeFn<W> + 'a {
-        move |w: WriteContext<W>| der_integer(&num.to_bytes_be())(w)
+        fn prepare(input: &[u8]) -> SigResult<Vec<u8>> {
+            Ok(Sha384::digest(input).to_vec())
+        }
+
+        fn read_signature(input: &[u8]) -> SigResult<Self::Signature> {
+            Self::Signature::from_bytes(input)
+        }
     }
 
-    /// From [RFC 8017](https://tools.ietf.org/html/rfc8017#appendix-A.1.1):
-    /// ```text
-    /// RSAPublicKey ::= SEQUENCE {
-    ///     modulus           INTEGER,  -- n
-    ///     publicExponent    INTEGER   -- e
-    /// }
-    /// ```
-    pub(super) fn rsa_pubkey<'a, W: Write + 'a>(
-        pubkey: &'a RsaPublicKey,
-    ) -> impl SerializeFn<W> + 'a {
-        der_sequence((
-            der_integer_biguint(pubkey.n()),
-            der_integer_biguint(pubkey.e()),
-        ))
+    /// Trait used to handle subtypes of RSA keys
+    pub trait RsaLength {
+        /// The length of the RSA key in bits
+        const BIT_LENGTH: usize;
+        /// The algorithm to use when talking with the Yubikey.
+        const ALGORITHM: AlgorithmId;
+    }
+
+    /// RSA 1024 bits key
+    pub struct Rsa1024;
+
+    impl RsaLength for Rsa1024 {
+        const BIT_LENGTH: usize = 1024;
+        const ALGORITHM: AlgorithmId = AlgorithmId::Rsa1024;
+    }
+
+    /// RSA 2048 bits key
+    pub struct Rsa2048;
+
+    impl RsaLength for Rsa2048 {
+        const BIT_LENGTH: usize = 2048;
+        const ALGORITHM: AlgorithmId = AlgorithmId::Rsa2048;
+    }
+
+    /// RSA keys used to sign certificates
+    pub struct YubiRsa<N: RsaLength> {
+        _len: PhantomData<N>,
+    }
+
+    impl<N: RsaLength> KeyType for YubiRsa<N> {
+        type Error = signature::Error;
+        type Signature = rsa::pkcs1v15::Signature;
+        type VerifyingKey = rsa::pkcs1v15::VerifyingKey<Sha256>;
+        type PublicKey = rsa::RsaPublicKey;
+        const ALGORITHM: AlgorithmId = N::ALGORITHM;
+
+        fn prepare(input: &[u8]) -> SigResult<Vec<u8>> {
+            let hashed = Sha256::digest(input).to_vec();
+
+            OctetString::new(hashed)
+                .map_err(|e| e.into())
+                .and_then(Self::emsa_pkcs1_1_5)
+                .map_err(signature::Error::from_source)
+        }
+
+        fn read_signature(input: &[u8]) -> SigResult<Self::Signature> {
+            Self::Signature::try_from(input)
+        }
+    }
+
+    impl<N: RsaLength> YubiRsa<N> {
+        /// https://www.rfc-editor.org/rfc/rfc8017#section-9.2
+        fn emsa_pkcs1_1_5(digest: OctetString) -> Result<Vec<u8>> {
+            /// https://www.rfc-editor.org/rfc/rfc8017#appendix-A.2.4
+            #[derive(Debug, Sequence)]
+            struct DigestInfo {
+                digest_algorithm: AlgorithmIdentifierOwned,
+                digest: OctetString,
+            }
+
+            let em_len = N::BIT_LENGTH / 8;
+
+            let null = Any::null();
+
+            let t = DigestInfo {
+                digest_algorithm: AlgorithmIdentifierOwned {
+                    oid: rfc5912::ID_SHA_256,
+                    parameters: Some(null),
+                },
+                digest,
+            };
+            let t = t.to_der()?;
+
+            let ps = vec![0xff; em_len - t.len() - 3];
+            assert!(ps.len() >= 8, "spec violation");
+
+            let mut out = Vec::with_capacity(em_len);
+            out.write(&[0x00, 0x01]).map_err(|_| Error::MemoryError)?;
+            out.write(&ps).map_err(|_| Error::MemoryError)?;
+            out.write(&[0x00]).map_err(|_| Error::MemoryError)?;
+            out.write(&t).map_err(|_| Error::MemoryError)?;
+            Ok(out)
+        }
+    }
+
+    /// The entrypoint to sign data with the yubikey.
+    pub struct Signer<'y, KT: KeyType> {
+        yubikey: RefCell<&'y mut YubiKey>,
+        key: SlotId,
+        public_key: KT::VerifyingKey,
+    }
+
+    impl<'y, KT: KeyType> Signer<'y, KT> {
+        /// Create new Signer
+        pub fn new(
+            yubikey: &'y mut YubiKey,
+            key: SlotId,
+            subject_pki: SubjectPublicKeyInfoRef<'_>,
+        ) -> Result<Self> {
+            let public_key = KT::PublicKey::try_from(subject_pki).map_err(|_| Error::ParseError)?;
+            let public_key = public_key.into();
+
+            Ok(Self {
+                yubikey: RefCell::new(yubikey),
+                key,
+                public_key,
+            })
+        }
+    }
+
+    impl<'y, KT: KeyType> Keypair for Signer<'y, KT> {
+        type VerifyingKey = KT::VerifyingKey;
+        fn verifying_key(&self) -> <Self as Keypair>::VerifyingKey {
+            self.public_key.clone()
+        }
+    }
+
+    impl<'y, KT: KeyType> DynSignatureAlgorithmIdentifier for Signer<'y, KT> {
+        fn signature_algorithm_identifier(&self) -> spki::Result<AlgorithmIdentifierOwned> {
+            self.verifying_key().signature_algorithm_identifier()
+        }
+    }
+
+    impl<'y, KT: KeyType> signature::Signer<KT::Signature> for Signer<'y, KT> {
+        fn try_sign(&self, msg: &[u8]) -> SigResult<KT::Signature> {
+            let data = KT::prepare(msg)?;
+
+            let out = sign_data(
+                &mut self.yubikey.borrow_mut(),
+                &data,
+                KT::ALGORITHM,
+                self.key,
+            )
+            .map_err(signature::Error::from_source)?;
+            let out = KT::read_signature(&out)?;
+            Ok(out)
+        }
     }
 }

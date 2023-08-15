@@ -9,7 +9,7 @@ use std::{
     sync::Mutex,
 };
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, StandardStreamLock, WriteColor};
-use x509_parser::parse_x509_certificate;
+use x509_cert::der::Encode;
 use yubikey::{certificate::Certificate, piv::*, YubiKey};
 
 /// Print a success status message (in green if colors are enabled)
@@ -180,52 +180,30 @@ pub fn print_cert_info(
             return Ok(());
         }
     };
-    let buf = cert.into_buffer();
+    let cert = &cert.cert;
 
-    if !buf.is_empty() {
-        let fingerprint = Sha256::digest(&buf);
-        let slot_id: u8 = slot.into();
-        print_cert_attr(stream, "Slot", format!("{:x}", slot_id))?;
-        match parse_x509_certificate(&buf) {
-            Ok((_rem, cert)) => {
-                print_cert_attr(
-                    stream,
-                    "Algorithm",
-                    cert.tbs_certificate.subject_pki.algorithm.algorithm,
-                )?;
+    let fingerprint = Sha256::digest(&cert.to_der().unwrap());
+    let slot_id: u8 = slot.into();
+    print_cert_attr(stream, "Slot", format!("{:x}", slot_id))?;
+    print_cert_attr(
+        stream,
+        "Algorithm",
+        cert.tbs_certificate.subject_public_key_info.algorithm.oid,
+    )?;
 
-                print_cert_attr(stream, "Subject", cert.tbs_certificate.subject)?;
-                print_cert_attr(stream, "Issuer", cert.tbs_certificate.issuer)?;
-                print_cert_attr(
-                    stream,
-                    "Fingerprint",
-                    &hex::upper::encode_string(&fingerprint),
-                )?;
-                print_cert_attr(
-                    stream,
-                    "Not Before",
-                    cert.tbs_certificate
-                        .validity
-                        .not_before
-                        .to_rfc2822()
-                        .unwrap(),
-                )?;
-                print_cert_attr(
-                    stream,
-                    "Not After",
-                    cert.tbs_certificate
-                        .validity
-                        .not_after
-                        .to_rfc2822()
-                        .unwrap(),
-                )?;
-            }
-            _ => {
-                println!("Failed to parse certificate");
-                return Ok(());
-            }
-        };
-    }
+    print_cert_attr(stream, "Subject", &cert.tbs_certificate.subject)?;
+    print_cert_attr(stream, "Issuer", &cert.tbs_certificate.issuer)?;
+    print_cert_attr(
+        stream,
+        "Fingerprint",
+        &hex::upper::encode_string(&fingerprint),
+    )?;
+    print_cert_attr(
+        stream,
+        "Not Before",
+        cert.tbs_certificate.validity.not_before,
+    )?;
+    print_cert_attr(stream, "Not After", cert.tbs_certificate.validity.not_after)?;
 
     Ok(())
 }

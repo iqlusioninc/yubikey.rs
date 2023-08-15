@@ -44,7 +44,7 @@
 
 use crate::{
     apdu::{Ins, StatusWords},
-    certificate::{self, Certificate, PublicKeyInfo},
+    certificate::{self, Certificate},
     consts::CB_OBJ_MAX,
     error::{Error, Result},
     policy::{PinPolicy, TouchPolicy},
@@ -53,15 +53,16 @@ use crate::{
     yubikey::YubiKey,
     Buffer, ObjectId,
 };
-use elliptic_curve::sec1::EncodedPoint as EcPublicKey;
+use elliptic_curve::{sec1::EncodedPoint as EcPublicKey, PublicKey};
 use log::{debug, error, warn};
 use p256::NistP256;
 use p384::NistP384;
-use rsa::{BigUint, RsaPublicKey};
+use rsa::{pkcs8::EncodePublicKey, BigUint, RsaPublicKey};
 use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
+use x509_cert::{der::Decode, spki::SubjectPublicKeyInfoOwned};
 
 #[cfg(feature = "untested")]
 use {
@@ -441,10 +442,11 @@ impl ManagementSlotId {
 }
 
 /// Personal Identity Verification (PIV) key slots
-pub const SLOTS: [SlotId; 27] = [
+pub const SLOTS: [SlotId; 28] = [
     SlotId::Authentication,
     SlotId::Signature,
     SlotId::KeyManagement,
+    SlotId::Attestation,
     SlotId::Retired(RetiredSlotId::R1),
     SlotId::Retired(RetiredSlotId::R2),
     SlotId::Retired(RetiredSlotId::R3),
@@ -591,7 +593,7 @@ pub fn generate(
     algorithm: AlgorithmId,
     pin_policy: PinPolicy,
     touch_policy: TouchPolicy,
-) -> Result<PublicKeyInfo> {
+) -> Result<SubjectPublicKeyInfoOwned> {
     // Keygen messages
     // TODO(tarcieri): extract these into an I18N-handling type?
     const SZ_SETTING_ROCA: &str = "Enable_Unsafe_Keygen_ROCA";
@@ -955,7 +957,7 @@ pub struct SlotMetadata {
     /// Imported or generated key
     pub origin: Option<Origin>,
     /// Pub key of the key
-    pub public: Option<PublicKeyInfo>,
+    pub public: Option<SubjectPublicKeyInfoOwned>,
     /// Whether PIN PUK and management key are default
     pub default: Option<bool>,
     /// Number of retries left
@@ -1110,7 +1112,7 @@ fn read_public_key(
     algorithm: AlgorithmId,
     input: &[u8],
     skip_asn1_tag: bool,
-) -> Result<PublicKeyInfo> {
+) -> Result<SubjectPublicKeyInfoOwned> {
     // TODO(str4d): Response is wrapped in an ASN.1 TLV:
     //
     //    0x7f 0x49 -> Application | Constructed | 0x49
@@ -1159,14 +1161,17 @@ fn read_public_key(
             }
             let exp = exp_tlv.value.to_vec();
 
-            Ok(PublicKeyInfo::Rsa {
-                algorithm,
-                pubkey: RsaPublicKey::new(
-                    BigUint::from_bytes_be(&modulus),
-                    BigUint::from_bytes_be(&exp),
-                )
-                .map_err(|_| Error::InvalidObject)?,
-            })
+            let pubkey = RsaPublicKey::new(
+                BigUint::from_bytes_be(&modulus),
+                BigUint::from_bytes_be(&exp),
+            )
+            .map_err(|_| Error::InvalidObject)?;
+            Ok(SubjectPublicKeyInfoOwned::from_der(
+                pubkey
+                    .to_public_key_der()
+                    .map_err(|_| Error::ParseError)?
+                    .as_bytes(),
+            )?)
         }
         AlgorithmId::EccP256 | AlgorithmId::EccP384 => {
             // 2-byte ASN.1 tag, 1-byte length (because all supported EC pubkey lengths
@@ -1194,16 +1199,22 @@ fn read_public_key(
 
             let point = tlv.value.to_vec();
 
-            match algorithm {
-                AlgorithmId::EccP256 => {
-                    EcPublicKey::<NistP256>::from_bytes(point).map(PublicKeyInfo::EcP256)
-                }
-                AlgorithmId::EccP384 => {
-                    EcPublicKey::<NistP384>::from_bytes(point).map(PublicKeyInfo::EcP384)
-                }
+            let pubkey = match algorithm {
+                AlgorithmId::EccP256 => PublicKey::<NistP256>::try_from(
+                    EcPublicKey::<NistP256>::from_bytes(point).map_err(|_| Error::InvalidObject)?,
+                )
+                .map_err(|_| Error::InvalidObject)?
+                .to_public_key_der(),
+                AlgorithmId::EccP384 => PublicKey::<NistP384>::try_from(
+                    EcPublicKey::<NistP384>::from_bytes(point).map_err(|_| Error::InvalidObject)?,
+                )
+                .map_err(|_| Error::InvalidObject)?
+                .to_public_key_der(),
                 _ => return Err(Error::AlgorithmError),
             }
-            .map_err(|_| Error::InvalidObject)
+            .map_err(|_| Error::InvalidObject)?;
+
+            Ok(SubjectPublicKeyInfoOwned::from_der(pubkey.as_bytes())?)
         }
     }
 }
