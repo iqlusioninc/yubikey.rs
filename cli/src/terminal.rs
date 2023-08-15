@@ -182,7 +182,7 @@ pub fn print_cert_info(
     };
     let cert = &cert.cert;
 
-    let fingerprint = Sha256::digest(&cert.to_der().unwrap());
+    let fingerprint = Sha256::digest(cert.to_der().unwrap());
     let slot_id: u8 = slot.into();
     print_cert_attr(stream, "Slot", format!("{:x}", slot_id))?;
     print_cert_attr(
