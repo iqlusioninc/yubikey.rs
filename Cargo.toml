@@ -1,6 +1,6 @@
 [package]
 name = "yubikey"
-version = "0.8.0-pre.0"
+version = "0.8.0"
 description = """
 Pure Rust cross-platform host-side driver for YubiKey devices from Yubico with
 support for hardware-backed public-key decryption and digital signatures using

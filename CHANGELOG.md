@@ -4,11 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.8.0 (2023-08-15)
 ### Added
-- `YubiKey::disconnect`
-- `impl Debug for {Context, YubiKey}`
-- `Error::AppletNotFound`
+- `impl Debug for {Context, YubiKey}` ([#457])
+- `YubiKey::disconnect` ([#462])
+- `Error::AppletNotFound` ([#476])
 
 ### Changed
 - `Reader::open` now returns `Error::AppletNotFound` instead of `Error::Generic`
@@ -18,11 +18,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Reader::open` now avoids resetting the card if an error occurs (equivalent to
   calling `YubiKey::disconnect(pcsc::Disposition::LeaveCard)` if `Reader::open`
   succeeds).
+- Raise minimum `pcsc` version to 2.3.1 and remove workaround ([#478])
+- Bump asymmetric crypto dependencies; MSRV 1.65 ([#490])
+  - `elliptic-curve` v0.13
+  - `k256` v0.13
+  - `p256` v0.13
+  - `p384` v0.13
+  - `pbkdf2` v0.12
+  - `rsa` v0.9 ([#502])
+  - `signature` v2
+- Use `x509-cert` certificate builder ([#495])
+- Make `RsaKeyData::new` fallible ([#517])
 
 ### Fixed
 - `StatusWords::code` now returns the correct code (including embedded `tries`
   count) for `StatusWords::VerifyFailError`. Previously the returned code lost
   information and was not round-trip compatible with `StatusWords::from(u16)`.
+- Parsing of serial numbers ([#466])
+- Make `YubiKey::open()` more robust ([#504])
+
+[#457]: https://github.com/iqlusioninc/yubikey.rs/pull/457
+[#462]: https://github.com/iqlusioninc/yubikey.rs/pull/462
+[#466]: https://github.com/iqlusioninc/yubikey.rs/pull/466
+[#476]: https://github.com/iqlusioninc/yubikey.rs/pull/476
+[#478]: https://github.com/iqlusioninc/yubikey.rs/pull/478
+[#490]: https://github.com/iqlusioninc/yubikey.rs/pull/490
+[#495]: https://github.com/iqlusioninc/yubikey.rs/pull/495
+[#502]: https://github.com/iqlusioninc/yubikey.rs/pull/502
+[#504]: https://github.com/iqlusioninc/yubikey.rs/pull/504
+[#517]: https://github.com/iqlusioninc/yubikey.rs/pull/517
 
 ## 0.7.0 (2022-11-14)
 ### Added
