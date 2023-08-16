@@ -96,11 +96,7 @@ impl<'tx> Transaction<'tx> {
             return Err(Error::GenericError);
         }
 
-        if response.data().len() < 3 {
-            return Err(Error::SizeError);
-        }
-
-        Ok(Version::new(response.data()[..3].try_into().unwrap()))
+        Ok(response.data()[..3].try_into().map(Version::new)?)
     }
 
     /// Get YubiKey device serial number.

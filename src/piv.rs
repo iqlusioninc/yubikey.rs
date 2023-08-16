@@ -767,6 +767,7 @@ impl RsaKeyData {
     /// Generates a new RSA key data set from two randomly generated, secret, primes.
     ///
     /// Panics if `secret_p` or `secret_q` are invalid primes.
+    #[allow(clippy::unwrap_used)] // TODO(tarcieri): make fallible and handle errors
     pub fn new(secret_p: &[u8], secret_q: &[u8]) -> Self {
         let p = BigUint::from_bytes_be(secret_p);
         let q = BigUint::from_bytes_be(secret_q);

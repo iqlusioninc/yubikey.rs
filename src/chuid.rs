@@ -30,7 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{Error, Result, YubiKey};
+use crate::{Result, YubiKey};
 use std::fmt::{self, Debug, Display};
 use uuid::Uuid;
 
@@ -61,6 +61,7 @@ const OBJ_CHUID: u32 = 0x005f_c102;
 /// - 0x35: Exp. Date (hard-coded)
 /// - 0x3e: Signature (hard-coded, empty)
 /// - 0xfe: Error Detection Code (hard-coded)
+#[allow(dead_code)]
 const CHUID_TMPL: &[u8] = &[
     0x30, 0x19, 0xd4, 0xe7, 0x39, 0xda, 0x73, 0x9c, 0xed, 0x39, 0xce, 0x73, 0x9d, 0x83, 0x68, 0x58,
     0x21, 0x08, 0x42, 0x10, 0x84, 0x21, 0xc8, 0x42, 0x10, 0xc3, 0xeb, 0x34, 0x10, 0x00, 0x00, 0x00,
@@ -86,12 +87,13 @@ impl ChuId {
     pub fn fascn(&self) -> [u8; Self::FASCN_SIZE] {
         self.0[CHUID_FASCN_OFFS..(CHUID_FASCN_OFFS + Self::FASCN_SIZE)]
             .try_into()
-            .unwrap()
+            .expect("should be FASCN_SIZE")
     }
 
     /// Return Card UUID/GUID component of CHUID
     pub fn uuid(&self) -> Uuid {
-        Uuid::from_slice(&self.0[CHUID_GUID_OFFS..(CHUID_GUID_OFFS + 16)]).unwrap()
+        Uuid::from_slice(&self.0[CHUID_GUID_OFFS..(CHUID_GUID_OFFS + 16)])
+            .expect("should be UUID-sized")
     }
 
     /// Return expiration date component of CHUID
@@ -99,19 +101,14 @@ impl ChuId {
     pub fn expiration(&self) -> [u8; Self::EXPIRATION_SIZE] {
         self.0[CHUID_EXPIRATION_OFFS..(CHUID_EXPIRATION_OFFS + Self::EXPIRATION_SIZE)]
             .try_into()
-            .unwrap()
+            .expect("should be EXPIRATION_SIZE")
     }
 
     /// Get Cardholder Unique Identifier (CHUID)
     pub fn get(yubikey: &mut YubiKey) -> Result<ChuId> {
         let txn = yubikey.begin_transaction()?;
         let response = txn.fetch_object(OBJ_CHUID)?;
-
-        if response.len() != CHUID_TMPL.len() {
-            return Err(Error::GenericError);
-        }
-
-        Ok(ChuId(response[..Self::BYTE_SIZE].try_into().unwrap()))
+        Ok(response[..Self::BYTE_SIZE].try_into().map(Self)?)
     }
 
     /// Set Cardholder Unique Identifier (CHUID)

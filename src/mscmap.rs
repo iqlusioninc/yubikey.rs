@@ -140,7 +140,7 @@ impl MsContainer {
         let name_bytes_len = Self::NAME_LEN * 2;
 
         for (i, chunk) in bytes[..name_bytes_len].chunks_exact(2).enumerate() {
-            name[i] = u16::from_le_bytes(chunk.try_into().unwrap());
+            name[i] = u16::from_le_bytes([chunk[0], chunk[1]]);
         }
 
         let mut cert_fingerprint = [0u8; 20];
@@ -150,11 +150,10 @@ impl MsContainer {
             name,
             slot: bytes[name_bytes_len].try_into()?,
             key_spec: bytes[name_bytes_len + 1],
-            key_size_bits: u16::from_le_bytes(
-                bytes[(name_bytes_len + 2)..(name_bytes_len + 4)]
-                    .try_into()
-                    .unwrap(),
-            ),
+            key_size_bits: u16::from_le_bytes([
+                bytes[name_bytes_len + 2],
+                bytes[name_bytes_len + 3],
+            ]),
             flags: bytes[name_bytes_len + 4],
             pin_id: bytes[name_bytes_len + 5],
             associated_echd_container: bytes[name_bytes_len + 6],
@@ -183,7 +182,10 @@ impl MsContainer {
         bytes.push(self.pin_id);
         bytes.push(self.associated_echd_container);
         bytes.extend_from_slice(&self.cert_fingerprint);
-        bytes.as_slice().try_into().unwrap()
+        bytes
+            .as_slice()
+            .try_into()
+            .expect("should be REC_LEN-sized")
     }
 }
 
