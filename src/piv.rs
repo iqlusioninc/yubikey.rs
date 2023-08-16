@@ -764,11 +764,12 @@ pub struct RsaKeyData {
 
 #[cfg(feature = "untested")]
 impl RsaKeyData {
-    /// Generates a new RSA key data set from two randomly generated, secret, primes.
+    /// Generates a new RSA key data set from two (randomly generated) secret primes.
     ///
-    /// Panics if `secret_p` or `secret_q` are invalid primes.
-    #[allow(clippy::unwrap_used)] // TODO(tarcieri): make fallible and handle errors
-    pub fn new(secret_p: &[u8], secret_q: &[u8]) -> Self {
+    /// # Returns
+    /// - `Ok(key_data)` if `secret_p` and `secret_q` are valid primes.
+    /// - `Err(Error::AlgorithmError)` if `secret_p`/`secret_q` are invalid primes.
+    pub fn new(secret_p: &[u8], secret_q: &[u8]) -> Result<Self> {
         let p = BigUint::from_bytes_be(secret_p);
         let q = BigUint::from_bytes_be(secret_q);
 
@@ -779,10 +780,10 @@ impl RsaKeyData {
             p_t.lcm(&q_t)
         };
 
-        let exp = BigUint::from_u64(KEYDATA_RSA_EXP).unwrap();
+        let exp = BigUint::from_u64(KEYDATA_RSA_EXP).ok_or(Error::AlgorithmError)?;
 
-        let d = exp.mod_inverse(&totient).unwrap();
-        let d = d.to_biguint().unwrap();
+        let d = exp.mod_inverse(&totient).ok_or(Error::AlgorithmError)?;
+        let d = d.to_biguint().ok_or(Error::AlgorithmError)?;
 
         // We calculate the optimization values ahead of time, instead of making the user
         // do so.
@@ -790,16 +791,16 @@ impl RsaKeyData {
         let dp = &d % (&p - BigUint::one());
         let dq = &d % (&q - BigUint::one());
 
-        let qinv = q.clone().mod_inverse(&p).unwrap();
+        let qinv = q.clone().mod_inverse(&p).ok_or(Error::AlgorithmError)?;
         let (_, qinv) = qinv.to_bytes_be();
 
-        RsaKeyData {
+        Ok(RsaKeyData {
             p: Zeroizing::new(p.to_bytes_be()),
             q: Zeroizing::new(q.to_bytes_be()),
             dp: Zeroizing::new(dp.to_bytes_be()),
             dq: Zeroizing::new(dq.to_bytes_be()),
             qinv: Zeroizing::new(qinv),
-        }
+        })
     }
 
     fn total_len(&self) -> usize {
