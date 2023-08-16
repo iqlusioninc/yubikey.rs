@@ -303,9 +303,14 @@ fn test_read_metadata() {
     )
     .unwrap();
 
-    let metadata = piv::metadata(&mut yubikey, slot).unwrap();
-
-    assert_eq!(metadata.public, Some(generated));
+    match piv::metadata(&mut yubikey, slot) {
+        Ok(metadata) => assert_eq!(metadata.public, Some(generated)),
+        Err(Error::NotSupported) => {
+            // Some YubiKeys don't support metadata
+            eprintln!("metadata not supported by this YubiKey");
+        }
+        Err(err) => panic!("{}", err),
+    }
 }
 
 #[test]
