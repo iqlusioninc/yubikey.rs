@@ -1036,7 +1036,7 @@ dependencies = [
 
 [[package]]
 name = "yubikey"
-version = "0.8.0-pre.0"
+version = "0.8.0"
 dependencies = [
  "base16ct",
  "der",
@@ -1069,7 +1069,7 @@ dependencies = [
 
 [[package]]
 name = "yubikey-cli"
-version = "0.7.0"
+version = "0.8.0-pre"
 dependencies = [
  "base16ct",
  "clap",
