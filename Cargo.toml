@@ -33,7 +33,7 @@ nom = "7"
 num-bigint-dig = { version = "0.8", features = ["rand"] }
 num-traits = "0.2"
 num-integer = "0.1"
-ecdsa = { version = "0.16.7", features = ["digest", "pem"] }
+ecdsa = { version = "0.16.9", features = ["digest", "pem"] }
 p256 = "0.13"
 p384 = "0.13"
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
