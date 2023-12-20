@@ -92,7 +92,7 @@ impl<'tx> Transaction<'tx> {
         // get version from device
         let response = Apdu::new(Ins::GetVersion).transmit(self, 261)?;
 
-        if !response.is_success() {
+        if !response.is_success() || response.data().is_empty() {
             return Err(Error::GenericError);
         }
 
