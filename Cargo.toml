@@ -20,7 +20,7 @@ rust-version = "1.65"
 members = [".", "cli"]
 
 [workspace.dependencies]
-x509-cert = { version = "0.2.3", features = [ "builder", "hazmat" ] }
+x509-cert = { version = "0.2.5", features = [ "builder", "hazmat" ] }
 
 [dependencies]
 der = "0.7.1"
