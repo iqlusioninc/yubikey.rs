@@ -41,8 +41,10 @@ use crate::{
 };
 use log::error;
 use x509_cert::{
-    builder::{Builder, CertificateBuilder, Profile},
+    builder::{self, profile::Profile, Builder, CertificateBuilder},
+    certificate::TbsCertificate,
     der::{self, referenced::OwnedToRef, Decode, Encode},
+    ext::Extension,
     name::Name,
     serial_number::SerialNumber,
     spki::{SubjectPublicKeyInfoOwned, SubjectPublicKeyInfoRef},
@@ -85,6 +87,37 @@ impl From<CertInfo> for u8 {
     }
 }
 
+/// Profile generating Self signed certificates.
+pub struct SelfSigned {
+    subject: Name,
+}
+
+impl SelfSigned {
+    /// Creates a new profile with the provided subject
+    pub fn new(subject: Name) -> Self {
+        Self { subject }
+    }
+}
+
+impl Profile for SelfSigned {
+    fn get_issuer(&self, _subject: &Name) -> Name {
+        self.subject.clone()
+    }
+
+    fn get_subject(&self) -> Name {
+        self.subject.clone()
+    }
+
+    fn build_extensions(
+        &self,
+        _spk: SubjectPublicKeyInfoRef<'_>,
+        _issuer_spk: SubjectPublicKeyInfoRef<'_>,
+        _tbs: &TbsCertificate,
+    ) -> builder::Result<Vec<Extension>> {
+        Ok(vec![])
+    }
+}
+
 /// Certificates
 #[derive(Clone, Debug)]
 pub struct Certificate {
@@ -109,23 +142,18 @@ impl Certificate {
         extensions: F,
     ) -> Result<Self>
     where
-        F: FnOnce(&mut CertificateBuilder<'_, yubikey_signer::Signer<'_, KT>>) -> der::Result<()>,
+        F: FnOnce(&mut CertificateBuilder<SelfSigned>) -> der::Result<()>,
     {
-        let signer = yubikey_signer::Signer::new(yubikey, key, subject_pki.owned_to_ref())?;
-        let mut builder = CertificateBuilder::new(
-            Profile::Manual { issuer: None },
-            serial,
-            validity,
-            subject,
-            subject_pki,
-            &signer,
-        )
-        .map_err(|_| Error::KeyError)?;
+        let profile = SelfSigned::new(subject);
+        let signer =
+            yubikey_signer::Signer::<'_, KT>::new(yubikey, key, subject_pki.owned_to_ref())?;
+        let mut builder = CertificateBuilder::new(profile, serial, validity, subject_pki)
+            .map_err(|_| Error::KeyError)?;
 
         // Add custom extensions
         extensions(&mut builder)?;
 
-        let cert = builder.build().map_err(|_| Error::KeyError)?;
+        let cert = builder.build(&signer).map_err(|_| Error::KeyError)?;
         let cert = Self { cert };
         cert.write(yubikey, key, CertInfo::Uncompressed)?;
 

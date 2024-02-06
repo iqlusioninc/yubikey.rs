@@ -14,18 +14,33 @@ readme = "README.md"
 categories = ["api-bindings", "authentication", "cryptography", "hardware-support"]
 keywords = ["ecdsa", "encryption", "rsa", "piv", "signature"]
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.75"
+
+[patch.crates-io]
+const-oid = { git = "https://github.com/RustCrypto/formats.git" }
+der_derive = { git = "https://github.com/RustCrypto/formats.git" }
+der = { git = "https://github.com/RustCrypto/formats.git" }
+pkcs1 = { git = "https://github.com/RustCrypto/formats.git" }
+pkcs8 = { git = "https://github.com/RustCrypto/formats.git" }
+sec1 = { git = "https://github.com/RustCrypto/formats.git" }
+spki = { git = "https://github.com/RustCrypto/formats.git" }
+x509-cert = { git = "https://github.com/RustCrypto/formats.git" }
+
+ecdsa = { git = "https://github.com/RustCrypto/signatures.git" }
+
+p256 = { git = "https://github.com/RustCrypto/elliptic-curves.git" }
+p384 = { git = "https://github.com/RustCrypto/elliptic-curves.git" }
 
 [workspace]
 members = [".", "cli"]
 
 [workspace.dependencies]
-x509-cert = { version = "0.2.5", features = [ "builder", "hazmat" ] }
+x509-cert = { version = "=0.3.0-pre", features = [ "builder", "hazmat" ] }
 
 [dependencies]
-der = "0.7.1"
+der = "=0.8.0-pre.0"
 des = "0.8"
-elliptic-curve = "0.13"
+elliptic-curve = "=0.14.0-pre.5"
 hex = { package = "base16ct", version = "0.2", features = ["alloc"] }
 hmac = "0.12"
 log = "0.4"
@@ -33,17 +48,17 @@ nom = "7"
 num-bigint-dig = { version = "0.8", features = ["rand"] }
 num-traits = "0.2"
 num-integer = "0.1"
-ecdsa = { version = "0.16.7", features = ["digest", "pem"] }
-p256 = "0.13"
-p384 = "0.13"
-pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+ecdsa = { version = "0.17.0-pre.4", features = ["digest", "pem"] }
+p256 = "=0.14.0-pre.0"
+p384 = "=0.14.0-pre"
+pbkdf2 = { version = "=0.13.0-pre.0", default-features = false, features = ["hmac"] }
 pcsc = "2.3.1"
 rand_core = { version = "0.6", features = ["std"] }
-rsa = { version = "0.9.6", features = ["sha2"] }
+rsa = { version = "=0.10.0-pre.1", features = ["sha2"] }
 secrecy = "0.8"
-sha1 = { version = "0.10", features = ["oid"] }
-sha2 = { version = "0.10", features = ["oid"] }
-signature = "2"
+sha1 = { version = "=0.11.0-pre.3", features = ["oid"] }
+sha2 = { version = "=0.11.0-pre.3", features = ["oid"] }
+signature = "=2.3.0-pre.3"
 subtle = "2"
 uuid = { version = "1.2", features = ["v4"] }
 x509-cert.workspace = true
@@ -52,7 +67,7 @@ zeroize = "1"
 [dev-dependencies]
 env_logger = "0.10"
 once_cell = "1"
-signature = "2"
+signature = "=2.3.0-pre.3"
 
 [features]
 untested = []
