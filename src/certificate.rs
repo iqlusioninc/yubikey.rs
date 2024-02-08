@@ -109,23 +109,23 @@ impl Certificate {
         extensions: F,
     ) -> Result<Self>
     where
-        F: FnOnce(&mut CertificateBuilder<'_, yubikey_signer::Signer<'_, KT>>) -> der::Result<()>,
+        F: FnOnce(&mut CertificateBuilder) -> der::Result<()>,
     {
-        let signer = yubikey_signer::Signer::new(yubikey, key, subject_pki.owned_to_ref())?;
+        let signer =
+            yubikey_signer::Signer::<'_, KT>::new(yubikey, key, subject_pki.owned_to_ref())?;
         let mut builder = CertificateBuilder::new(
             Profile::Manual { issuer: None },
             serial,
             validity,
             subject,
             subject_pki,
-            &signer,
         )
         .map_err(|_| Error::KeyError)?;
 
         // Add custom extensions
         extensions(&mut builder)?;
 
-        let cert = builder.build().map_err(|_| Error::KeyError)?;
+        let cert = builder.build(&signer).map_err(|_| Error::KeyError)?;
         let cert = Self { cert };
         cert.write(yubikey, key, CertInfo::Uncompressed)?;
 
