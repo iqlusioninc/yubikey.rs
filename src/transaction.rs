@@ -163,17 +163,16 @@ impl<'tx> Transaction<'tx> {
             .p2(slot.into())
             .transmit(self, CB_OBJ_MAX)?;
 
-        if !response.is_success() {
-            if response.status_words() == StatusWords::NotSupportedError {
-                return Err(Error::NotSupported); // Requires firmware 5.2.3
-            } else {
-                return Err(Error::GenericError);
+        match response.status_words() {
+            StatusWords::Success => {
+                let buf = Buffer::new(response.data().into());
+                piv::SlotMetadata::try_from(buf)
             }
+            StatusWords::ReferenceDataNotFoundError => Err(Error::NotFound),
+            // Requires firmware 5.2.3
+            StatusWords::NotSupportedError => Err(Error::NotSupported),
+            _ => Err(Error::GenericError),
         }
-
-        let buf = Buffer::new(response.data().into());
-
-        piv::SlotMetadata::try_from(buf)
     }
 
     /// Verify device PIN.
