@@ -204,6 +204,15 @@ pub enum Ins {
     /// Get slot metadata
     GetMetadata,
 
+    /// Management // Read Config
+    ReadConfig,
+
+    /// Management // Write Config
+    WriteConfig,
+
+    /// Management // DeviceReset
+    DeviceReset,
+
     /// Other/unrecognized instruction codes
     Other(u8),
 }
@@ -229,6 +238,12 @@ impl Ins {
             Ins::Attest => 0xf9,
             Ins::GetSerial => 0xf8,
             Ins::GetMetadata => 0xf7,
+
+            // Management
+            Ins::ReadConfig => 0x1d,
+            Ins::WriteConfig => 0x1c,
+            Ins::DeviceReset => 0x1f,
+
             Ins::Other(code) => code,
         }
     }
@@ -237,6 +252,11 @@ impl Ins {
 impl From<u8> for Ins {
     fn from(code: u8) -> Self {
         match code {
+            // Management
+            0x1d => Ins::ReadConfig,
+            0x1c => Ins::WriteConfig,
+            0x1f => Ins::DeviceReset,
+
             0x20 => Ins::Verify,
             0x24 => Ins::ChangeReference,
             0x2c => Ins::ResetRetry,
