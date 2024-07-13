@@ -274,10 +274,11 @@ pub mod yubikey_signer {
         YubiKey,
     };
     use der::{
-        asn1::{Any, OctetString},
+        asn1::{Any, BitString, OctetString},
         oid::db::rfc5912,
         Encode, Sequence,
     };
+    use ed25519_dalek::pkcs8::EncodePublicKey as Ed25519EncodePublicKey;
     use sha2::{Digest, Sha256, Sha384};
     use signature::Keypair;
     use std::{cell::RefCell, fmt, io::Write, marker::PhantomData};
@@ -285,6 +286,77 @@ pub mod yubikey_signer {
         self, AlgorithmIdentifierOwned, DynSignatureAlgorithmIdentifier, EncodePublicKey,
         SignatureBitStringEncoding, SubjectPublicKeyInfoRef,
     };
+
+    /// ed25519_dalek::Signature wrapper to implement required traits
+    #[derive(Debug)]
+    pub struct Ed25519SignatureWrapper(ed25519_dalek::Signature);
+
+    impl SignatureBitStringEncoding for Ed25519SignatureWrapper {
+        fn to_bitstring(&self) -> der::Result<BitString> {
+            BitString::from_bytes(self.0.to_bytes().as_ref())
+        }
+    }
+
+    impl TryFrom<&[u8]> for Ed25519SignatureWrapper {
+        type Error = signature::Error;
+
+        fn try_from(bytes: &[u8]) -> std::result::Result<Self, Self::Error> {
+            ed25519_dalek::Signature::from_slice(bytes)
+                .map(Ed25519SignatureWrapper)
+                .map_err(|e| signature::Error::from_source(e))
+        }
+    }
+
+    /// Wrapper type for Ed25519 verifying key that implements required X.509 traits
+    #[derive(Debug, Clone)]
+    pub struct Ed25519VerifyingKeyWrapper(ed25519_dalek::VerifyingKey);
+
+    impl ed25519_dalek::Verifier<ed25519_dalek::Signature> for Ed25519VerifyingKeyWrapper {
+        fn verify(
+            &self,
+            msg: &[u8],
+            signature: &ed25519_dalek::Signature,
+        ) -> std::result::Result<(), ed25519_dalek::ed25519::Error> {
+            self.0.verify(msg, signature)
+        }
+    }
+
+    impl EncodePublicKey for Ed25519VerifyingKeyWrapper {
+        fn to_public_key_der(&self) -> spki::Result<der::Document> {
+            let document = Ed25519EncodePublicKey::to_public_key_der(&self.0)
+                .map_err(|_| spki::Error::KeyMalformed)?;
+            let vec = document.to_vec();
+            der::Document::try_from(vec).map_err(|_| spki::Error::KeyMalformed)
+        }
+    }
+
+    impl DynSignatureAlgorithmIdentifier for Ed25519VerifyingKeyWrapper {
+        fn signature_algorithm_identifier(&self) -> spki::Result<AlgorithmIdentifierOwned> {
+            Ok(AlgorithmIdentifierOwned {
+                // Ed25519 OID from RFC 8410
+                oid: spki::ObjectIdentifier::new_unwrap("1.3.101.112"),
+                parameters: None,
+            })
+        }
+    }
+
+    impl From<ed25519_dalek::VerifyingKey> for Ed25519VerifyingKeyWrapper {
+        fn from(key: ed25519_dalek::VerifyingKey) -> Self {
+            Self(key)
+        }
+    }
+
+    impl TryFrom<SubjectPublicKeyInfoRef<'_>> for Ed25519VerifyingKeyWrapper {
+        type Error = spki::Error;
+
+        fn try_from(spki: SubjectPublicKeyInfoRef<'_>) -> spki::Result<Self> {
+            // Extract the raw public key bytes from SPKI
+            let key_data: &[u8; 32] = spki.subject_public_key.raw_bytes().try_into().unwrap();
+            ed25519_dalek::VerifyingKey::from_bytes(key_data)
+                .map(Ed25519VerifyingKeyWrapper)
+                .map_err(|_| spki::Error::KeyMalformed)
+        }
+    }
 
     type SigResult<T> = core::result::Result<T, signature::Error>;
 
@@ -311,6 +383,22 @@ pub mod yubikey_signer {
         fn prepare(input: &[u8]) -> SigResult<Vec<u8>>;
         /// Read back the signature from the device
         fn read_signature(input: &[u8]) -> SigResult<Self::Signature>;
+    }
+
+    impl KeyType for ed25519_dalek::SigningKey {
+        const ALGORITHM: AlgorithmId = AlgorithmId::Ed25519;
+        type Error = signature::Error;
+        type Signature = Ed25519SignatureWrapper;
+        type VerifyingKey = Ed25519VerifyingKeyWrapper;
+        type PublicKey = Ed25519VerifyingKeyWrapper;
+
+        fn prepare(input: &[u8]) -> SigResult<Vec<u8>> {
+            Ok(input.to_vec())
+        }
+
+        fn read_signature(input: &[u8]) -> SigResult<Self::Signature> {
+            Ed25519SignatureWrapper::try_from(input)
+        }
     }
 
     impl KeyType for p256::NistP256 {

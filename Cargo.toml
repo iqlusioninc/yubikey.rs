@@ -37,6 +37,9 @@ ecdsa = { version = "0.17.0-rc.6", features = ["digest", "pem"] }
 p256 = "=0.14.0-pre.11"
 p384 = "=0.14.0-pre.11"
 pbkdf2 = { version = "0.13.0-rc.1", default-features = false, features = ["hmac"] }
+curve25519-dalek = "4"
+x25519-dalek = "2"
+ed25519-dalek = { version = "2", features = ["pkcs8"] }
 pcsc = "2.3.1"
 rand = "0.9"
 rand_core = { version = "0.9", features = ["os_rng"] }
