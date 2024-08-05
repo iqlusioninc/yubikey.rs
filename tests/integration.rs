@@ -16,7 +16,8 @@ use yubikey::{
     certificate::yubikey_signer,
     certificate::Certificate,
     piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
-    Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
+    Error, MgmKey, MgmKey3Des, MgmKeyAes128, MgmKeyAes192, MgmKeyAes256, MgmKeyAlgorithm,
+    PinPolicy, Serial, TouchPolicy, YubiKey,
 };
 
 static YUBIKEY: Lazy<Mutex<YubiKey>> = Lazy::new(|| {
@@ -108,6 +109,26 @@ fn test_verify_pin() {
     assert!(yubikey.verify_pin(b"123456").is_ok());
 }
 
+fn get_mgm_key_meta(yubikey: &mut YubiKey) -> piv::SlotMetadata {
+    piv::metadata(yubikey, SlotId::Management(ManagementSlotId::Management)).unwrap()
+}
+
+/// Given a default YubiKey, authenticate with the default management key.
+/// 
+/// This is slightly complicated by newer firmwares using AES192 as the MGM default key,
+/// over 3DES.
+fn auth_default_mgm(yubikey: &mut YubiKey) {
+    match get_mgm_key_meta(yubikey).algorithm {
+        piv::ManagementAlgorithmId::ThreeDes => {
+            assert!(yubikey.authenticate(MgmKey3Des::default()).is_ok())
+        }
+        piv::ManagementAlgorithmId::Aes192 => {
+            assert!(yubikey.authenticate(MgmKeyAes192::default()).is_ok())
+        }
+        other => panic!("unexpected management key algorithm: {:?}", other),
+    }
+}
+
 //
 // Management key support
 //
@@ -119,29 +140,41 @@ fn test_set_mgmkey() {
     let mut yubikey = YUBIKEY.lock().unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
-    assert!(MgmKey::get_protected(&mut yubikey).is_err());
-    assert!(yubikey.authenticate(MgmKey::default()).is_ok());
 
-    // Set a protected management key.
-    assert!(MgmKey::generate().set_protected(&mut yubikey).is_ok());
-    let protected = MgmKey::get_protected(&mut yubikey).unwrap();
-    assert!(yubikey.authenticate(MgmKey::default()).is_err());
-    assert!(yubikey.authenticate(protected.clone()).is_ok());
+    fn test_mgm<M: MgmKeyAlgorithm>(yubikey: &mut YubiKey) {
+        assert!(yubikey.authenticate::<M>(MgmKey::default::<M>()).is_ok());
+        assert!(MgmKey::<M>::get_protected(yubikey).is_err());
 
-    // Set a manual management key.
-    let manual = MgmKey::generate();
-    assert!(manual.set_manual(&mut yubikey, false).is_ok());
-    assert!(MgmKey::get_protected(&mut yubikey).is_err());
-    assert!(yubikey.authenticate(MgmKey::default()).is_err());
-    assert!(yubikey.authenticate(protected.clone()).is_err());
-    assert!(yubikey.authenticate(manual.clone()).is_ok());
+        // Set a protected management key.
+        assert!(MgmKey::generate::<M>().set_protected(yubikey).is_ok());
+        let protected = MgmKey::get_protected::<M>(yubikey).unwrap();
+        assert!(yubikey.authenticate::<M>(MgmKey::default::<M>()).is_err());
+        assert!(yubikey.authenticate(protected.clone()).is_ok());
 
-    // Set back to the default management key.
-    assert!(MgmKey::set_default(&mut yubikey).is_ok());
-    assert!(MgmKey::get_protected(&mut yubikey).is_err());
-    assert!(yubikey.authenticate(protected).is_err());
-    assert!(yubikey.authenticate(manual).is_err());
-    assert!(yubikey.authenticate(MgmKey::default()).is_ok());
+        // Set a manual management key.
+        let manual = MgmKey::<M>::generate();
+        assert!(manual.set_manual(&mut yubikey, false).is_ok());
+        assert!(MgmKey::<M>::get_protected(&mut yubikey).is_err());
+        assert!(yubikey.authenticate(MgmKey::<M>::default()).is_err());
+        assert!(yubikey.authenticate(protected.clone()).is_err());
+        assert!(yubikey.authenticate(manual.clone()).is_ok());
+
+        // Set back to the default management key.
+        assert!(MgmKey::<M>::set_default(&mut yubikey).is_ok());
+        assert!(MgmKey::<M>::get_protected(&mut yubikey).is_err());
+        assert!(yubikey.authenticate(protected).is_err());
+        assert!(yubikey.authenticate(manual).is_err());
+        assert!(yubikey.authenticate(MgmKey::<M>::default()).is_ok());
+    }
+
+    match get_mgm_admin(&mut yubikey).algorithm {
+        ManagementAlgorithmId::ThreeDes => test_mgm::<des::TdesEee3>(&mut yubikey),
+        ManagementAlgorithmId::Aes192 => test_mgm::<aes::Aes192>(&mut yubikey),
+        ManagementAlgorithmId::Aes128 | ManagementAlgorithmId::Aes192 => {
+            panic!("AES128 or AES256 should not be a default key")
+        }
+        other => panic!("unexpected management key algorithm: {:?}", other),
+    }
 }
 
 //
@@ -152,11 +185,10 @@ fn generate_self_signed_cert<KT: yubikey_signer::KeyType>() -> Certificate {
     let mut yubikey = YUBIKEY.lock().unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
-    assert!(yubikey.authenticate(MgmKey::default()).is_ok());
+    auth_default_mgm(&mut yubikey);
 
     let slot = SlotId::Retired(RetiredSlotId::R1);
 
-    // Generate a new key in the selected slot.
     let generated = piv::generate(
         &mut yubikey,
         slot,
@@ -289,7 +321,7 @@ fn test_read_metadata() {
     let mut yubikey = YUBIKEY.lock().unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
-    assert!(yubikey.authenticate(MgmKey::default()).is_ok());
+    auth_default_mgm(&mut yubikey);
 
     let slot = SlotId::Retired(RetiredSlotId::R1);
 
