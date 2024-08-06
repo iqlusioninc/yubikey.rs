@@ -66,9 +66,6 @@ use {
 /// Flag for PUK blocked
 pub(crate) const ADMIN_FLAGS_1_PUK_BLOCKED: u8 = 0x01;
 
-/// 3DES authentication
-pub(crate) const ALGO_3DES: u8 = 0x03;
-
 /// Card management key
 pub(crate) const KEY_CARDMGM: u8 = 0x9b;
 
@@ -626,53 +623,6 @@ impl YubiKey {
     pub fn save_object(&mut self, object_id: ObjectId, indata: &mut [u8]) -> Result<()> {
         let txn = self.begin_transaction()?;
         txn.save_object(object_id, indata)
-    }
-
-    /// Get an auth challenge.
-    #[cfg(feature = "untested")]
-    pub fn get_auth_challenge(&mut self) -> Result<[u8; 8]> {
-        let txn = self.begin_transaction()?;
-
-        let response = Apdu::new(Ins::Authenticate)
-            .params(ALGO_3DES, KEY_CARDMGM)
-            .data([0x7c, 0x02, 0x81, 0x00])
-            .transmit(&txn, 261)?;
-
-        if !response.is_success() {
-            return Err(Error::AuthenticationError);
-        }
-
-        Ok(response
-            .data()
-            .get(4..12)
-            .ok_or(Error::SizeError)?
-            .try_into()?)
-    }
-
-    /// Verify an auth response.
-    #[cfg(feature = "untested")]
-    pub fn verify_auth_response(&mut self, response: [u8; 8]) -> Result<()> {
-        let mut data = [0u8; 12];
-        data[0] = 0x7c;
-        data[1] = 0x0a;
-        data[2] = 0x82;
-        data[3] = 0x08;
-        data[4..12].copy_from_slice(&response);
-
-        let txn = self.begin_transaction()?;
-
-        // send the response to the card and a challenge of our own.
-        let status_words = Apdu::new(Ins::Authenticate)
-            .params(ALGO_3DES, KEY_CARDMGM)
-            .data(data)
-            .transmit(&txn, 261)?
-            .status_words();
-
-        if !status_words.is_success() {
-            return Err(Error::AuthenticationError);
-        }
-
-        Ok(())
     }
 
     /// Reset YubiKey.
