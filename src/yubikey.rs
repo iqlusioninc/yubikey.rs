@@ -363,7 +363,7 @@ impl YubiKey {
             .data([TAG_DYN_AUTH, 0x02, 0x80, 0x00])
             .transmit(&txn, 261)?;
 
-        if !card_response.is_success() {
+        if !card_response.is_success() || card_response.data().len() < 5 {
             return Err(Error::AuthenticationError);
         }
 
