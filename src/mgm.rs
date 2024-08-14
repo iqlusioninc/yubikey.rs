@@ -108,7 +108,7 @@ pub trait MgmKeyAlgorithm:
     }
 }
 
-impl MgmKeyAlgorithm for des::TdesEee3 {
+impl MgmKeyAlgorithm for des::TdesEde3 {
     const KEY_SIZE: u8 = 24;
     const ALGORITHM_ID: u8 = 0x03;
 
@@ -208,7 +208,7 @@ pub struct MgmKey<C: MgmKeyAlgorithm> {
 }
 
 /// A Management Key (MGM) using Triple-DES
-pub type MgmKey3Des = MgmKey<des::TdesEee3>;
+pub type MgmKey3Des = MgmKey<des::TdesEde3>;
 
 /// A Management Key (MGM) using AES-128
 pub type MgmKeyAes128 = MgmKey<aes::Aes128>;
@@ -522,7 +522,7 @@ impl<'a, C: MgmKeyAlgorithm> TryFrom<&'a [u8]> for MgmKey<C> {
 // Seal the MgmKeyAlgorithm trait
 mod private {
     pub trait Seal {}
-    impl Seal for des::TdesEee3 {}
+    impl Seal for des::TdesEde3 {}
     impl Seal for aes::Aes128 {}
     impl Seal for aes::Aes192 {}
     impl Seal for aes::Aes256 {}
