@@ -195,8 +195,8 @@ impl YubiKey {
                 if let Some(yk_stored) = yubikey {
                     // We found two YubiKeys, so we won't use either.
                     // Don't reset them.
-                    let _ = yk_stored.disconnect(pcsc::Disposition::LeaveCard);
-                    let _ = yk_found.disconnect(pcsc::Disposition::LeaveCard);
+                    let _ = yk_stored.disconnect(Disposition::LeaveCard);
+                    let _ = yk_found.disconnect(Disposition::LeaveCard);
 
                     error!("multiple YubiKeys detected!");
                     return Err(Error::PcscError { inner: None });
@@ -243,7 +243,7 @@ impl YubiKey {
                 return Ok(yubikey);
             } else {
                 // We didn't want this YubiKey; don't reset it.
-                let _ = yubikey.disconnect(pcsc::Disposition::LeaveCard);
+                let _ = yubikey.disconnect(Disposition::LeaveCard);
             }
         }
 
@@ -263,7 +263,7 @@ impl YubiKey {
         self.card.reconnect(
             pcsc::ShareMode::Shared,
             pcsc::Protocols::T1,
-            pcsc::Disposition::ResetCard,
+            Disposition::ResetCard,
         )?;
 
         let pin = self
@@ -373,7 +373,11 @@ impl YubiKey {
 
         let mut data = Vec::with_capacity(4 + challenge_len + 2 + challenge_len);
         data.push(TAG_DYN_AUTH);
-        data.push((2 + challenge_len + 2 + challenge_len).try_into().unwrap());
+        data.push(
+            (2 + challenge_len + 2 + challenge_len)
+                .try_into()
+                .expect("value fits in u8"),
+        );
         data.push(0x80);
         data.push(challenge_len as u8);
         data.extend_from_slice(&card_challenge);
@@ -672,7 +676,7 @@ impl<'a> TryFrom<&'a Reader<'_>> for YubiKey {
                 // a side-effect of determining this. Avoid disrupting its internal state
                 // any further (e.g. preserve the PIN cache of whatever applet is selected
                 // currently).
-                if let Err((_, e)) = card.disconnect(pcsc::Disposition::LeaveCard) {
+                if let Err((_, e)) = card.disconnect(Disposition::LeaveCard) {
                     error!("Failed to disconnect gracefully from card: {}", e);
                 }
 

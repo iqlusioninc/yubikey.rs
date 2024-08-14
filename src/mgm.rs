@@ -92,7 +92,7 @@ pub enum MgmType {
 
 /// The algorithm used for the MGM key.
 pub trait MgmKeyAlgorithm:
-    BlockCipher + BlockDecrypt + BlockEncrypt + KeyInit + private::Seal
+    BlockCipher + BlockDecrypt + BlockEncrypt + Clone + KeyInit + private::Seal
 {
     /// The KeySized used for this algorithm
     const KEY_SIZE: u8;
@@ -172,7 +172,7 @@ impl MgmKeyAlgorithm for des::TdesEee3 {
                     &key_bytes
                 );
 
-                return Err(Error::KeyError)
+                return Err(Error::KeyError);
             }
         }
 
@@ -459,8 +459,7 @@ impl<C: MgmKeyAlgorithm> MgmKey<C> {
 
         let mut output = challenge.to_owned();
 
-        C::new(&self.key)
-            .decrypt_block(GenericArray::from_mut_slice(&mut output));
+        C::new(&self.key).decrypt_block(GenericArray::from_mut_slice(&mut output));
 
         Ok(output)
     }
@@ -473,8 +472,7 @@ impl<C: MgmKeyAlgorithm> MgmKey<C> {
             return Err(Error::AuthenticationError);
         }
 
-        C::new(&self.key)
-            .encrypt_block(GenericArray::from_mut_slice(&mut response));
+        C::new(&self.key).encrypt_block(GenericArray::from_mut_slice(&mut response));
 
         use subtle::ConstantTimeEq;
         if response.ct_eq(auth_data).unwrap_u8() != 1 {

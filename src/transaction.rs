@@ -244,7 +244,11 @@ impl<'tx> Transaction<'tx> {
 
     /// Set the management key (MGM).
     #[cfg(feature = "untested")]
-    pub fn set_mgm_key<C: MgmKeyAlgorithm>(&self, new_key: &MgmKey<C>, require_touch: bool) -> Result<()> {
+    pub fn set_mgm_key<C: MgmKeyAlgorithm>(
+        &self,
+        new_key: &MgmKey<C>,
+        require_touch: bool,
+    ) -> Result<()> {
         let p2 = if require_touch { 0xfe } else { 0xff };
 
         let mut data = Vec::with_capacity(new_key.key_size() as usize + 3);
