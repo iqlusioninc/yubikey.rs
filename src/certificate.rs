@@ -41,8 +41,8 @@ use crate::{
 };
 use log::error;
 use x509_cert::{
-    builder::{Builder, CertificateBuilder, Profile},
-    der::{self, referenced::OwnedToRef, Decode, Encode},
+    builder::{profile::BuilderProfile, Builder, CertificateBuilder},
+    der::{referenced::OwnedToRef, Decode, Encode},
     name::Name,
     serial_number::SerialNumber,
     spki::{SubjectPublicKeyInfoOwned, SubjectPublicKeyInfoRef},
@@ -109,23 +109,18 @@ impl Certificate {
         extensions: F,
     ) -> Result<Self>
     where
-        F: FnOnce(&mut CertificateBuilder<'_, yubikey_signer::Signer<'_, KT>>) -> der::Result<()>,
+        F: FnOnce(&mut CertificateBuilder<SelfSigned>) -> der::Result<()>,
     {
-        let signer = yubikey_signer::Signer::new(yubikey, key, subject_pki.owned_to_ref())?;
-        let mut builder = CertificateBuilder::new(
-            Profile::Manual { issuer: None },
-            serial,
-            validity,
-            subject,
-            subject_pki,
-            &signer,
-        )
-        .map_err(|_| Error::KeyError)?;
+        let signer =
+            yubikey_signer::Signer::<'_, KT>::new(yubikey, key, subject_pki.owned_to_ref())?;
+        let mut builder =
+            CertificateBuilder::new(SelfSigned { subject }, serial, validity, subject_pki)
+                .map_err(|_| Error::KeyError)?;
 
         // Add custom extensions
         extensions(&mut builder)?;
 
-        let cert = builder.build().map_err(|_| Error::KeyError)?;
+        let cert = builder.build(&signer).map_err(|_| Error::KeyError)?;
         let cert = Self { cert };
         cert.write(yubikey, key, CertInfo::Uncompressed)?;
 
@@ -174,20 +169,52 @@ impl Certificate {
 
     /// Returns the Issuer field of the certificate.
     pub fn issuer(&self) -> String {
-        self.cert.tbs_certificate.issuer.to_string()
+        self.cert.tbs_certificate().issuer().to_string()
     }
 
     /// Returns the SubjectName field of the certificate.
     pub fn subject(&self) -> String {
-        self.cert.tbs_certificate.subject.to_string()
+        self.cert.tbs_certificate().subject().to_string()
     }
 
     /// Returns the SubjectPublicKeyInfo field of the certificate.
     pub fn subject_pki(&self) -> SubjectPublicKeyInfoRef<'_> {
         self.cert
-            .tbs_certificate
-            .subject_public_key_info
+            .tbs_certificate()
+            .subject_public_key_info()
             .owned_to_ref()
+    }
+}
+
+/// A [`BuilderProfile`] for self-signed certificates.
+///
+/// This profile has no default extensions.
+pub struct SelfSigned {
+    subject: Name,
+}
+
+impl BuilderProfile for SelfSigned {
+    fn get_issuer(&self, subject: &Name) -> Name {
+        // RFC 5280 Section 3.2:
+        //
+        // > Self-issued certificates are CA certificates in which the issuer and subject
+        // > are the same entity. [..] Self-signed certificates are self-issued
+        // > certificates where the digital signature may be verified by the public key
+        // > bound into the certificate.
+        subject.clone()
+    }
+
+    fn get_subject(&self) -> Name {
+        self.subject.clone()
+    }
+
+    fn build_extensions(
+        &self,
+        _spk: SubjectPublicKeyInfoRef<'_>,
+        _issuer_spk: SubjectPublicKeyInfoRef<'_>,
+        _tbs: &x509_cert::TbsCertificate,
+    ) -> x509_cert::builder::Result<Vec<x509_cert::ext::Extension>> {
+        Ok(vec![])
     }
 }
 
