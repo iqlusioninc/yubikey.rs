@@ -96,10 +96,9 @@ impl MsRoots {
             }
         }
 
-        MsRoots::new(&data).map(Some).map_err(|e| {
-            error!("error parsing msroots: {:?}", e);
-            e
-        })
+        MsRoots::new(&data)
+            .map(Some)
+            .inspect_err(|e| error!("error parsing msroots: {:?}", e))
     }
 
     /// Write `msroots` file to YubiKey

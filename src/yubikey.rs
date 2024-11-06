@@ -42,7 +42,7 @@ use crate::{
     transaction::Transaction,
 };
 use log::{error, info};
-use pcsc::{Card, Disposition};
+use pcsc::Card;
 use rand_core::{OsRng, RngCore};
 use std::{
     fmt::{self, Display},
@@ -293,7 +293,10 @@ impl YubiKey {
     /// `YubiKey` implements `Drop` which automatically disconnects the card using
     /// `Disposition::ResetCard`; you only need to call this function if you want to
     /// handle errors or use a different disposition method.
-    pub fn disconnect(self, disposition: Disposition) -> core::result::Result<(), (Self, Error)> {
+    pub fn disconnect(
+        self,
+        disposition: pcsc::Disposition,
+    ) -> core::result::Result<(), (Self, Error)> {
         let Self {
             card,
             name,
@@ -523,15 +526,11 @@ impl YubiKey {
 
         admin_data
             .set_item(TAG_ADMIN_TIMESTAMP, &tnow)
-            .map_err(|e| {
-                error!("could not set pin timestamp, err = {}", e);
-                e
-            })?;
+            .inspect_err(|e| error!("could not set pin timestamp, err = {}", e))?;
 
-        admin_data.write(&txn).map_err(|e| {
-            error!("could not write admin data, err = {}", e);
-            e
-        })?;
+        admin_data
+            .write(&txn)
+            .inspect_err(|e| error!("could not write admin data, err = {}", e))?;
 
         Ok(())
     }
@@ -581,7 +580,7 @@ impl YubiKey {
 
         // Attempt to set the "PUK blocked" flag in admin data.
         let mut admin_data = AdminData::read(&txn)
-            .map(|data| {
+            .inspect(|data| {
                 if let Ok(item) = data.get_item(TAG_ADMIN_FLAGS_1) {
                     if item.len() == flags.len() {
                         flags.copy_from_slice(item)
@@ -593,8 +592,6 @@ impl YubiKey {
                         );
                     }
                 }
-
-                data
             })
             .unwrap_or_default();
 
@@ -703,10 +700,9 @@ impl<'a> TryFrom<&'a Reader<'_>> for YubiKey {
     type Error = Error;
 
     fn try_from(reader: &'a Reader<'_>) -> Result<Self> {
-        let mut card = reader.connect().map_err(|e| {
-            error!("error connecting to reader '{}': {}", reader.name(), e);
-            e
-        })?;
+        let mut card = reader
+            .connect()
+            .inspect_err(|e| error!("error connecting to reader '{}': {}", reader.name(), e))?;
 
         info!("connected to reader: {}", reader.name());
 

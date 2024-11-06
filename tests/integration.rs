@@ -12,9 +12,7 @@ use signature::hazmat::PrehashVerifier;
 use std::{env, str::FromStr, sync::Mutex, time::Duration};
 use x509_cert::{der::Encode, name::Name, serial_number::SerialNumber, time::Validity};
 use yubikey::{
-    certificate,
-    certificate::yubikey_signer,
-    certificate::Certificate,
+    certificate::{yubikey_signer, Certificate},
     piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
     Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
 };
@@ -317,8 +315,7 @@ fn test_read_metadata() {
 #[ignore]
 fn test_parse_cert_from_der() {
     let bob_der = std::fs::read("tests/assets/Bob.der").expect(".der file not found");
-    let cert =
-        certificate::Certificate::from_bytes(bob_der).expect("Failed to parse valid certificate");
+    let cert = Certificate::from_bytes(bob_der).expect("Failed to parse valid certificate");
     assert_eq!(
         cert.subject(),
         "CN=Bob",

@@ -196,7 +196,7 @@ pub fn print_cert_info(
     print_cert_attr(
         stream,
         "Fingerprint",
-        &hex::upper::encode_string(&fingerprint),
+        hex::upper::encode_string(&fingerprint),
     )?;
     print_cert_attr(
         stream,
