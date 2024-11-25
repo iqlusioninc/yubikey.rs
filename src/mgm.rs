@@ -155,15 +155,12 @@ impl MgmKey {
     pub fn get_protected(yubikey: &mut YubiKey) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
 
-        let protected_data = ProtectedData::read(&txn).map_err(|e| {
-            error!("could not read protected data (err: {:?})", e);
-            e
-        })?;
+        let protected_data = ProtectedData::read(&txn)
+            .inspect_err(|e| error!("could not read protected data (err: {:?})", e))?;
 
-        let item = protected_data.get_item(TAG_PROTECTED_MGM).map_err(|e| {
-            error!("could not read protected MGM from metadata (err: {:?})", e);
-            e
-        })?;
+        let item = protected_data
+            .get_item(TAG_PROTECTED_MGM)
+            .inspect_err(|e| error!("could not read protected MGM from metadata (err: {:?})", e))?;
 
         if item.len() != DES_LEN_3DES {
             error!(
@@ -196,12 +193,10 @@ impl MgmKey {
     pub fn set_manual(&self, yubikey: &mut YubiKey, require_touch: bool) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 
-        txn.set_mgm_key(self, require_touch).map_err(|e| {
+        txn.set_mgm_key(self, require_touch)
             // Log a warning, since the device mgm key is corrupt or we're in a state
             // where we can't set the mgm key.
-            error!("could not set new derived mgm key, err = {}", e);
-            e
-        })?;
+            .inspect_err(|e| error!("could not set new derived mgm key, err = {}", e))?;
 
         // After this point, we've set the mgm key, so the function should succeed,
         // regardless of being able to set the metadata.
@@ -255,12 +250,10 @@ impl MgmKey {
     pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 
-        txn.set_mgm_key(self, false).map_err(|e| {
+        txn.set_mgm_key(self, false)
             // log a warning, since the device mgm key is corrupt or we're in
             // a state where we can't set the mgm key
-            error!("could not set new derived mgm key, err = {}", e);
-            e
-        })?;
+            .inspect_err(|e| error!("could not set new derived mgm key, err = {}", e))?;
 
         // after this point, we've set the mgm key, so the function should
         // succeed, regardless of being able to set the metadata
@@ -272,10 +265,9 @@ impl MgmKey {
         if let Err(e) = protected_data.set_item(TAG_PROTECTED_MGM, self.as_ref()) {
             error!("could not set protected mgm item, err = {:?}", e);
         } else {
-            protected_data.write(&txn).map_err(|e| {
-                error!("could not write protected data, err = {:?}", e);
-                e
-            })?;
+            protected_data
+                .write(&txn)
+                .inspect_err(|e| error!("could not write protected data, err = {:?}", e))?;
         }
 
         // set the protected mgm flag in admin data

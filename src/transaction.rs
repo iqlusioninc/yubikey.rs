@@ -66,10 +66,7 @@ impl<'tx> Transaction<'tx> {
             .p1(0x04)
             .data(piv::APPLET_ID)
             .transmit(self, 0xFF)
-            .map_err(|e| {
-                error!("failed communicating with card: '{}'", e);
-                e
-            })?;
+            .inspect_err(|e| error!("failed communicating with card: '{}'", e))?;
 
         if !response.is_success() {
             error!(
@@ -335,10 +332,7 @@ impl<'tx> Transaction<'tx> {
 
         let response = self
             .transfer_data(&templ, &indata[..offset], 1024)
-            .map_err(|e| {
-                error!("sign command failed to communicate: {}", e);
-                e
-            })?;
+            .inspect_err(|e| error!("sign command failed to communicate: {}", e))?;
 
         if !response.is_success() {
             error!("failed sign command with code {:x}", response.code());
