@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `yubikey::certificate::SelfSigned`
 - `yubikey::Error::CertificateBuilder`
 - `yubikey::MgmAlgorithmId`
+- `yubikey::mgm`:
+  - `MgmKey::generate_for`
+  - `MgmKey::get_default`
+  - `impl AsRef<[u8]> for MgmKey`
 
 ### Changed
 - MSRV is now 1.81.
@@ -20,11 +24,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `rsa 0.10.0-pre.3`
   - `sha2 0.11.0-pre.4`
   - `x509-cert 0.3.0-pre.0`
+- `yubikey::mgm`:
+  - `MgmKey::generate` now takes a `rand::TryCryptoRng` argument.
+  - `MgmKey::generate` now requires the caller to specify the key algorithm via
+    an `MgmAlgorithmId` parameter.
+    - Use `MgmKey::generate_for` if you want to generate a key using the
+      preferred algorithm for a given Yubikey's firmware version.
+  - `MgmKey::from_bytes` now takes an `Option<MgmAlgorithmId>` argument, to
+    disambiguate algorithms with the same key length.
 - `yubikey::piv`:
   - `ManagementAlgorithmId` has been renamed to `SlotAlgorithmId`, and its
     `ThreeDes` variant has been replaced by `SlotAlgorithmId::Management`
     containing a `yubikey::MgmAlgorithmId`.
 - Metadata command returns `Error:NotFound` instead of `Error::GenericError` when the object doesn't exist ([#558]).
+
+### Removed
+- `yubikey::mgm`:
+  - `MgmKey::new` (use `MgmKey::from_bytes(_, Some(MgmAlgorithmId::ThreeDes))`
+    instead).
+  - `impl AsRef<[u8; DES_LEN_3DES]> for MgmKey` (use
+    `impl AsRef<[u8]> for MgmKey` instead).
+  - `impl Default for MgmKey` (use `MgmKey::get_default` instead).
+  - `impl TryFrom<&[u8]> for MgmKey` (use `MgmKey::from_bytes` instead).
 
 ## 0.8.0 (2023-08-15)
 ### Added

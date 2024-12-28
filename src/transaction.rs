@@ -5,7 +5,7 @@ use crate::{
     apdu::{Apdu, Ins, StatusWords},
     consts::{CB_BUF_MAX, CB_OBJ_MAX},
     error::{Error, Result},
-    mgm::{MgmKey, DES_LEN_3DES},
+    mgm::MgmKey,
     otp,
     piv::{self, AlgorithmId, SlotId},
     serialization::*,
@@ -251,11 +251,11 @@ impl<'tx> Transaction<'tx> {
     pub fn set_mgm_key(&self, new_key: &MgmKey, require_touch: bool) -> Result<()> {
         let p2 = if require_touch { 0xfe } else { 0xff };
 
-        let mut data = [0u8; DES_LEN_3DES + 3];
-        data[0] = ALGO_3DES;
-        data[1] = KEY_CARDMGM;
-        data[2] = DES_LEN_3DES as u8;
-        data[3..3 + DES_LEN_3DES].copy_from_slice(new_key.as_ref());
+        let mut data = Vec::with_capacity(usize::from(new_key.key_size()) + 3);
+        data.push(new_key.algorithm_id().into());
+        data.push(KEY_CARDMGM);
+        data.push(new_key.key_size());
+        data.extend_from_slice(new_key.as_ref());
 
         let status_words = Apdu::new(Ins::SetMgmKey)
             .params(0xff, p2)
