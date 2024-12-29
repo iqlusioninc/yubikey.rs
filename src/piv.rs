@@ -47,6 +47,7 @@ use crate::{
     certificate::{self, Certificate},
     consts::CB_OBJ_MAX,
     error::{Error, Result},
+    mgm::MgmAlgorithmId,
     policy::{PinPolicy, TouchPolicy},
     serialization::*,
     setting,
@@ -945,7 +946,7 @@ pub fn metadata(yubikey: &mut YubiKey, slot: SlotId) -> Result<SlotMetadata> {
 #[derive(Debug)]
 pub struct SlotMetadata {
     /// Algorithm / Type of key
-    pub algorithm: ManagementAlgorithmId,
+    pub algorithm: SlotAlgorithmId,
     /// PIN and touch policy
     pub policy: Option<(PinPolicy, TouchPolicy)>,
     /// Imported or generated key
@@ -972,7 +973,7 @@ impl TryFrom<Buffer> for SlotMetadata {
             |input| Tlv::parse(input).map_err(|_| nom::Err::Error(())),
             || {
                 Ok(SlotMetadata {
-                    algorithm: ManagementAlgorithmId::PinPuk,
+                    algorithm: SlotAlgorithmId::PinPuk,
                     policy: None,
                     origin: None,
                     public: None,
@@ -983,7 +984,7 @@ impl TryFrom<Buffer> for SlotMetadata {
             |acc: Result<SlotMetadata>, tlv| match acc {
                 Ok(mut metadata) => match tlv.tag {
                     1 => {
-                        metadata.algorithm = ManagementAlgorithmId::try_from(tlv.value[0])?;
+                        metadata.algorithm = SlotAlgorithmId::try_from(tlv.value[0])?;
                         Ok(metadata)
                     }
                     2 => {
@@ -1015,7 +1016,7 @@ impl TryFrom<Buffer> for SlotMetadata {
                     }
                     4 => {
                         match metadata.algorithm {
-                            ManagementAlgorithmId::Asymmetric(alg) => {
+                            SlotAlgorithmId::Asymmetric(alg) => {
                                 metadata.public = Some(read_public_key(alg, tlv.value, false)?);
                             }
                             _ => Err(Error::ParseError)?,
@@ -1215,33 +1216,34 @@ fn read_public_key(
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 /// Algorithms as reported by the metadata command.
-pub enum ManagementAlgorithmId {
+pub enum SlotAlgorithmId {
     /// Used on PIN and PUK slots.
     PinPuk,
     /// Used on the key management slot.
-    ThreeDes,
+    Management(MgmAlgorithmId),
     /// Used on all other slots.
     Asymmetric(AlgorithmId),
 }
 
-impl TryFrom<u8> for ManagementAlgorithmId {
+impl TryFrom<u8> for SlotAlgorithmId {
     type Error = Error;
 
     fn try_from(value: u8) -> Result<Self> {
         match value {
-            0xff => Ok(ManagementAlgorithmId::PinPuk),
-            0x03 => Ok(ManagementAlgorithmId::ThreeDes),
-            oth => AlgorithmId::try_from(oth).map(ManagementAlgorithmId::Asymmetric),
+            0xff => Ok(SlotAlgorithmId::PinPuk),
+            oth => MgmAlgorithmId::try_from(oth)
+                .map(SlotAlgorithmId::Management)
+                .or_else(|_| AlgorithmId::try_from(oth).map(SlotAlgorithmId::Asymmetric)),
         }
     }
 }
 
-impl From<ManagementAlgorithmId> for u8 {
-    fn from(id: ManagementAlgorithmId) -> u8 {
+impl From<SlotAlgorithmId> for u8 {
+    fn from(id: SlotAlgorithmId) -> u8 {
         match id {
-            ManagementAlgorithmId::PinPuk => 0xff,
-            ManagementAlgorithmId::ThreeDes => 0x03,
-            ManagementAlgorithmId::Asymmetric(oth) => oth.into(),
+            SlotAlgorithmId::PinPuk => 0xff,
+            SlotAlgorithmId::Management(oth) => oth.into(),
+            SlotAlgorithmId::Asymmetric(oth) => oth.into(),
         }
     }
 }

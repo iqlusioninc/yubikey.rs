@@ -84,6 +84,32 @@ pub enum MgmType {
     Protected = 2,
 }
 
+/// Management key algorithm identifiers
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MgmAlgorithmId {
+    /// Triple DES (3DES) in EDE mode
+    ThreeDes,
+}
+
+impl TryFrom<u8> for MgmAlgorithmId {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self> {
+        match value {
+            0x03 => Ok(MgmAlgorithmId::ThreeDes),
+            _ => Err(Error::AlgorithmError),
+        }
+    }
+}
+
+impl From<MgmAlgorithmId> for u8 {
+    fn from(id: MgmAlgorithmId) -> u8 {
+        match id {
+            MgmAlgorithmId::ThreeDes => 0x03,
+        }
+    }
+}
+
 /// Management Key (MGM).
 ///
 /// This key is used to authenticate to the management applet running on
