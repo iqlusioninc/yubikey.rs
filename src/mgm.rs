@@ -39,6 +39,8 @@ use zeroize::Zeroize;
 use crate::{
     consts::{TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_PROTECTED_MGM},
     metadata::{AdminData, ProtectedData},
+    piv::{ManagementSlotId, SlotAlgorithmId},
+    transaction::Transaction,
     yubikey::YubiKey,
 };
 use des::{
@@ -110,6 +112,27 @@ impl From<MgmAlgorithmId> for u8 {
     }
 }
 
+impl MgmAlgorithmId {
+    /// Looks up the algorithm for the given Yubikey's current management key.
+    #[cfg(feature = "untested")]
+    fn query(txn: &Transaction<'_>) -> Result<Self> {
+        match txn.get_metadata(crate::piv::SlotId::Management(ManagementSlotId::Management)) {
+            Ok(metadata) => match metadata.algorithm {
+                SlotAlgorithmId::Management(alg) => Ok(alg),
+                // We specifically queried the management key slot; getting a known
+                // non-management algorithm back from the Yubikey is invalid.
+                _ => Err(Error::InvalidObject),
+            },
+            // Firmware versions without `GET METADATA` only support 3DES.
+            Err(Error::NotSupported) => Ok(MgmAlgorithmId::ThreeDes),
+            // `Error::AlgorithmError` only occurs when a new algorithm is encountered.
+            Err(Error::AlgorithmError) => Err(Error::NotSupported),
+            // Raise other errors as-is.
+            Err(e) => Err(e),
+        }
+    }
+}
+
 /// Management Key (MGM).
 ///
 /// This key is used to authenticate to the management applet running on
@@ -155,6 +178,12 @@ impl MgmKey {
     pub fn get_derived(yubikey: &mut YubiKey, pin: &[u8]) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
 
+        // Check the key algorithm.
+        let alg = MgmAlgorithmId::query(&txn)?;
+        if alg != MgmAlgorithmId::ThreeDes {
+            return Err(Error::NotSupported);
+        }
+
         // recover management key
         let admin_data = AdminData::read(&txn)?;
         let salt = admin_data.get_item(TAG_ADMIN_SALT)?;
@@ -178,6 +207,12 @@ impl MgmKey {
     #[cfg(feature = "untested")]
     pub fn get_protected(yubikey: &mut YubiKey) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
+
+        // Check the key algorithm.
+        let alg = MgmAlgorithmId::query(&txn)?;
+        if alg != MgmAlgorithmId::ThreeDes {
+            return Err(Error::NotSupported);
+        }
 
         let protected_data = ProtectedData::read(&txn)
             .inspect_err(|e| error!("could not read protected data (err: {:?})", e))?;
