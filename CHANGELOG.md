@@ -5,8 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+- `yubikey::certificate::SelfSigned`
+- `yubikey::Error::CertificateBuilder`
+
 ### Changed
 - MSRV is now 1.81.
+- Migrated the public API to the following (pre-release) dependencies:
+  - `der 0.8.0-rc.1`
+  - `ecdsa 0.17.0-pre.9`
+  - `p256 0.14.0-pre.2`
+  - `p384 0.14.0-pre.2`
+  - `rsa 0.10.0-pre.3`
+  - `sha2 0.11.0-pre.4`
+  - `x509-cert 0.3.0-pre.0`
 
 ## 0.8.0 (2023-08-15)
 ### Added

@@ -188,11 +188,14 @@ pub fn print_cert_info(
     print_cert_attr(
         stream,
         "Algorithm",
-        cert.tbs_certificate.subject_public_key_info.algorithm.oid,
+        cert.tbs_certificate()
+            .subject_public_key_info()
+            .algorithm
+            .oid,
     )?;
 
-    print_cert_attr(stream, "Subject", &cert.tbs_certificate.subject)?;
-    print_cert_attr(stream, "Issuer", &cert.tbs_certificate.issuer)?;
+    print_cert_attr(stream, "Subject", &cert.tbs_certificate().subject())?;
+    print_cert_attr(stream, "Issuer", &cert.tbs_certificate().issuer())?;
     print_cert_attr(
         stream,
         "Fingerprint",
@@ -201,9 +204,13 @@ pub fn print_cert_info(
     print_cert_attr(
         stream,
         "Not Before",
-        cert.tbs_certificate.validity.not_before,
+        cert.tbs_certificate().validity().not_before,
     )?;
-    print_cert_attr(stream, "Not After", cert.tbs_certificate.validity.not_after)?;
+    print_cert_attr(
+        stream,
+        "Not After",
+        cert.tbs_certificate().validity().not_after,
+    )?;
 
     Ok(())
 }

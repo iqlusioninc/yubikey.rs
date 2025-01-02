@@ -183,7 +183,7 @@ impl<'tx> Transaction<'tx> {
         if !pin.is_empty() {
             let mut data = Zeroizing::new([0xff; CB_PIN_MAX]);
             data[0..pin.len()].copy_from_slice(pin);
-            query.data(data.as_ref());
+            query.data(data.as_slice());
         }
 
         let response = query.transmit(self, 261)?;

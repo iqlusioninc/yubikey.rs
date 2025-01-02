@@ -57,6 +57,9 @@ pub enum Error {
     /// Authentication error
     AuthenticationError,
 
+    /// Error while building a certificate
+    CertificateBuilder,
+
     /// Generic error
     GenericError,
 
@@ -136,6 +139,7 @@ impl Error {
             }
             Error::ArgumentError => f.write_str("argument error"),
             Error::AuthenticationError => f.write_str("authentication error"),
+            Error::CertificateBuilder => f.write_str("certificate builder error"),
             Error::GenericError => f.write_str("generic error"),
             Error::InvalidObject => f.write_str("invalid object"),
             Error::KeyError => f.write_str("key error"),
@@ -195,5 +199,11 @@ impl std::error::Error for Error {
 impl From<der::Error> for Error {
     fn from(_err: der::Error) -> Error {
         Error::ParseError
+    }
+}
+
+impl From<x509_cert::builder::Error> for Error {
+    fn from(_err: x509_cert::builder::Error) -> Error {
+        Error::CertificateBuilder
     }
 }
