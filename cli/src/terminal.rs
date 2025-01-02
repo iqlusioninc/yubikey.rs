@@ -194,8 +194,8 @@ pub fn print_cert_info(
             .oid,
     )?;
 
-    print_cert_attr(stream, "Subject", &cert.tbs_certificate().subject())?;
-    print_cert_attr(stream, "Issuer", &cert.tbs_certificate().issuer())?;
+    print_cert_attr(stream, "Subject", cert.tbs_certificate().subject())?;
+    print_cert_attr(stream, "Issuer", cert.tbs_certificate().issuer())?;
     print_cert_attr(
         stream,
         "Fingerprint",

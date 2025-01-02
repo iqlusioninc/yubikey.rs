@@ -455,20 +455,20 @@ pub mod yubikey_signer {
         }
     }
 
-    impl<'y, KT: KeyType> Keypair for Signer<'y, KT> {
+    impl<KT: KeyType> Keypair for Signer<'_, KT> {
         type VerifyingKey = KT::VerifyingKey;
         fn verifying_key(&self) -> <Self as Keypair>::VerifyingKey {
             self.public_key.clone()
         }
     }
 
-    impl<'y, KT: KeyType> DynSignatureAlgorithmIdentifier for Signer<'y, KT> {
+    impl<KT: KeyType> DynSignatureAlgorithmIdentifier for Signer<'_, KT> {
         fn signature_algorithm_identifier(&self) -> spki::Result<AlgorithmIdentifierOwned> {
             self.verifying_key().signature_algorithm_identifier()
         }
     }
 
-    impl<'y, KT: KeyType> signature::Signer<KT::Signature> for Signer<'y, KT> {
+    impl<KT: KeyType> signature::Signer<KT::Signature> for Signer<'_, KT> {
         fn try_sign(&self, msg: &[u8]) -> SigResult<KT::Signature> {
             let data = KT::prepare(msg)?;
 
