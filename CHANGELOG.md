@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `yubikey::certificate::SelfSigned`
 - `yubikey::Error::CertificateBuilder`
-- `yubikey::{MgmAlgorithmId, MgmKey3Des, MgmKeyAlgorithm, MgmKeyOps}`
+- `yubikey::{MgmAlgorithmId, MgmKeyAlgorithm, MgmKeyOps}`
+- `yubikey::{MgmKey3Des, MgmKeyAes128, MgmKeyAes192, MgmKeyAes256}`
 - `yubikey::mgm`:
   - `MgmKey::generate_for`
   - `MgmKey::get_default`
