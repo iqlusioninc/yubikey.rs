@@ -3,6 +3,18 @@
 version = 3
 
 [[package]]
+name = "aes"
+version = "0.9.0-rc.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd4838e4ad37bb032dea137f441d5f71c16c26c068af512e64c5bc13a88cdfc7"
+dependencies = [
+ "cfg-if",
+ "cipher",
+ "cpufeatures",
+ "zeroize",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1077,6 +1089,7 @@ dependencies = [
 name = "yubikey"
 version = "0.8.0"
 dependencies = [
+ "aes",
  "base16ct",
  "bitflags 2.5.0",
  "cipher",
