@@ -78,7 +78,9 @@ use zeroize::Zeroizing;
 pub(crate) const APPLET_NAME: &str = "PIV";
 
 /// PIV Applet ID
-pub(crate) const APPLET_ID: &[u8] = &[0xa0, 0x00, 0x00, 0x03, 0x08];
+pub(crate) const APPLET_ID: &[u8] = &[
+    0xa0, 0x00, 0x00, 0x03, 0x08, 0x00, 0x00, 0x10, 0x00, 0x01, 0x00,
+];
 
 const CB_ECC_POINTP256: usize = 65;
 const CB_ECC_POINTP384: usize = 97;

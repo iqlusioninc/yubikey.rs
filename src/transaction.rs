@@ -62,10 +62,12 @@ impl<'tx> Transaction<'tx> {
 
     /// Select application.
     pub fn select_application(&self) -> Result<()> {
-        let response = Apdu::new(Ins::SelectApplication)
+        let bytes = Apdu::new(Ins::SelectApplication)
             .p1(0x04)
             .data(piv::APPLET_ID)
-            .transmit(self, 0xFF)
+            .to_bytes();
+        let response = self
+            .transfer_data(&bytes[0..4], &bytes[5..], 0xFF)
             .inspect_err(|e| error!("failed communicating with card: '{}'", e))?;
 
         if !response.is_success() {
@@ -149,7 +151,9 @@ impl<'tx> Transaction<'tx> {
             }
 
             // YK5 implements getting the serial as a PIV applet command (0xf8)
-            5 => {
+            // Nitrokey 3 has version 6.6.6, also supports this command, but returns the static serial 0x0052f743
+            // see https://github.com/trussed-dev/piv-authenticator/blob/b69b394facdaaafcd41a5ea48dae34ed3680e9d5/src/lib.rs#L195
+            5 | 6 => {
                 let response = Apdu::new(Ins::GetSerial).transmit(self, 0xFF)?;
 
                 if !response.is_success() {
