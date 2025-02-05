@@ -229,8 +229,11 @@ fn generate_rsa3072() {
     );
 
     match generated {
-        Ok(key) => { let pubkey = key.subject_public_key; assert!(pubkey.bit_len() > 3072) },
-        Err(e)  => assert!( (version.major,version.minor) < (5,7) && e == Error::AlgorithmError),
+        Ok(key) => {
+            let pubkey = key.subject_public_key;
+            assert!(pubkey.bit_len() > 3072)
+        }
+        Err(e) => assert!((version.major, version.minor) < (5, 7) && e == Error::AlgorithmError),
     }
 }
 
