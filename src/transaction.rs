@@ -281,22 +281,22 @@ impl<'tx> Transaction<'tx> {
         let templ = [0, Ins::Authenticate.code(), algorithm.into(), key.into()];
 
         match algorithm {
-            AlgorithmId::Rsa1024  => {
+            AlgorithmId::Rsa1024 => {
                 if in_len != 128 {
                     return Err(Error::SizeError);
                 }
             }
-            AlgorithmId::Rsa2048  => {
+            AlgorithmId::Rsa2048 => {
                 if in_len != 256 {
                     return Err(Error::SizeError);
                 }
             }
-            AlgorithmId::Rsa3072  => {
+            AlgorithmId::Rsa3072 => {
                 if in_len != 384 {
                     return Err(Error::SizeError);
                 }
             }
-            AlgorithmId::Rsa4096  => {
+            AlgorithmId::Rsa4096 => {
                 if in_len != 512 {
                     return Err(Error::SizeError);
                 }

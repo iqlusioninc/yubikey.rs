@@ -545,7 +545,10 @@ impl AlgorithmId {
     #[cfg(feature = "untested")]
     fn get_param_tag(self) -> u8 {
         match self {
-            AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 | AlgorithmId::Rsa3072 | AlgorithmId::Rsa4096 => 0x01,
+            AlgorithmId::Rsa1024
+            | AlgorithmId::Rsa2048
+            | AlgorithmId::Rsa3072
+            | AlgorithmId::Rsa4096 => 0x01,
             AlgorithmId::EccP256 | AlgorithmId::EccP384 => 0x6,
         }
     }
@@ -618,7 +621,10 @@ pub fn generate(
     let setting_roca: setting::Setting;
 
     match algorithm {
-        AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 | AlgorithmId::Rsa3072 | AlgorithmId::Rsa4096 => {
+        AlgorithmId::Rsa1024
+        | AlgorithmId::Rsa2048
+        | AlgorithmId::Rsa3072
+        | AlgorithmId::Rsa4096 => {
             if yubikey.version.major == 4
                 && (yubikey.version.minor < 3
                     || yubikey.version.minor == 3 && (yubikey.version.patch < 5))
@@ -833,7 +839,10 @@ pub fn import_rsa_key(
     pin_policy: PinPolicy,
 ) -> Result<()> {
     match algorithm {
-        AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 | AlgorithmId::Rsa3072 | AlgorithmId::Rsa4096 => (),
+        AlgorithmId::Rsa1024
+        | AlgorithmId::Rsa2048
+        | AlgorithmId::Rsa3072
+        | AlgorithmId::Rsa4096 => (),
         _ => return Err(Error::AlgorithmError),
     }
 
@@ -1123,7 +1132,10 @@ fn read_public_key(
     //
     //    0x7f 0x49 -> Application | Constructed | 0x49
     match algorithm {
-        AlgorithmId::Rsa1024 | AlgorithmId::Rsa2048 | AlgorithmId::Rsa3072 | AlgorithmId::Rsa4096=> {
+        AlgorithmId::Rsa1024
+        | AlgorithmId::Rsa2048
+        | AlgorithmId::Rsa3072
+        | AlgorithmId::Rsa4096 => {
             // It appears that the inner application-specific value returned by the
             // YubiKey is constructed such that RSA pubkeys can be parsed in two ways:
             //
