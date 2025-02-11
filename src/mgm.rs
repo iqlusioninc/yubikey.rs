@@ -31,13 +31,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{Error, Result};
-use log::error;
 use rand_core::{OsRng, RngCore, TryRngCore};
 use zeroize::Zeroize;
 
 use des::{
-    cipher::{BlockCipherDecrypt, BlockCipherEncrypt, KeyInit},
-    TdesEde3,
+    cipher::{
+        typenum::Unsigned, BlockCipherDecrypt, BlockCipherEncrypt, Key, KeyInit, KeySizeUser,
+    },
+    Des, TdesEde3,
 };
 #[cfg(feature = "untested")]
 use {
@@ -56,6 +57,7 @@ use {
         Serial, Version,
     },
     bitflags::bitflags,
+    log::error,
     pbkdf2::pbkdf2_hmac,
     sha1::Sha1,
 };
@@ -70,9 +72,11 @@ pub(crate) const APPLET_NAME: &str = "YubiKey MGMT";
 #[cfg(feature = "untested")]
 pub(crate) const APPLET_ID: &[u8] = &[0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
 
-mod tdes;
-pub(crate) use tdes::DES_LEN_3DES;
-use tdes::DES_LEN_DES;
+/// Size of a 3DES key
+#[cfg(feature = "untested")]
+pub(crate) const DES_LEN_3DES: usize = <TdesEde3 as KeySizeUser>::KeySize::USIZE;
+/// Size of a DES key
+const DES_LEN_DES: usize = <Des as KeySizeUser>::KeySize::USIZE;
 
 pub(crate) const ADMIN_FLAGS_1_PROTECTED_MGM: u8 = 0x02;
 
@@ -150,12 +154,12 @@ impl MgmAlgorithmId {
 ///
 /// The only supported algorithm for MGM keys is 3DES.
 #[derive(Clone)]
-pub struct MgmKey([u8; DES_LEN_3DES]);
+pub struct MgmKey(Key<TdesEde3>);
 
 impl MgmKey {
     /// Generate a random MGM key
     pub fn generate() -> Self {
-        let mut key_bytes = [0u8; DES_LEN_3DES];
+        let mut key_bytes = Key::<TdesEde3>::default();
         let mut rng = OsRng.unwrap_err();
         rng.fill_bytes(&mut key_bytes);
         Self(key_bytes)
@@ -171,15 +175,8 @@ impl MgmKey {
     /// Create an MGM key from the given byte array.
     ///
     /// Returns an error if the key is weak.
-    pub fn new(key_bytes: [u8; DES_LEN_3DES]) -> Result<Self> {
-        if tdes::is_weak_key(&key_bytes) {
-            error!(
-                "blacklisting key '{:?}' since it's weak (with odd parity)",
-                &key_bytes
-            );
-
-            return Err(Error::KeyError);
-        }
+    pub fn new(key_bytes: Key<TdesEde3>) -> Result<Self> {
+        TdesEde3::weak_key_test(&key_bytes).map_err(|_| Error::KeyError)?;
 
         Ok(Self(key_bytes))
     }
@@ -209,7 +206,7 @@ impl MgmKey {
             return Err(Error::GenericError);
         }
 
-        let mut mgm = [0u8; DES_LEN_3DES];
+        let mut mgm = Key::<TdesEde3>::default();
         pbkdf2_hmac::<Sha1>(pin, salt, ITER_MGM_PBKDF2, &mut mgm);
         MgmKey::from_bytes(mgm)
     }
@@ -384,20 +381,20 @@ impl MgmKey {
     /// Encrypt with 3DES key
     pub(crate) fn encrypt(&self, input: &[u8; DES_LEN_DES]) -> [u8; DES_LEN_DES] {
         let mut output = input.to_owned();
-        TdesEde3::new(&self.0.into()).encrypt_block((&mut output).into());
+        TdesEde3::new(&self.0).encrypt_block((&mut output).into());
         output
     }
 
     /// Decrypt with 3DES key
     pub(crate) fn decrypt(&self, input: &[u8; DES_LEN_DES]) -> [u8; DES_LEN_DES] {
         let mut output = input.to_owned();
-        TdesEde3::new(&self.0.into()).decrypt_block((&mut output).into());
+        TdesEde3::new(&self.0).decrypt_block((&mut output).into());
         output
     }
 }
 
-impl AsRef<[u8; DES_LEN_3DES]> for MgmKey {
-    fn as_ref(&self) -> &[u8; DES_LEN_3DES] {
+impl AsRef<Key<TdesEde3>> for MgmKey {
+    fn as_ref(&self) -> &Key<TdesEde3> {
         &self.0
     }
 }
@@ -405,9 +402,12 @@ impl AsRef<[u8; DES_LEN_3DES]> for MgmKey {
 /// Default MGM key configured on all YubiKeys
 impl Default for MgmKey {
     fn default() -> Self {
-        MgmKey([
-            1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,
-        ])
+        MgmKey(
+            [
+                1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,
+            ]
+            .into(),
+        )
     }
 }
 
