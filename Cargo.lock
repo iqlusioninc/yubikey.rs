@@ -123,11 +123,11 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "cipher"
 version = "0.5.0-pre.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b1425e6ce000f05a73096556cabcfb6a10a3ffe3bb4d75416ca8f00819c0b6a"
+source = "git+https://github.com/RustCrypto/traits.git#efe27ed0cca4ac6bc1ce993c8e49b156cd74f9d8"
 dependencies = [
  "crypto-common",
  "inout",
+ "zeroize",
 ]
 
 [[package]]
@@ -207,12 +207,9 @@ dependencies = [
 [[package]]
 name = "crypto-common"
 version = "0.2.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0b8ce8218c97789f16356e7896b3714f26c2ee1079b79c0b7ae7064bb9089fa"
+source = "git+https://github.com/RustCrypto/traits.git#efe27ed0cca4ac6bc1ce993c8e49b156cd74f9d8"
 dependencies = [
- "getrandom",
  "hybrid-array",
- "rand_core",
 ]
 
 [[package]]
@@ -242,17 +239,16 @@ dependencies = [
 [[package]]
 name = "des"
 version = "0.9.0-pre.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76239c731adb4b5204cfeec47bd06ec1071d9477a0d32bbb83dc7d8c599efe63"
+source = "git+https://github.com/RustCrypto/block-ciphers.git#b40a0038dadde829bc03e424c4557c282de87747"
 dependencies = [
  "cipher",
+ "subtle",
 ]
 
 [[package]]
 name = "digest"
 version = "0.11.0-pre.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf2e3d6615d99707295a9673e889bf363a04b2a466bd320c65a72536f7577379"
+source = "git+https://github.com/RustCrypto/traits.git#efe27ed0cca4ac6bc1ce993c8e49b156cd74f9d8"
 dependencies = [
  "block-buffer",
  "const-oid",
