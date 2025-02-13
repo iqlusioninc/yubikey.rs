@@ -1101,6 +1101,7 @@ version = "0.8.0"
 dependencies = [
  "base16ct",
  "bitflags 2.5.0",
+ "cipher",
  "der",
  "des",
  "ecdsa",
