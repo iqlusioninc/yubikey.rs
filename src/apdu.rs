@@ -344,7 +344,7 @@ impl From<Vec<u8>> for Response {
         }
 
         let sw = StatusWords::from(
-            (bytes[bytes.len() - 2] as u16) << 8 | (bytes[bytes.len() - 1] as u16),
+            ((bytes[bytes.len() - 2] as u16) << 8) | (bytes[bytes.len() - 1] as u16),
         );
 
         let len = bytes.len() - 2;

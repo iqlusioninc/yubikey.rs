@@ -157,8 +157,10 @@ impl<T: MetadataType> Metadata<T> {
 
             // We did not find an existing tag, append
             assert_eq!(offset, self.inner.len());
-            self.inner
-                .extend(iter::repeat(0).take(1 + get_length_size(item.len()) + item.len()));
+            self.inner.extend(iter::repeat_n(
+                0,
+                1 + get_length_size(item.len()) + item.len(),
+            ));
             Tlv::write(&mut self.inner[offset..], tag, item)?;
 
             return Ok(());
@@ -193,7 +195,7 @@ impl<T: MetadataType> Metadata<T> {
         // Move remaining data
         let orig_len = self.inner.len();
         if cb_moved > 0 {
-            self.inner.extend(iter::repeat(0).take(cb_moved as usize));
+            self.inner.extend(iter::repeat_n(0, cb_moved as usize));
         }
         self.inner.copy_within(
             next_offset..orig_len,
