@@ -171,9 +171,9 @@ impl From<SlotId> for u8 {
 impl Display for SlotId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SlotId::Management(r) => write!(f, "{:?}", r),
-            SlotId::Retired(r) => write!(f, "{:?}", r),
-            _ => write!(f, "{:?}", self),
+            SlotId::Management(r) => write!(f, "{r:?}"),
+            SlotId::Retired(r) => write!(f, "{r:?}"),
+            _ => write!(f, "{self:?}"),
         }
     }
 }
@@ -326,7 +326,7 @@ impl From<RetiredSlotId> for u8 {
 
 impl Display for RetiredSlotId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -409,7 +409,7 @@ impl From<ManagementSlotId> for u8 {
 
 impl Display for ManagementSlotId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 

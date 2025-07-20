@@ -135,7 +135,7 @@ impl Error {
             Error::AlgorithmError => f.write_str("algorithm error"),
             Error::AppletError => f.write_str("applet error"),
             Error::AppletNotFound { applet_name } => {
-                f.write_str(&format!("{} applet not found", applet_name))
+                f.write_str(&format!("{applet_name} applet not found"))
             }
             Error::ArgumentError => f.write_str("argument error"),
             Error::AuthenticationError => f.write_str("authentication error"),
@@ -150,7 +150,7 @@ impl Error {
 
             Error::PcscError {
                 inner: Some(pcsc_error),
-            } => f.write_fmt(format_args!("PC/SC error: {}", pcsc_error)),
+            } => f.write_fmt(format_args!("PC/SC error: {pcsc_error}")),
 
             Error::PcscError { .. } => f.write_str("PC/SC error"),
 

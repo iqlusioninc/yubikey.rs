@@ -48,7 +48,7 @@ fn test_get_cccid() {
     match yubikey.cccid() {
         Ok(cccid) => trace!("CCCID: {:?}", cccid),
         Err(Error::NotFound) => trace!("CCCID not found"),
-        Err(err) => panic!("error getting CCCID: {:?}", err),
+        Err(err) => panic!("error getting CCCID: {err:?}"),
     }
 }
 
@@ -64,7 +64,7 @@ fn test_get_chuid() {
     match yubikey.chuid() {
         Ok(chuid) => trace!("CHUID: {:?}", chuid),
         Err(Error::NotFound) => trace!("CHUID not found"),
-        Err(err) => panic!("error getting CHUID: {:?}", err),
+        Err(err) => panic!("error getting CHUID: {err:?}"),
     }
 }
 
