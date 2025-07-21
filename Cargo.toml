@@ -30,7 +30,7 @@ des = "0.9.0-rc.0"
 elliptic-curve = "0.14.0-rc.7"
 hex = { package = "base16ct", version = "0.2", features = ["alloc"] }
 log = "0.4"
-nom = "7"
+nom = "8"
 ecdsa = { version = "0.17.0-rc.2", features = ["digest", "pem"] }
 p256 = "=0.14.0-pre.9"
 p384 = "=0.14.0-pre.9"

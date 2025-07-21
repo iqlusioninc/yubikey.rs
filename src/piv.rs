@@ -981,6 +981,7 @@ impl TryFrom<Buffer> for SlotMetadata {
             combinator::{eof, map_res},
             multi::fold_many1,
             number::complete::u8,
+            Parser,
         };
 
         let out = fold_many1(
@@ -1005,8 +1006,8 @@ impl TryFrom<Buffer> for SlotMetadata {
                         fn policy_parser(
                             i: &[u8],
                         ) -> nom::IResult<&[u8], (PinPolicy, TouchPolicy)> {
-                            let (i, pin) = map_res(u8, PinPolicy::try_from)(i)?;
-                            let (i, touch) = map_res(u8, TouchPolicy::try_from)(i)?;
+                            let (i, pin) = map_res(u8, PinPolicy::try_from).parse(i)?;
+                            let (i, touch) = map_res(u8, TouchPolicy::try_from).parse(i)?;
                             let (i, _) = eof(i)?;
 
                             Ok((i, (pin, touch)))
@@ -1018,7 +1019,7 @@ impl TryFrom<Buffer> for SlotMetadata {
                     }
                     3 => {
                         fn origin_parser(i: &[u8]) -> nom::IResult<&[u8], Origin> {
-                            let (i, origin) = map_res(u8, Origin::try_from)(i)?;
+                            let (i, origin) = map_res(u8, Origin::try_from).parse(i)?;
                             let (i, _) = eof(i)?;
 
                             Ok((i, origin))
@@ -1078,7 +1079,8 @@ impl TryFrom<Buffer> for SlotMetadata {
                 },
                 err => err,
             },
-        )(buf.as_ref());
+        )
+        .parse(buf.as_ref());
 
         match out {
             Ok((_, res)) => res,

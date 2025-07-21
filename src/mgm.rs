@@ -663,6 +663,7 @@ impl DeviceInfo {
             combinator::{eof, map},
             multi::fold_many1,
             number::complete::{be_u16, be_u32, u8},
+            Parser,
         };
 
         fn u8_parser(i: &[u8]) -> nom::IResult<&[u8], u8> {
@@ -679,13 +680,13 @@ impl DeviceInfo {
         }
 
         fn capability_parser(i: &[u8]) -> nom::IResult<&[u8], Capability> {
-            let (i, v) = map(be_u16, Capability::from_bits_retain)(i)?;
+            let (i, v) = map(be_u16, Capability::from_bits_retain).parse(i)?;
             let (i, _) = eof(i)?;
 
             Ok((i, v))
         }
         fn serial_parser(i: &[u8]) -> nom::IResult<&[u8], Serial> {
-            let (i, v) = map(be_u32, Serial)(i)?;
+            let (i, v) = map(be_u32, Serial).parse(i)?;
             let (i, _) = eof(i)?;
 
             Ok((i, v))
@@ -792,7 +793,8 @@ impl DeviceInfo {
                 }
                 err => err,
             },
-        )(rest)
+        )
+        .parse(rest)
         .map_err(|_: nom::Err<()>| Error::ParseError)?
         .1?;
 
@@ -880,9 +882,10 @@ impl DeviceFlags {
         use nom::{
             combinator::{eof, map},
             number::complete::u8,
+            Parser,
         };
 
-        let (i, v) = map(u8, Self::from_bits_retain)(i)?;
+        let (i, v) = map(u8, Self::from_bits_retain).parse(i)?;
         let (i, _) = eof(i)?;
 
         Ok((i, v))
