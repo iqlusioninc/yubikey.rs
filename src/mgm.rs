@@ -32,7 +32,7 @@
 
 use crate::{Error, Result};
 use log::error;
-use rand_core::{OsRng, RngCore};
+use rand_core::{OsRng, RngCore, TryRngCore};
 use zeroize::Zeroize;
 
 use des::{
@@ -156,7 +156,8 @@ impl MgmKey {
     /// Generate a random MGM key
     pub fn generate() -> Self {
         let mut key_bytes = [0u8; DES_LEN_3DES];
-        OsRng.fill_bytes(&mut key_bytes);
+        let mut rng = OsRng.unwrap_err();
+        rng.fill_bytes(&mut key_bytes);
         Self(key_bytes)
     }
 

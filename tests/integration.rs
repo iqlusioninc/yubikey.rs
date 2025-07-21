@@ -5,7 +5,7 @@
 
 use log::trace;
 use once_cell::sync::Lazy;
-use rand_core::{OsRng, RngCore};
+use rand_core::{OsRng, RngCore, TryRngCore};
 use rsa::{pkcs1v15, RsaPublicKey};
 use sha2::{Digest, Sha256};
 use signature::hazmat::PrehashVerifier;
@@ -48,7 +48,7 @@ fn test_get_cccid() {
     match yubikey.cccid() {
         Ok(cccid) => trace!("CCCID: {:?}", cccid),
         Err(Error::NotFound) => trace!("CCCID not found"),
-        Err(err) => panic!("error getting CCCID: {:?}", err),
+        Err(err) => panic!("error getting CCCID: {err:?}"),
     }
 }
 
@@ -64,7 +64,7 @@ fn test_get_chuid() {
     match yubikey.chuid() {
         Ok(chuid) => trace!("CHUID: {:?}", chuid),
         Err(Error::NotFound) => trace!("CHUID not found"),
-        Err(err) => panic!("error getting CHUID: {:?}", err),
+        Err(err) => panic!("error getting CHUID: {err:?}"),
     }
 }
 
@@ -167,7 +167,8 @@ fn generate_self_signed_cert<KT: yubikey_signer::KeyType>() -> Certificate {
     // 0x80 0x00 ... (20bytes) is invalid because of high MSB (serial will keep the sign)
     // we'll limit ourselves to 19 bytes serial.
     let mut serial = [0u8; 19];
-    OsRng.fill_bytes(&mut serial);
+    let mut rng = OsRng.unwrap_err();
+    rng.fill_bytes(&mut serial);
     let serial = SerialNumber::new(&serial[..]).expect("serial can't be more than 20 bytes long");
     let validity = Validity::from_now(Duration::new(500000, 0)).unwrap();
 

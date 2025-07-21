@@ -57,7 +57,7 @@ use elliptic_curve::{sec1::EncodedPoint as EcPublicKey, PublicKey};
 use log::{debug, error, warn};
 use p256::NistP256;
 use p384::NistP384;
-use rsa::{pkcs8::EncodePublicKey, BigUint, RsaPublicKey};
+use rsa::{pkcs8::EncodePublicKey, BoxedUint, RsaPublicKey};
 use std::{
     fmt::{Display, Formatter},
     str::FromStr,
@@ -65,17 +65,13 @@ use std::{
 use x509_cert::{der::Decode, spki::SubjectPublicKeyInfoOwned};
 
 #[cfg(feature = "untested")]
-use {
-    num_bigint_dig::traits::ModInverse,
-    num_integer::Integer,
-    num_traits::{FromPrimitive, One},
-};
-
-#[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
 #[cfg(feature = "untested")]
 use crate::consts::CB_OBJ_MAX;
+
+#[cfg(feature = "untested")]
+use rsa::{traits::PrivateKeyParts, RsaPrivateKey};
 
 /// PIV Applet Name
 pub(crate) const APPLET_NAME: &str = "PIV";
@@ -175,9 +171,9 @@ impl From<SlotId> for u8 {
 impl Display for SlotId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SlotId::Management(r) => write!(f, "{:?}", r),
-            SlotId::Retired(r) => write!(f, "{:?}", r),
-            _ => write!(f, "{:?}", self),
+            SlotId::Management(r) => write!(f, "{r:?}"),
+            SlotId::Retired(r) => write!(f, "{r:?}"),
+            _ => write!(f, "{self:?}"),
         }
     }
 }
@@ -330,7 +326,7 @@ impl From<RetiredSlotId> for u8 {
 
 impl Display for RetiredSlotId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -413,7 +409,7 @@ impl From<ManagementSlotId> for u8 {
 
 impl Display for ManagementSlotId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -791,36 +787,44 @@ impl RsaKeyData {
     /// - `Ok(key_data)` if `secret_p` and `secret_q` are valid primes.
     /// - `Err(Error::AlgorithmError)` if `secret_p`/`secret_q` are invalid primes.
     pub fn new(secret_p: &[u8], secret_q: &[u8]) -> Result<Self> {
-        let p = BigUint::from_bytes_be(secret_p);
-        let q = BigUint::from_bytes_be(secret_q);
+        let p = BoxedUint::from_be_slice_vartime(secret_p);
+        let q = BoxedUint::from_be_slice_vartime(secret_q);
+        let exp = BoxedUint::from(KEYDATA_RSA_EXP);
 
-        let totient = {
-            let p_t = &p - BigUint::one();
-            let q_t = &p - BigUint::one();
-
-            p_t.lcm(&q_t)
-        };
-
-        let exp = BigUint::from_u64(KEYDATA_RSA_EXP).ok_or(Error::AlgorithmError)?;
-
-        let d = exp.mod_inverse(&totient).ok_or(Error::AlgorithmError)?;
-        let d = d.to_biguint().ok_or(Error::AlgorithmError)?;
-
-        // We calculate the optimization values ahead of time, instead of making the user
-        // do so.
-
-        let dp = &d % (&p - BigUint::one());
-        let dq = &d % (&q - BigUint::one());
-
-        let qinv = q.clone().mod_inverse(&p).ok_or(Error::AlgorithmError)?;
-        let (_, qinv) = qinv.to_bytes_be();
+        let mut private_key = RsaPrivateKey::from_p_q(p.clone(), q.clone(), exp)
+            .map_err(|_| Error::AlgorithmError)?;
+        private_key
+            .precompute()
+            .map_err(|_| Error::AlgorithmError)?;
 
         Ok(RsaKeyData {
-            p: Zeroizing::new(p.to_bytes_be()),
-            q: Zeroizing::new(q.to_bytes_be()),
-            dp: Zeroizing::new(dp.to_bytes_be()),
-            dq: Zeroizing::new(dq.to_bytes_be()),
-            qinv: Zeroizing::new(qinv),
+            p: Zeroizing::new(p.to_be_bytes().to_vec()),
+            q: Zeroizing::new(q.to_be_bytes().to_vec()),
+            dp: Zeroizing::new(
+                private_key
+                    .dp()
+                    .expect("invariant violation: precompute should fill the field")
+                    .clone()
+                    .to_be_bytes()
+                    .to_vec(),
+            ),
+            dq: Zeroizing::new(
+                private_key
+                    .dq()
+                    .expect("invariant violation: precompute should fill the field")
+                    .clone()
+                    .to_be_bytes()
+                    .to_vec(),
+            ),
+            qinv: Zeroizing::new(
+                private_key
+                    .qinv()
+                    .expect("invariant violation: precompute should fill the field")
+                    .clone()
+                    .retrieve()
+                    .to_be_bytes()
+                    .to_vec(),
+            ),
         })
     }
 
@@ -1170,8 +1174,8 @@ fn read_public_key(
             let exp = exp_tlv.value.to_vec();
 
             let pubkey = RsaPublicKey::new(
-                BigUint::from_bytes_be(&modulus),
-                BigUint::from_bytes_be(&exp),
+                BoxedUint::from_be_slice_vartime(&modulus),
+                BoxedUint::from_be_slice_vartime(&exp),
             )
             .map_err(|_| Error::InvalidObject)?;
             Ok(SubjectPublicKeyInfoOwned::from_der(

@@ -122,7 +122,7 @@ impl Setting {
 
     /// Get a setting boolean from an environment variable
     fn from_env(key: &str) -> Option<Self> {
-        env::var(format!("YUBIKEY_PIV_{}", key))
+        env::var(format!("YUBIKEY_PIV_{key}"))
             .ok()
             .map(|value| Setting {
                 source: SettingSource::User,

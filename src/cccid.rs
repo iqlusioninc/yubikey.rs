@@ -31,7 +31,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{Result, YubiKey};
-use rand_core::{OsRng, RngCore};
+use rand_core::{OsRng, RngCore, TryRngCore};
 use std::fmt::{self, Debug, Display};
 
 /// CCCID offset
@@ -66,8 +66,14 @@ impl CardId {
 
     /// Generate a random CCC Card ID
     pub fn generate() -> Self {
+        let mut rng = OsRng.unwrap_err();
+        Self::generate_from_rng(&mut rng)
+    }
+
+    /// Generate a random CCC Card ID from an [`RngCore`]
+    pub fn generate_from_rng<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         let mut id = [0u8; Self::BYTE_SIZE];
-        OsRng.fill_bytes(&mut id);
+        rng.fill_bytes(&mut id);
         Self(id)
     }
 }
