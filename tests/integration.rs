@@ -13,6 +13,7 @@ use std::{env, str::FromStr, sync::Mutex, time::Duration};
 use x509_cert::{der::Encode, name::Name, serial_number::SerialNumber, time::Validity};
 use yubikey::{
     certificate::{yubikey_signer, Certificate},
+    ed25519_wrapper::VerifyingKeyWrapper,
     piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
     Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
 };
@@ -288,15 +289,13 @@ fn generate_self_signed_ec_cert() {
 #[test]
 #[ignore]
 fn generate_self_signed_cv_cert() {
-    use crate::yubikey_signer::Ed25519VerifyingKeyWrapper;
     let cert = generate_self_signed_cert::<ed25519_dalek::SigningKey>();
 
     //
     // Verify that the certificate is signed correctly
     //
 
-    let pubkey =
-        Ed25519VerifyingKeyWrapper::try_from(cert.subject_pki()).expect("ed25519 key expected");
+    let pubkey = VerifyingKeyWrapper::try_from(cert.subject_pki()).expect("ed25519 key expected");
 
     let data = cert.cert.to_der().expect("DER format key expected");
     let cert_len = data[2] as usize;
