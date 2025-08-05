@@ -53,7 +53,6 @@ use crate::{
     yubikey::YubiKey,
     Buffer, ObjectId,
 };
-use ed25519_dalek::VerifyingKey as CvVerifyingKey;
 use elliptic_curve::{sec1::EncodedPoint as EcPublicKey, PublicKey};
 use log::{debug, error, warn};
 use p256::NistP256;
@@ -63,7 +62,6 @@ use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
-use x25519_dalek::PublicKey as CvPublicKey;
 use x509_cert::{
     der::{asn1::BitString, Decode},
     spki::{AlgorithmIdentifier, ObjectIdentifier, SubjectPublicKeyInfoOwned},
@@ -90,6 +88,11 @@ const CB_ECC_POINTP384: usize = 97;
 const TAG_RSA_MODULUS: u8 = 0x81;
 const TAG_RSA_EXP: u8 = 0x82;
 const TAG_ECC_POINT: u8 = 0x86;
+
+/// OID for ed25519 algorithm
+pub const ED25519_ALGORITHM_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.101.112");
+/// OID for x25519 algorithm
+pub const X25519_ALGORITHM_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.101.110");
 
 #[cfg(feature = "untested")]
 const KEYDATA_LEN: usize = 1024;
@@ -1186,11 +1189,11 @@ fn read_public_key(
             match algorithm {
                 AlgorithmId::Ed25519 => Ok(SubjectPublicKeyInfoOwned {
                     algorithm: AlgorithmIdentifier {
-                        oid: ObjectIdentifier::new_unwrap("1.3.101.112"),
+                        oid: ED25519_ALGORITHM_OID,
                         parameters: None,
                     },
                     subject_public_key: BitString::from_bytes(
-                        CvVerifyingKey::from_bytes(&pk_data)
+                        ed25519_dalek::VerifyingKey::from_bytes(&pk_data)
                             .map_err(|_| Error::InvalidObject)?
                             .as_bytes(),
                     )
@@ -1198,11 +1201,11 @@ fn read_public_key(
                 }),
                 AlgorithmId::X25519 => Ok(SubjectPublicKeyInfoOwned {
                     algorithm: AlgorithmIdentifier {
-                        oid: ObjectIdentifier::new_unwrap("1.3.101.110"),
+                        oid: X25519_ALGORITHM_OID,
                         parameters: None,
                     },
                     subject_public_key: BitString::from_bytes(
-                        CvPublicKey::from(pk_data).as_bytes(),
+                        x25519_dalek::PublicKey::from(pk_data).as_bytes(),
                     )
                     .map_err(|_| Error::InvalidObject)?,
                 }),
