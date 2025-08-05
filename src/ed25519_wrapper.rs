@@ -1,12 +1,11 @@
 //! Provides a wrapper to allow ed25519 implementations using ed25519_dalek
-use der::{asn1::BitString, oid::ObjectIdentifier};
+
+use crate::piv::ED25519_ALGORITHM_OID;
+use der::asn1::BitString;
 use x509_cert::spki::{
     self, AlgorithmIdentifierOwned, DynSignatureAlgorithmIdentifier, EncodePublicKey,
     SignatureBitStringEncoding, SubjectPublicKeyInfoRef,
 };
-
-/// OID for ed25519 algorithm
-pub const ALGORITHM_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.101.112");
 
 /// ed25519_dalek::Signature wrapper to implement required traits
 #[derive(Debug)]
@@ -54,7 +53,7 @@ impl EncodePublicKey for VerifyingKeyWrapper {
 impl DynSignatureAlgorithmIdentifier for VerifyingKeyWrapper {
     fn signature_algorithm_identifier(&self) -> spki::Result<AlgorithmIdentifierOwned> {
         Ok(AlgorithmIdentifierOwned {
-            oid: ALGORITHM_OID,
+            oid: ED25519_ALGORITHM_OID,
             parameters: None,
         })
     }
