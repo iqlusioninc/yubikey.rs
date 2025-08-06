@@ -268,7 +268,6 @@ pub mod yubikey_signer {
     //! Signer implementation for yubikey
 
     use crate::{
-        ed25519_wrapper::{SignatureWrapper, VerifyingKeyWrapper},
         error::{Error, Result},
         piv::AlgorithmId,
         piv::{sign_data, SlotId},
@@ -316,10 +315,10 @@ pub mod yubikey_signer {
 
     impl KeyType for ed25519_dalek::SigningKey {
         const ALGORITHM: AlgorithmId = AlgorithmId::Ed25519;
-        type Error = signature::Error;
-        type Signature = SignatureWrapper;
-        type VerifyingKey = VerifyingKeyWrapper;
-        type PublicKey = VerifyingKeyWrapper;
+        type Error = ed25519_dalek::SignatureError;
+        type Signature = ed25519_dalek::Signature;
+        type VerifyingKey = ed25519_dalek::VerifyingKey;
+        type PublicKey = ed25519_dalek::VerifyingKey;
 
         fn prepare(input: &[u8]) -> SigResult<Vec<u8>> {
             Ok(Sha512::digest(input).to_vec())
