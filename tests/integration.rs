@@ -297,7 +297,7 @@ fn generate_self_signed_cv_cert() {
     let pubkey =
         ed25519_dalek::VerifyingKey::try_from(cert.subject_pki()).expect("ed25519 key expected");
 
-    let data = cert.cert.to_der().expect("DER format key expected");
+    let data = cert.cert.to_der().expect("serialize certificate");
     let cert_len = data[2] as usize;
     let tbs_cert_len = data[5] as usize;
     let sig_algo_len: usize = 64;
