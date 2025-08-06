@@ -49,7 +49,6 @@ pub mod certificate;
 mod chuid;
 mod config;
 mod consts;
-pub mod ed25519_wrapper;
 mod error;
 mod metadata;
 pub mod mgm;
