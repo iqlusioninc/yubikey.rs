@@ -89,10 +89,8 @@ const TAG_RSA_MODULUS: u8 = 0x81;
 const TAG_RSA_EXP: u8 = 0x82;
 const TAG_ECC_POINT: u8 = 0x86;
 
-/// OID for ed25519 algorithm
-pub const ED25519_ALGORITHM_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.101.112");
-/// OID for x25519 algorithm
-pub const X25519_ALGORITHM_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.101.110");
+/// OID for ed25519 and x25519 algorithms
+pub const OID_X25519: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.101.110");
 
 #[cfg(feature = "untested")]
 const KEYDATA_LEN: usize = 1024;
@@ -1187,21 +1185,17 @@ fn read_public_key(
             let pk_data: [u8; 32] = tlv.value.try_into().map_err(|_| Error::InvalidObject)?;
 
             match algorithm {
-                AlgorithmId::Ed25519 => Ok(SubjectPublicKeyInfoOwned {
-                    algorithm: AlgorithmIdentifier {
-                        oid: ED25519_ALGORITHM_OID,
-                        parameters: None,
-                    },
-                    subject_public_key: BitString::from_bytes(
-                        ed25519_dalek::VerifyingKey::from_bytes(&pk_data)
-                            .map_err(|_| Error::InvalidObject)?
-                            .as_bytes(),
-                    )
-                    .map_err(|_| Error::InvalidObject)?,
-                }),
+                AlgorithmId::Ed25519 => SubjectPublicKeyInfoOwned::from_der(
+                    ed25519_dalek::VerifyingKey::from_bytes(&pk_data)
+                        .map_err(|_| Error::InvalidObject)?
+                        .to_public_key_der()
+                        .map_err(|_| Error::InvalidObject)?
+                        .as_bytes(),
+                )
+                .map_err(|_| Error::InvalidObject),
                 AlgorithmId::X25519 => Ok(SubjectPublicKeyInfoOwned {
                     algorithm: AlgorithmIdentifier {
-                        oid: X25519_ALGORITHM_OID,
+                        oid: OID_X25519,
                         parameters: None,
                     },
                     subject_public_key: BitString::from_bytes(
