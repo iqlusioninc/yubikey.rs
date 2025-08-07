@@ -1203,7 +1203,7 @@ fn read_public_key(
                     )
                     .map_err(|_| Error::InvalidObject)?,
                 }),
-                _ => return Err(Error::AlgorithmError),
+                _ => Err(Error::AlgorithmError),
             }
         }
         AlgorithmId::Rsa1024
