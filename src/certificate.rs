@@ -278,7 +278,7 @@ pub mod yubikey_signer {
         oid::db::rfc5912,
         Encode, Sequence,
     };
-    use sha2::{Digest, Sha256, Sha384};
+    use sha2::{Digest, Sha256, Sha384, Sha512};
     use signature::Keypair;
     use std::{cell::RefCell, fmt, io::Write, marker::PhantomData};
     use x509_cert::spki::{
@@ -311,6 +311,22 @@ pub mod yubikey_signer {
         fn prepare(input: &[u8]) -> SigResult<Vec<u8>>;
         /// Read back the signature from the device
         fn read_signature(input: &[u8]) -> SigResult<Self::Signature>;
+    }
+
+    impl KeyType for ed25519_dalek::SigningKey {
+        const ALGORITHM: AlgorithmId = AlgorithmId::Ed25519;
+        type Error = ed25519_dalek::SignatureError;
+        type Signature = ed25519_dalek::Signature;
+        type VerifyingKey = ed25519_dalek::VerifyingKey;
+        type PublicKey = ed25519_dalek::VerifyingKey;
+
+        fn prepare(input: &[u8]) -> SigResult<Vec<u8>> {
+            Ok(Sha512::digest(input).to_vec())
+        }
+
+        fn read_signature(input: &[u8]) -> SigResult<Self::Signature> {
+            Self::Signature::try_from(input)
+        }
     }
 
     impl KeyType for p256::NistP256 {
