@@ -197,6 +197,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a23fa214dea9efd4dacee5a5614646b30216ae0f05d4bb51bafb50e9da1c5be"
 dependencies = [
  "hybrid-array",
+ "rand_core",
 ]
 
 [[package]]
@@ -1078,6 +1079,7 @@ version = "0.8.0"
 dependencies = [
  "base16ct",
  "bitflags 2.5.0",
+ "cipher",
  "der",
  "des",
  "ecdsa",
