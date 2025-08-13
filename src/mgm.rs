@@ -70,11 +70,13 @@ pub(crate) const APPLET_NAME: &str = "YubiKey MGMT";
 #[cfg(feature = "untested")]
 pub(crate) const APPLET_ID: &[u8] = &[0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
 
-mod tdes;
-pub(crate) use tdes::DES_LEN_3DES;
-use tdes::DES_LEN_DES;
-
 pub(crate) const ADMIN_FLAGS_1_PROTECTED_MGM: u8 = 0x02;
+
+/// Size of a DES key
+pub(super) const DES_LEN_DES: usize = 8;
+
+/// Size of a 3DES key
+pub(crate) const DES_LEN_3DES: usize = DES_LEN_DES * 3;
 
 #[cfg(feature = "untested")]
 const CB_ADMIN_SALT: usize = 16;
@@ -172,7 +174,7 @@ impl MgmKey {
     ///
     /// Returns an error if the key is weak.
     pub fn new(key_bytes: [u8; DES_LEN_3DES]) -> Result<Self> {
-        if tdes::is_weak_key(&key_bytes) {
+        if TdesEde3::weak_key_test(key_bytes.as_ref()).is_err() {
             error!(
                 "blacklisting key '{:?}' since it's weak (with odd parity)",
                 &key_bytes
