@@ -15,7 +15,7 @@ use log::{error, trace};
 use zeroize::Zeroizing;
 
 #[cfg(feature = "untested")]
-use crate::mgm::{DeviceConfig, DeviceInfo, Lock, MgmKeyOps};
+use crate::mgm::{DeviceConfig, DeviceInfo, Lock, MgmKey};
 
 const CB_PIN_MAX: usize = 8;
 
@@ -248,7 +248,7 @@ impl<'tx> Transaction<'tx> {
 
     /// Set the management key (MGM).
     #[cfg(feature = "untested")]
-    pub fn set_mgm_key<K: MgmKeyOps>(&self, new_key: &K, require_touch: bool) -> Result<()> {
+    pub fn set_mgm_key(&self, new_key: &MgmKey, require_touch: bool) -> Result<()> {
         let p2 = if require_touch { 0xfe } else { 0xff };
 
         let mut data = Vec::with_capacity(usize::from(new_key.key_size()) + 3);

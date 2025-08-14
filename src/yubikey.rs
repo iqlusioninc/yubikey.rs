@@ -36,7 +36,7 @@ use crate::{
     chuid::ChuId,
     config::Config,
     error::{Error, Result},
-    mgm::MgmKeyOps,
+    mgm::MgmKey,
     piv,
     reader::{Context, Reader},
     transaction::Transaction,
@@ -411,7 +411,7 @@ impl YubiKey {
     }
 
     /// Authenticate to the card using the provided management key (MGM).
-    pub fn authenticate<K: MgmKeyOps>(&mut self, mgm_key: &K) -> Result<()> {
+    pub fn authenticate(&mut self, mgm_key: &MgmKey) -> Result<()> {
         let txn = self.begin_transaction()?;
 
         // get a challenge from the card

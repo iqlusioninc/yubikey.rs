@@ -8,11 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `yubikey::certificate::SelfSigned`
 - `yubikey::Error::CertificateBuilder`
-- `yubikey::{MgmAlgorithmId, MgmKey3Des, MgmKeyAlgorithm, MgmKeyOps}`
+- `yubikey::MgmAlgorithmId`
 - `yubikey::mgm`:
   - `MgmKey::generate_for`
   - `MgmKey::get_default`
-  - `SpecificMgmKey<C: MgmKeyAlgorithm>`
   - `impl AsRef<[u8]> for MgmKey`
 
 ### Changed
@@ -25,14 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `rsa 0.10.0-pre.3`
   - `sha2 0.11.0-pre.4`
   - `x509-cert 0.3.0-pre.0`
-- `yubikey::Yubikey::authenticate` now accepts any `&impl MgmKeyOps`.
 - `yubikey::mgm`:
   - `MgmKey::generate` now takes a `rand::TryCryptoRng` argument.
   - `MgmKey::generate` now requires the caller to specify the key algorithm via
     an `MgmAlgorithmId` parameter.
     - Use `MgmKey::generate_for` if you want to generate a key using the
       preferred algorithm for a given Yubikey's firmware version.
-    - Use `MgmKey3Des::generate` for the previous behaviour.
   - `MgmKey::from_bytes` now takes an `Option<MgmAlgorithmId>` argument, to
     disambiguate algorithms with the same key length.
 - `yubikey::piv`:
@@ -45,7 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `yubikey::mgm`:
   - `MgmKey::new` (use `MgmKey::from_bytes(_, Some(MgmAlgorithmId::ThreeDes))`
     instead).
-  - `MgmKey::get_derived` (use `MgmKey3Des::get_derived` instead).
   - `impl AsRef<[u8; DES_LEN_3DES]> for MgmKey` (use
     `impl AsRef<[u8]> for MgmKey` instead).
   - `impl Default for MgmKey` (use `MgmKey::get_default` instead).

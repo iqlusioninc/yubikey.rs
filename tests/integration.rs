@@ -114,8 +114,6 @@ fn test_verify_pin() {
 #[test]
 #[ignore]
 fn test_set_mgmkey() {
-    use yubikey::MgmKeyOps;
-
     let mut rng = OsRng;
     let mut yubikey = YUBIKEY.lock().unwrap();
     let default_key = MgmKey::get_default(&yubikey).unwrap();
