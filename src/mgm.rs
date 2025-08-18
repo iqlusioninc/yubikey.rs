@@ -30,7 +30,14 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{Error, Result};
+use crate::{
+    consts::{TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_PROTECTED_MGM},
+    metadata::{AdminData, ProtectedData},
+    piv::{ManagementSlotId, SlotAlgorithmId},
+    transaction::Transaction,
+    Error, Result, YubiKey,
+};
+use bitflags::bitflags;
 use log::error;
 use rand_core::{OsRng, RngCore, TryRngCore};
 use zeroize::Zeroize;
@@ -39,23 +46,18 @@ use des::{
     cipher::{BlockCipherDecrypt, BlockCipherEncrypt, KeyInit},
     TdesEde3,
 };
+
 #[cfg(feature = "untested")]
 use {
     crate::{
         consts::{
-            CB_BUF_MAX, TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_AUTO_EJECT_TIMEOUT,
-            TAG_CHALRESP_TIMEOUT, TAG_CONFIG_LOCK, TAG_DEVICE_FLAGS, TAG_FORM_FACTOR,
-            TAG_NFC_ENABLED, TAG_NFC_SUPPORTED, TAG_PROTECTED_MGM, TAG_REBOOT, TAG_SERIAL,
-            TAG_UNLOCK, TAG_USB_ENABLED, TAG_USB_SUPPORTED, TAG_VERSION,
+            CB_BUF_MAX, TAG_AUTO_EJECT_TIMEOUT, TAG_CHALRESP_TIMEOUT, TAG_CONFIG_LOCK,
+            TAG_DEVICE_FLAGS, TAG_FORM_FACTOR, TAG_NFC_ENABLED, TAG_NFC_SUPPORTED, TAG_REBOOT,
+            TAG_SERIAL, TAG_UNLOCK, TAG_USB_ENABLED, TAG_USB_SUPPORTED, TAG_VERSION,
         },
-        metadata::{AdminData, ProtectedData},
-        piv::{ManagementSlotId, SlotAlgorithmId},
         serialization::Tlv,
-        transaction::Transaction,
-        yubikey::YubiKey,
         Serial, Version,
     },
-    bitflags::bitflags,
     pbkdf2::pbkdf2_hmac,
     sha1::Sha1,
 };
@@ -126,7 +128,6 @@ impl From<MgmAlgorithmId> for u8 {
 
 impl MgmAlgorithmId {
     /// Looks up the algorithm for the given Yubikey's current management key.
-    #[cfg(feature = "untested")]
     fn query(txn: &Transaction<'_>) -> Result<Self> {
         match txn.get_metadata(crate::piv::SlotId::Management(ManagementSlotId::Management)) {
             Ok(metadata) => match metadata.algorithm {
@@ -217,7 +218,6 @@ impl MgmKey {
     }
 
     /// Get protected management key (MGM)
-    #[cfg(feature = "untested")]
     pub fn get_protected(yubikey: &mut YubiKey) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
 
@@ -250,7 +250,6 @@ impl MgmKey {
     /// Resets the management key for the given YubiKey to the default value.
     ///
     /// This will wipe any metadata related to derived and PIN-protected management keys.
-    #[cfg(feature = "untested")]
     pub fn set_default(yubikey: &mut YubiKey) -> Result<()> {
         MgmKey::default().set_manual(yubikey, false)
     }
@@ -261,7 +260,6 @@ impl MgmKey {
     /// management operations.
     ///
     /// This will wipe any metadata related to derived and PIN-protected management keys.
-    #[cfg(feature = "untested")]
     pub fn set_manual(&self, yubikey: &mut YubiKey, require_touch: bool) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 
@@ -318,7 +316,6 @@ impl MgmKey {
     /// Configures the given YubiKey to use this as a PIN-protected management key.
     ///
     /// This enables key management operations to be performed with access to the PIN.
-    #[cfg(feature = "untested")]
     pub fn set_protected(&self, yubikey: &mut YubiKey) -> Result<()> {
         let txn = yubikey.begin_transaction()?;
 
@@ -524,7 +521,6 @@ impl Lock {
 
 /// Configuration for a device
 #[derive(Clone, Debug, PartialEq)]
-#[cfg(feature = "untested")]
 pub struct DeviceConfig {
     /// List of applets that are available on the USB interface
     pub usb_enabled_apps: Capability,
@@ -539,8 +535,8 @@ pub struct DeviceConfig {
     pub device_flags: Option<DeviceFlags>,
 }
 
-#[cfg(feature = "untested")]
 impl DeviceConfig {
+    #[cfg(feature = "untested")]
     pub(crate) fn as_tlv(
         &self,
         reboot: bool,
@@ -622,7 +618,6 @@ impl DeviceConfig {
     }
 }
 
-#[cfg(feature = "untested")]
 bitflags! {
     /// Represents a set of applications.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -649,7 +644,6 @@ bitflags! {
 
 /// Device information
 /// This represents the configuration and the status of the device
-#[cfg(feature = "untested")]
 pub struct DeviceInfo {
     /// Configuration of the YubiKey
     pub config: DeviceConfig,
@@ -657,8 +651,8 @@ pub struct DeviceInfo {
     pub is_locked: bool,
 }
 
-#[cfg(feature = "untested")]
 impl DeviceInfo {
+    #[cfg(feature = "untested")]
     pub(crate) fn parse(input: &[u8]) -> Result<Self> {
         use nom::{
             bytes::complete::take,
@@ -820,7 +814,6 @@ impl DeviceInfo {
 }
 
 /// FormFactor of the YubiKey
-#[cfg(feature = "untested")]
 #[derive(Debug, Copy, Clone, PartialEq)]
 #[repr(u8)]
 pub enum FormFactor {
@@ -844,8 +837,8 @@ pub enum FormFactor {
     Unsupported(u8),
 }
 
-#[cfg(feature = "untested")]
 impl FormFactor {
+    #[cfg(feature = "untested")]
     fn parse(input: &[u8]) -> Result<Self> {
         use nom::{combinator::eof, number::complete::u8};
 
@@ -866,7 +859,6 @@ impl FormFactor {
     }
 }
 
-#[cfg(feature = "untested")]
 bitflags! {
     /// Represents configuration flags.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -878,8 +870,8 @@ bitflags! {
     }
 }
 
-#[cfg(feature = "untested")]
 impl DeviceFlags {
+    #[cfg(feature = "untested")]
     fn parse(i: &[u8]) -> nom::IResult<&[u8], Self> {
         use nom::{
             combinator::{eof, map},

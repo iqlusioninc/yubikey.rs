@@ -5,6 +5,7 @@ use crate::{
     apdu::{Apdu, Ins, StatusWords},
     consts::{CB_BUF_MAX, CB_OBJ_MAX},
     error::{Error, Result},
+    mgm::{MgmKey, DES_LEN_3DES},
     otp,
     piv::{self, AlgorithmId, SlotId},
     serialization::*,
@@ -15,7 +16,7 @@ use log::{error, trace};
 use zeroize::Zeroizing;
 
 #[cfg(feature = "untested")]
-use crate::mgm::{DeviceConfig, DeviceInfo, Lock, MgmKey, DES_LEN_3DES};
+use crate::mgm::{DeviceConfig, DeviceInfo, Lock};
 
 const CB_PIN_MAX: usize = 8;
 
@@ -247,7 +248,6 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Set the management key (MGM).
-    #[cfg(feature = "untested")]
     pub fn set_mgm_key(&self, new_key: &MgmKey, require_touch: bool) -> Result<()> {
         let p2 = if require_touch { 0xfe } else { 0xff };
 

@@ -1,5 +1,6 @@
-#![allow(dead_code)]
 //! Miscellaneous constant values
+
+#![allow(dead_code)]
 
 /// YubiKey max buffer size
 pub(crate) const CB_BUF_MAX: usize = 3072;
@@ -8,7 +9,6 @@ pub(crate) const CB_BUF_MAX: usize = 3072;
 pub(crate) const CB_OBJ_MAX: usize = CB_BUF_MAX - 9;
 
 pub(crate) const CB_OBJ_TAG_MIN: usize = 2; // 1 byte tag + 1 byte len
-#[cfg(feature = "untested")]
 pub(crate) const CB_OBJ_TAG_MAX: usize = CB_OBJ_TAG_MIN + 2; // 1 byte tag + 3 bytes len
 
 // Admin tags

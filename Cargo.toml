@@ -21,7 +21,7 @@ members = [".", "cli"]
 
 [workspace.dependencies]
 sha2 = "0.11.0-rc.0"
-x509-cert = { version = "0.3.0-rc.1", features = [ "builder", "hazmat" ] }
+x509-cert = { version = "0.3.0-rc.1", features = ["builder", "hazmat"] }
 
 [dependencies]
 bitflags = "2.5.0"
@@ -54,6 +54,10 @@ once_cell = "1"
 
 [features]
 untested = []
+
+[[example]]
+name = "change-mode"
+required-features = ["untested"]
 
 [package.metadata.docs.rs]
 all-features = true
