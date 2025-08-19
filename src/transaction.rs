@@ -320,6 +320,19 @@ impl<'tx> Transaction<'tx> {
                     return Err(Error::SizeError);
                 }
             }
+            AlgorithmId::X25519 => {
+                if !decipher {
+                    return Err(Error::NotSupported);
+                }
+                if in_len != 32 {
+                    return Err(Error::SizeError);
+                }
+            }
+            AlgorithmId::Ed25519 => {
+                if decipher {
+                    return Err(Error::NotSupported);
+                }
+            }
         }
 
         let bytes = if in_len < 0x80 {
@@ -336,7 +349,9 @@ impl<'tx> Transaction<'tx> {
                 Tlv::write(
                     &mut buf[2..],
                     match (algorithm, decipher) {
-                        (AlgorithmId::EccP256, true) | (AlgorithmId::EccP384, true) => 0x85,
+                        (AlgorithmId::EccP256, true)
+                        | (AlgorithmId::EccP384, true)
+                        | (AlgorithmId::X25519, true) => 0x85,
                         _ => 0x81,
                     },
                     sign_in
