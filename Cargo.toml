@@ -28,13 +28,13 @@ bitflags = "2.5.0"
 cipher = { version = "0.5.0-rc.0", features = ["rand_core"] }
 der = "0.8.0-rc.7"
 des = "0.9.0-rc.0"
-elliptic-curve = "0.14.0-rc.7"
+elliptic-curve = "0.14.0-rc.10"
 hex = { package = "base16ct", version = "0.2", features = ["alloc"] }
 log = "0.4"
 nom = "8"
-ecdsa = { version = "0.17.0-rc.2", features = ["digest", "pem"] }
-p256 = "=0.14.0-pre.9"
-p384 = "=0.14.0-pre.9"
+ecdsa = { version = "0.17.0-rc.5", features = ["digest", "pem"] }
+p256 = "0.14.0-pre.9"
+p384 = "0.14.0-pre.9"
 pbkdf2 = { version = "0.13.0-rc.0", default-features = false, features = ["hmac"] }
 pcsc = "2.3.1"
 rand = "0.9"
@@ -63,3 +63,14 @@ required-features = ["untested"]
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[patch.crates-io]
+crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint.git" }
+der = { git = "https://github.com/RustCrypto/formats.git" }
+ecdsa = { git = "https://github.com/RustCrypto/signatures.git" }
+elliptic-curve = { git = "https://github.com/RustCrypto/traits.git" }
+p256 = { git = "https://github.com/RustCrypto/elliptic-curves.git" }
+p384 = { git = "https://github.com/RustCrypto/elliptic-curves.git" }
+primefield = { git = "https://github.com/RustCrypto/elliptic-curves.git" }
+rsa = { git = "https://github.com/RustCrypto/RSA.git" }
+x509-cert = { git = "https://github.com/RustCrypto/formats.git" }
