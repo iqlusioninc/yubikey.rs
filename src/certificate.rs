@@ -96,9 +96,8 @@ impl Certificate {
     /// Creates a new self-signed certificate for the given key. Writes the resulting
     /// certificate to the slot before returning it.
     ///
-    /// `extensions` is optional; if empty, no extensions will be included. Due to the
-    /// need for an `O: Oid` type parameter, users who do not have any extensions should
-    /// use the workaround `let extensions: &[x509_cert::Extension<'_, &[u64]>] = &[];`.
+    /// `extensions` is a required argument; users who do not have any extensions
+    /// should set the `extensions` argument set to `|_| Ok(())`.
     pub fn generate_self_signed<F, KT: yubikey_signer::KeyType>(
         yubikey: &mut YubiKey,
         key: SlotId,
