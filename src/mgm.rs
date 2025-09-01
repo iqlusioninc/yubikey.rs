@@ -107,6 +107,12 @@ pub enum MgmType {
 pub enum MgmAlgorithmId {
     /// Triple DES (3DES) in EDE mode
     ThreeDes,
+    /// AES-128
+    Aes128,
+    /// AES-192
+    Aes192,
+    /// AES-256
+    Aes256,
 }
 
 impl TryFrom<u8> for MgmAlgorithmId {
@@ -115,6 +121,9 @@ impl TryFrom<u8> for MgmAlgorithmId {
     fn try_from(value: u8) -> Result<Self> {
         match value {
             0x03 => Ok(MgmAlgorithmId::ThreeDes),
+            0x08 => Ok(MgmAlgorithmId::Aes128),
+            0x0a => Ok(MgmAlgorithmId::Aes192),
+            0x0c => Ok(MgmAlgorithmId::Aes256),
             _ => Err(Error::AlgorithmError),
         }
     }
@@ -124,6 +133,9 @@ impl From<MgmAlgorithmId> for u8 {
     fn from(id: MgmAlgorithmId) -> u8 {
         match id {
             MgmAlgorithmId::ThreeDes => 0x03,
+            MgmAlgorithmId::Aes128 => 0x08,
+            MgmAlgorithmId::Aes192 => 0x0a,
+            MgmAlgorithmId::Aes256 => 0x0c,
         }
     }
 }
@@ -153,13 +165,16 @@ impl MgmAlgorithmId {
 /// This key is used to authenticate to the management applet running on
 /// a YubiKey in order to perform administrative functions.
 ///
-/// The only supported algorithm for MGM keys is 3DES.
+/// The only supported algorithm for MGM keys are 3DES and AES.
 #[derive(Clone)]
 pub struct MgmKey(MgmKeyKind);
 
 #[derive(Clone)]
 enum MgmKeyKind {
     Tdes(Key<des::TdesEde3>),
+    Aes128(Key<aes::Aes128>),
+    Aes192(Key<aes::Aes192>),
+    Aes256(Key<aes::Aes256>),
 }
 
 impl MgmKey {
@@ -168,6 +183,15 @@ impl MgmKey {
         match alg {
             MgmAlgorithmId::ThreeDes => {
                 des::TdesEde3::try_generate_key_with_rng(rng).map(MgmKeyKind::Tdes)
+            }
+            MgmAlgorithmId::Aes128 => {
+                aes::Aes128::try_generate_key_with_rng(rng).map(MgmKeyKind::Aes128)
+            }
+            MgmAlgorithmId::Aes192 => {
+                aes::Aes192::try_generate_key_with_rng(rng).map(MgmKeyKind::Aes192)
+            }
+            MgmAlgorithmId::Aes256 => {
+                aes::Aes256::try_generate_key_with_rng(rng).map(MgmKeyKind::Aes256)
             }
         }
         .map_err(|e| {
@@ -194,7 +218,7 @@ impl MgmKey {
                 minor: 7..,
                 ..
             }
-            | Version { major: 6.., .. } => Err(Error::NotSupported),
+            | Version { major: 6.., .. } => Self::generate(MgmAlgorithmId::Aes192, rng),
         }
     }
 
@@ -232,7 +256,7 @@ impl MgmKey {
                 minor: 7..,
                 ..
             }
-            | Version { major: 6.., .. } => Err(Error::NotSupported),
+            | Version { major: 6.., .. } => Ok(Self(MgmKeyKind::Aes192(DEFAULT_MGM_KEY.into()))),
         }
     }
 
@@ -284,11 +308,7 @@ impl MgmKey {
     pub fn get_protected(yubikey: &mut YubiKey) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
 
-        // Check the key algorithm.
         let alg = MgmAlgorithmId::query(&txn)?;
-        if alg != MgmAlgorithmId::ThreeDes {
-            return Err(Error::NotSupported);
-        }
 
         let protected_data = ProtectedData::read(&txn)
             .inspect_err(|e| error!("could not read protected data (err: {:?})", e))?;
@@ -440,6 +460,9 @@ impl MgmKey {
     pub(crate) fn algorithm_id(&self) -> MgmAlgorithmId {
         match &self.0 {
             MgmKeyKind::Tdes(_) => MgmAlgorithmId::ThreeDes,
+            MgmKeyKind::Aes128(_) => MgmAlgorithmId::Aes128,
+            MgmKeyKind::Aes192(_) => MgmAlgorithmId::Aes192,
+            MgmKeyKind::Aes256(_) => MgmAlgorithmId::Aes256,
         }
     }
 
@@ -447,6 +470,9 @@ impl MgmKey {
     pub(crate) fn key_size(&self) -> u8 {
         match &self.0 {
             MgmKeyKind::Tdes(_) => <des::TdesEde3 as KeySizeUser>::KeySize::U8,
+            MgmKeyKind::Aes128(_) => <aes::Aes128 as KeySizeUser>::KeySize::U8,
+            MgmKeyKind::Aes192(_) => <aes::Aes192 as KeySizeUser>::KeySize::U8,
+            MgmKeyKind::Aes256(_) => <aes::Aes256 as KeySizeUser>::KeySize::U8,
         }
     }
 
@@ -462,6 +488,15 @@ impl MgmKey {
                 des::TdesEde3::weak_key_test(&key).map_err(|_| Error::KeyError)?;
                 Ok(MgmKeyKind::Tdes(key))
             }
+            MgmAlgorithmId::Aes128 => Key::<aes::Aes128>::try_from(bytes.as_ref())
+                .map_err(|_| Error::SizeError)
+                .map(MgmKeyKind::Aes128),
+            MgmAlgorithmId::Aes192 => Key::<aes::Aes192>::try_from(bytes.as_ref())
+                .map_err(|_| Error::SizeError)
+                .map(MgmKeyKind::Aes192),
+            MgmAlgorithmId::Aes256 => Key::<aes::Aes256>::try_from(bytes.as_ref())
+                .map_err(|_| Error::SizeError)
+                .map(MgmKeyKind::Aes256),
         }
         .map(Self)
     }
@@ -474,6 +509,15 @@ impl MgmKey {
             MgmKeyKind::Tdes(k) => {
                 des::TdesEde3::new(k).encrypt_block(block.try_into().map_err(|_| Error::SizeError)?)
             }
+            MgmKeyKind::Aes128(k) => {
+                aes::Aes128::new(k).encrypt_block(block.try_into().map_err(|_| Error::SizeError)?)
+            }
+            MgmKeyKind::Aes192(k) => {
+                aes::Aes192::new(k).encrypt_block(block.try_into().map_err(|_| Error::SizeError)?)
+            }
+            MgmKeyKind::Aes256(k) => {
+                aes::Aes256::new(k).encrypt_block(block.try_into().map_err(|_| Error::SizeError)?)
+            }
         }
         Ok(())
     }
@@ -485,6 +529,15 @@ impl MgmKey {
         match &self.0 {
             MgmKeyKind::Tdes(k) => {
                 des::TdesEde3::new(k).decrypt_block(block.try_into().map_err(|_| Error::SizeError)?)
+            }
+            MgmKeyKind::Aes128(k) => {
+                aes::Aes128::new(k).decrypt_block(block.try_into().map_err(|_| Error::SizeError)?)
+            }
+            MgmKeyKind::Aes192(k) => {
+                aes::Aes192::new(k).decrypt_block(block.try_into().map_err(|_| Error::SizeError)?)
+            }
+            MgmKeyKind::Aes256(k) => {
+                aes::Aes256::new(k).decrypt_block(block.try_into().map_err(|_| Error::SizeError)?)
             }
         }
         Ok(())
@@ -516,6 +569,9 @@ impl AsRef<[u8]> for MgmKey {
     fn as_ref(&self) -> &[u8] {
         match &self.0 {
             MgmKeyKind::Tdes(k) => k.as_ref(),
+            MgmKeyKind::Aes128(k) => k.as_ref(),
+            MgmKeyKind::Aes192(k) => k.as_ref(),
+            MgmKeyKind::Aes256(k) => k.as_ref(),
         }
     }
 }
