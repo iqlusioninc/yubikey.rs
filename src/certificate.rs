@@ -97,7 +97,7 @@ impl Certificate {
     /// certificate to the slot before returning it.
     ///
     /// `extensions` is a required argument; users who do not have any extensions
-    /// should set the `extensions` argument set to `|_| Ok(())`.
+    /// should set the `extensions` argument to `|_| Ok(())`.
     pub fn generate_self_signed<F, KT: yubikey_signer::KeyType>(
         yubikey: &mut YubiKey,
         key: SlotId,
