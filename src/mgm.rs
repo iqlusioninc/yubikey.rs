@@ -457,7 +457,7 @@ impl MgmKey {
     }
 
     /// Returns the ID used to identify the key algorithm with APDU packets.
-    pub(crate) fn algorithm_id(&self) -> MgmAlgorithmId {
+    pub fn algorithm_id(&self) -> MgmAlgorithmId {
         match &self.0 {
             MgmKeyKind::Tdes(_) => MgmAlgorithmId::ThreeDes,
             MgmKeyKind::Aes128(_) => MgmAlgorithmId::Aes128,
