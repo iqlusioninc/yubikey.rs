@@ -175,7 +175,7 @@ Yubico's [yubico-piv-tool], a C library/CLI program. The original library
 was licensed under a [2-Clause BSD License][BSDL], which this library inherits
 as a derived work.
 
-Copyright (c) 2014-2023 Yubico AB, Tony Arcieri
+Copyright (c) 2014-2025 Yubico AB, Tony Arcieri
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -211,7 +211,7 @@ or conditions.
 
 [//]: # (badges)
 
-[crate-image]:  https://buildstats.info/crate/yubikey
+[crate-image]: https://img.shields.io/crates/v/yubikey?logo=rust
 [crate-link]: https://crates.io/crates/yubikey
 [docs-image]: https://docs.rs/yubikey/badge.svg
 [docs-link]: https://docs.rs/yubikey/
@@ -220,7 +220,7 @@ or conditions.
 [msrv-image]: https://img.shields.io/badge/rustc-1.81+-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
-[build-image]: https://github.com/iqlusioninc/yubikey.rs/workflows/CI/badge.svg?branch=main&event=push
+[build-image]: https://github.com/iqlusioninc/yubikey.rs/actions/workflows/ci.yml/badge.svg
 [build-link]: https://github.com/iqlusioninc/yubikey.rs/actions
 [deps-image]: https://deps.rs/repo/github/iqlusioninc/yubikey.rs/status.svg
 [deps-link]: https://deps.rs/repo/github/iqlusioninc/yubikey.rs
@@ -238,6 +238,7 @@ or conditions.
 [YubiKey 4]: https://support.yubico.com/support/solutions/articles/15000006486-yubikey-4
 [YubiKey 5]: https://www.yubico.com/products/yubikey-5-overview/
 [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/
+[piv-tool-guide]: https://docs.yubico.com/software/yubikey/tools/pivtool/Introduction.html
 [Corrode]: https://github.com/jameysharp/corrode
 [cc-web]: https://contributor-covenant.org/
 [cc-md]: https://github.com/iqlusioninc/yubikey.rs/blob/main/CODE_OF_CONDUCT.md
