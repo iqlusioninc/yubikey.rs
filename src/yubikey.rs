@@ -31,11 +31,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    apdu::{Apdu, Ins},
+    apdu::{Apdu, Ins, NoLE},
     cccid::CccId,
     chuid::ChuId,
     config::Config,
     error::{Error, Result},
+    hsmauth::HsmAuth,
     mgm::MgmKey,
     piv,
     reader::{Context, Reader},
@@ -418,7 +419,7 @@ impl YubiKey {
         let card_response = Apdu::new(Ins::Authenticate)
             .params(mgm_key.algorithm_id().into(), KEY_CARDMGM)
             .data([TAG_DYN_AUTH, 0x02, 0x80, 0x00])
-            .transmit(&txn, 261)?;
+            .transmit::<NoLE>(&txn, 261)?;
 
         if !card_response.is_success() || card_response.data().len() < 5 {
             return Err(Error::AuthenticationError);
@@ -451,7 +452,7 @@ impl YubiKey {
         let authentication = Apdu::new(Ins::Authenticate)
             .params(mgm_key.algorithm_id().into(), KEY_CARDMGM)
             .data(data)
-            .transmit(&txn, 261)?;
+            .transmit::<NoLE>(&txn, 261)?;
 
         if !authentication.is_success() {
             return Err(Error::AuthenticationError);
@@ -474,7 +475,7 @@ impl YubiKey {
         let status_words = Apdu::new(Ins::SelectApplication)
             .p1(0x04)
             .data(mgm::APPLET_ID)
-            .transmit(&txn, 255)?
+            .transmit::<NoLE>(&txn, 255)?
             .status_words();
 
         if !status_words.is_success() {
@@ -690,7 +691,7 @@ impl YubiKey {
         let response = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
             .data([0x7c, 0x02, 0x81, 0x00])
-            .transmit(&txn, 261)?;
+            .transmit::<NoLE>(&txn, 261)?;
 
         if !response.is_success() {
             return Err(Error::AuthenticationError);
@@ -719,7 +720,7 @@ impl YubiKey {
         let status_words = Apdu::new(Ins::Authenticate)
             .params(ALGO_3DES, KEY_CARDMGM)
             .data(data)
-            .transmit(&txn, 261)?
+            .transmit::<NoLE>(&txn, 261)?
             .status_words();
 
         if !status_words.is_success() {
@@ -745,6 +746,11 @@ impl YubiKey {
         }
 
         Ok(())
+    }
+
+    /// Creates a client for the YubiHSM AUth
+    pub fn hsmauth(self) -> Result<HsmAuth> {
+        HsmAuth::new(self)
     }
 }
 
