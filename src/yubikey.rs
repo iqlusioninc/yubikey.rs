@@ -80,7 +80,7 @@ const TAG_DYN_AUTH: u8 = 0x7c;
 pub type CachedPin = secrecy::SecretVec<u8>;
 
 /// YubiKey serial number.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct Serial(pub u32);
 
 impl From<u32> for Serial {
