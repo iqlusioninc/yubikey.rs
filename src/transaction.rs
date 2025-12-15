@@ -17,6 +17,8 @@ use zeroize::Zeroizing;
 
 #[cfg(feature = "untested")]
 use crate::mgm::{DeviceConfig, DeviceInfo, Lock};
+#[cfg(feature = "untested")]
+use log::info;
 
 const CB_PIN_MAX: usize = 8;
 
@@ -559,28 +561,156 @@ impl<'tx> Transaction<'tx> {
         Ok(())
     }
 
-    /// Write configuration to the YubiKey
+    /// Read configuration from the YubiKey
+    ///
+    /// This reads all configuration pages (if multiple pages exist) and parses
+    /// the combined configuration data. Firmware 5.7+ uses multiple pages to
+    /// store configuration data, indicated by the TAG_MORE_DATA field.
     #[cfg(feature = "untested")]
     pub fn read_config(&mut self) -> Result<DeviceInfo> {
-        let mut data = [0u8; CB_BUF_MAX];
-        let mut len = data.len();
-        let data_remaining = &mut data[..];
+        use crate::consts::TAG_MORE_DATA;
+        use crate::serialization::Tlv;
 
-        len -= data_remaining.len();
-        let response = Apdu::new(Ins::ReadConfig)
-            .params(0x00, 0x00)
-            .data(&data[..len])
-            .transmit(self, CB_BUF_MAX + 2)?;
+        let mut all_tlv_data = Vec::new();
+        let mut page: u8 = 0;
 
-        if !response.is_success() {
-            error!(
-                "Unable to read configuration: {:04x}",
-                response.status_words().code()
-            );
-            return Err(Error::GenericError);
+        loop {
+            let response = Apdu::new(Ins::ReadConfig)
+                .params(page, 0x00)
+                .transmit(self, CB_BUF_MAX + 2)?;
+
+            if !response.is_success() {
+                error!(
+                    "Unable to read configuration page {}: {:04x}",
+                    page,
+                    response.status_words().code()
+                );
+                return Err(Error::GenericError);
+            }
+
+            let data = response.data();
+
+            // First byte is the length of TLV data in this page
+            if data.is_empty() {
+                error!("Empty response when reading config page {}", page);
+                return Err(Error::GenericError);
+            }
+
+            let len = data[0] as usize;
+            if data.len() < 1 + len {
+                error!(
+                    "Invalid length in config page {}: {} bytes claimed, {} available",
+                    page,
+                    len,
+                    data.len() - 1
+                );
+                return Err(Error::GenericError);
+            }
+
+            let page_tlv_data = &data[1..1 + len];
+
+            // Check if there are more pages by looking for TAG_MORE_DATA
+            let mut has_more_data = false;
+            let mut remaining = page_tlv_data;
+
+            while !remaining.is_empty() {
+                match Tlv::parse(remaining) {
+                    Ok((rest, tlv)) => {
+                        if tlv.tag == TAG_MORE_DATA {
+                            // TAG_MORE_DATA value is typically 0x01 if true
+                            has_more_data = !tlv.value.is_empty() && tlv.value[0] != 0;
+                            trace!("Found TAG_MORE_DATA on page {}: {}", page, tlv.value[0]);
+                        } else {
+                            trace!(
+                                "Page {} TAG 0x{:02x} ({} bytes): {:02x?}",
+                                page,
+                                tlv.tag,
+                                tlv.value.len(),
+                                tlv.value
+                            );
+
+                            // Calculate how much space this TLV will need
+                            let value_len = tlv.value.len();
+                            let length_bytes = if value_len < 0x80 {
+                                1
+                            } else if value_len < 0x100 {
+                                2
+                            } else if value_len < 0x10000 {
+                                3
+                            } else {
+                                error!("TLV value too long: {} bytes", value_len);
+                                return Err(Error::SizeError);
+                            };
+
+                            let tlv_total_size = 1 + length_bytes + value_len; // tag + length + value
+
+                            // Check if adding this TLV would exceed the 255 byte limit
+                            if all_tlv_data.len() + tlv_total_size > 255 {
+                                error!(
+                                    "Total TLV data would exceed 255 bytes: {} + {} = {}",
+                                    all_tlv_data.len(),
+                                    tlv_total_size,
+                                    all_tlv_data.len() + tlv_total_size
+                                );
+                                return Err(Error::SizeError);
+                            }
+
+                            // Only copy non-TAG_MORE_DATA TLVs to the accumulated data
+                            // We need to reconstruct the TLV: tag + length + value
+                            all_tlv_data.push(tlv.tag);
+
+                            // Encode length
+                            if value_len < 0x80 {
+                                all_tlv_data.push(value_len as u8);
+                            } else if value_len < 0x100 {
+                                all_tlv_data.push(0x81);
+                                all_tlv_data.push(value_len as u8);
+                            } else {
+                                all_tlv_data.push(0x82);
+                                all_tlv_data.push((value_len >> 8) as u8);
+                                all_tlv_data.push(value_len as u8);
+                            }
+
+                            all_tlv_data.extend_from_slice(tlv.value);
+                        }
+                        remaining = rest;
+                    }
+                    Err(_) => {
+                        error!("Failed to parse TLV in config page {}", page);
+                        return Err(Error::ParseError);
+                    }
+                }
+            }
+
+            if !has_more_data {
+                break;
+            }
+
+            // Check for page limit before incrementing to prevent overflow
+            if page == 255 {
+                error!("Too many config pages (reached maximum of 255)");
+                return Err(Error::GenericError);
+            }
+            page += 1;
         }
 
-        let data = response.data();
-        DeviceInfo::parse(data)
+        // Now build a single buffer with format: [total_length, ...all_tlv_data...]
+        let total_len = all_tlv_data.len();
+        if total_len > 255 {
+            error!("Total TLV data too long: {} bytes", total_len);
+            return Err(Error::SizeError);
+        }
+
+        let mut complete_buffer = Vec::with_capacity(1 + total_len);
+        complete_buffer.push(total_len as u8);
+        complete_buffer.extend_from_slice(&all_tlv_data);
+
+        info!(
+            "Merged config from {} page(s), total {} TLV bytes",
+            page + 1,
+            total_len
+        );
+
+        DeviceInfo::parse(&complete_buffer)
     }
 }
