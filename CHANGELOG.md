@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
+- FIPS 140-2 detection API (requires `untested` feature):
+  - `YubiKey::is_fips()` - Check if PIV application is in FIPS-approved mode
+    - Firmware 5.7+: Detects activation status via TAG_FIPS_APPROVED (0x15)
+    - Firmware 5.4.3+: Returns `Ok(false)` (TAG_FIPS_APPROVED not available)
+    - YubiKey 4 FIPS: Returns `Error::ParseError`
+  - `YubiKey::is_fips_capable()` - Check if hardware is FIPS 140-2 Level 2 validated
+    - Firmware 5.7+: Uses TAG_FIPS_CAPABLE (0x14)
+    - Firmware 5.4.3+: Uses FORM_FACTOR bit 7 (0x80) fallback
+    - YubiKey 4 FIPS: Returns `Error::ParseError`
+  - `mgm::FipsCapability` - Bitflags for FIPS-capable/approved applications (different bit encoding than `Capability`)
+  - `mgm::DeviceConfig::fips_capable` - Optional field for FIPS hardware capability
+  - `mgm::DeviceConfig::fips_approved` - Optional field for FIPS-approved applications
+  - `mgm::DeviceConfig::form_factor_raw` - Raw form factor value for FIPS detection fallback
+  - Multi-page device configuration reading via TAG_MORE_DATA (0x10)
+  - Examples: `check-fips.rs`, `check-fips-capable.rs`, `activate-fips.rs`, `activate-fips-reset.rs`
 - `yubikey::certificate::SelfSigned`
 - `yubikey::Error::CertificateBuilder`
 - `yubikey::MgmAlgorithmId`

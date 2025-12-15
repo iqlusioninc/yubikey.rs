@@ -53,6 +53,34 @@ and stored on YubiKey devices.
 See [Yubico's guide to PIV-enabled YubiKeys][yk-guide] for more information
 on which devices support PIV and the available functionality.
 
+### FIPS 140-2 Detection
+
+This library supports detecting whether a YubiKey is FIPS 140-2 Level 2 validated:
+
+```rust,no_run
+use yubikey::YubiKey;
+
+let mut yubikey = YubiKey::open()?;
+if yubikey.is_fips()? {
+    println!("FIPS 140-2 validated YubiKey");
+}
+# Ok::<(), yubikey::Error>(())
+```
+
+FIPS detection is available behind the `untested` feature flag. This is essential
+for government and enterprise environments that mandate FIPS-validated cryptographic
+modules (e.g., DoD, Federal agencies).
+
+**Firmware Support:**
+- **Firmware 5.4.3+**: `is_fips_capable()` detects FIPS hardware
+- **Firmware 5.7+**: `is_fips()` detects if PIV is in FIPS-approved mode
+- **YubiKey 4 FIPS**: Returns `ParseError` (different configuration structure)
+
+**FIPS Mode Activation:**
+To operate in FIPS-approved mode, the PIN (minimum 6 chars), PUK (minimum 6 chars), and management key must all be changed from defaults.
+
+See the [`check-fips` example](examples/check-fips.rs) for a complete demonstration.
+
 ### Supported Algorithms
 - **Authentication**: `3DES`
 - **Encryption**:

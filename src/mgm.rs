@@ -49,8 +49,9 @@ use {
     crate::{
         consts::{
             CB_BUF_MAX, TAG_AUTO_EJECT_TIMEOUT, TAG_CHALRESP_TIMEOUT, TAG_CONFIG_LOCK,
-            TAG_DEVICE_FLAGS, TAG_FORM_FACTOR, TAG_NFC_ENABLED, TAG_NFC_SUPPORTED, TAG_REBOOT,
-            TAG_SERIAL, TAG_UNLOCK, TAG_USB_ENABLED, TAG_USB_SUPPORTED, TAG_VERSION,
+            TAG_DEVICE_FLAGS, TAG_FIPS_APPROVED, TAG_FIPS_CAPABLE, TAG_FORM_FACTOR,
+            TAG_NFC_ENABLED, TAG_NFC_SUPPORTED, TAG_REBOOT, TAG_SERIAL, TAG_UNLOCK,
+            TAG_USB_ENABLED, TAG_USB_SUPPORTED, TAG_VERSION,
         },
         serialization::Tlv,
         Serial,
@@ -224,7 +225,7 @@ impl MgmKey {
 
     /// Parses an MGM key from the given byte slice.
     ///
-    /// Returns an error if the slice is an invalid size or the key is weak.
+    /// Returns an error if the slice is an invalid size.
     ///
     /// If `alg` is `None`, the algorithm will be selected based on the length of the
     /// slice, returning an error if there is not a unique match.
@@ -476,16 +477,19 @@ impl MgmKey {
         }
     }
 
-    /// Parses an MGM key from the given byte slice.
+    /// Parses an MGM key from the given byte slice, performing weak key validation for 3DES.
     ///
-    /// Returns an error if the algorithm is unsupported, or the slice is the wrong size,
-    /// or the key is weak.
+    /// Returns an error if the algorithm is unsupported, the slice is the wrong size,
+    /// or the key is weak (3DES only).
     fn parse_key(alg: MgmAlgorithmId, bytes: impl AsRef<[u8]>) -> Result<Self> {
         match alg {
             MgmAlgorithmId::ThreeDes => {
                 let key =
                     Key::<des::TdesEde3>::try_from(bytes.as_ref()).map_err(|_| Error::SizeError)?;
-                des::TdesEde3::weak_key_test(&key).map_err(|_| Error::KeyError)?;
+                des::TdesEde3::weak_key_test(&key).map_err(|_| {
+                    error!("rejecting weak 3DES key");
+                    Error::KeyError
+                })?;
                 Ok(MgmKeyKind::Tdes(key))
             }
             MgmAlgorithmId::Aes128 => Key::<aes::Aes128>::try_from(bytes.as_ref())
@@ -685,6 +689,32 @@ pub struct DeviceConfig {
     pub challenge_response_timeout: Option<u8>,
     /// Configuration flags
     pub device_flags: Option<DeviceFlags>,
+    /// Form factor raw value (TAG 0x04)
+    ///
+    /// Bit 7 (0x80) indicates FIPS-capable hardware when set.
+    /// This provides a fallback method for FIPS detection on firmware < 5.7
+    /// where TAG_FIPS_CAPABLE (0x14) is not available.
+    pub form_factor_raw: Option<u8>,
+    /// FIPS-capable applications (firmware 5.7+)
+    ///
+    /// Indicates which applications are FIPS-capable (hardware validated).
+    /// This is independent of whether the applications are currently in FIPS-approved mode.
+    ///
+    /// Note: This uses FipsCapability bitflags which have different bit positions
+    /// than standard Capability flags. See TAG_FIPS_CAPABLE (0x14) documentation.
+    pub fips_capable: Option<FipsCapability>,
+    /// FIPS-approved capabilities (firmware 5.7+)
+    ///
+    /// Indicates which applications are operating in FIPS 140-2 approved mode.
+    /// For PIV to be FIPS-approved, the PIN, PUK, and management key must all
+    /// be changed from their default values.
+    ///
+    /// Note: This uses FipsCapability bitflags which have different bit positions
+    /// than standard Capability flags. See TAG_FIPS_APPROVED (0x15) documentation.
+    ///
+    /// Not available on firmware < 5.7 (including 5.4.3 FIPS). Use form_factor bit 7
+    /// as a fallback to detect FIPS-capable hardware on older firmware.
+    pub fips_approved: Option<FipsCapability>,
 }
 
 impl DeviceConfig {
@@ -794,6 +824,32 @@ bitflags! {
     }
 }
 
+bitflags! {
+    /// FIPS-specific capability flags for TAG_FIPS_CAPABLE (0x14) and TAG_FIPS_APPROVED (0x15).
+    ///
+    /// These use a different bit encoding than standard Capability flags:
+    /// - Bit 0 (0x01) = FIDO
+    /// - Bit 1 (0x02) = PIV
+    /// - Bit 2 (0x04) = OpenPGP
+    /// - Bit 3 (0x08) = OATH
+    /// - Bit 4 (0x10) = YubiHSM-Auth
+    ///
+    /// See: <https://docs.yubico.com/hardware/yubikey/yk-tech-manual/yk5-fips-specifics.html>
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct FipsCapability: u16 {
+        /// FIDO/FIDO2 (bit 0)
+        const FIDO = 0x01;
+        /// PIV (bit 1)
+        const PIV = 0x02;
+        /// OpenPGP (bit 2)
+        const OPENPGP = 0x04;
+        /// OATH (bit 3)
+        const OATH = 0x08;
+        /// YubiHSM-Auth (bit 4)
+        const HSMAUTH = 0x10;
+    }
+}
+
 /// Device information
 /// This represents the configuration and the status of the device
 pub struct DeviceInfo {
@@ -833,6 +889,12 @@ impl DeviceInfo {
 
             Ok((i, v))
         }
+        fn fips_capability_parser(i: &[u8]) -> nom::IResult<&[u8], FipsCapability> {
+            let (i, v) = map(be_u16, FipsCapability::from_bits_retain).parse(i)?;
+            let (i, _) = eof(i)?;
+
+            Ok((i, v))
+        }
         fn serial_parser(i: &[u8]) -> nom::IResult<&[u8], Serial> {
             let (i, v) = map(be_u32, Serial).parse(i)?;
             let (i, _) = eof(i)?;
@@ -848,10 +910,13 @@ impl DeviceInfo {
             nfc_enabled_apps: Option<Capability>,
             serial: Option<Serial>,
             form_factor: Option<FormFactor>,
+            form_factor_raw: Option<u8>,
             version: Option<Version>,
             auto_eject_timeout: Option<u16>,
             challenge_response_timeout: Option<u8>,
             device_flags: Option<DeviceFlags>,
+            fips_capable: Option<FipsCapability>,
+            fips_approved: Option<FipsCapability>,
             is_locked: bool,
         }
 
@@ -904,6 +969,8 @@ impl DeviceInfo {
                         }
                         v if v == TAG_FORM_FACTOR => {
                             config.form_factor = Some(FormFactor::parse(tlv.value)?);
+                            config.form_factor_raw =
+                                Some(u8_parser(tlv.value).map_err(|_| Error::ParseError)?.1);
                             Ok(config)
                         }
                         v if v == TAG_VERSION => {
@@ -923,6 +990,22 @@ impl DeviceInfo {
                         v if v == TAG_DEVICE_FLAGS => {
                             config.device_flags = Some(
                                 DeviceFlags::parse(tlv.value)
+                                    .map_err(|_| Error::ParseError)?
+                                    .1,
+                            );
+                            Ok(config)
+                        }
+                        v if v == TAG_FIPS_CAPABLE => {
+                            config.fips_capable = Some(
+                                fips_capability_parser(tlv.value)
+                                    .map_err(|_| Error::ParseError)?
+                                    .1,
+                            );
+                            Ok(config)
+                        }
+                        v if v == TAG_FIPS_APPROVED => {
+                            config.fips_approved = Some(
+                                fips_capability_parser(tlv.value)
                                     .map_err(|_| Error::ParseError)?
                                     .1,
                             );
@@ -956,6 +1039,9 @@ impl DeviceInfo {
             auto_eject_timeout: out.auto_eject_timeout,
             challenge_response_timeout: out.challenge_response_timeout,
             device_flags: out.device_flags,
+            form_factor_raw: out.form_factor_raw,
+            fips_capable: out.fips_capable,
+            fips_approved: out.fips_approved,
         };
 
         Ok(DeviceInfo {
@@ -1017,8 +1103,12 @@ bitflags! {
     pub struct DeviceFlags: u8{
         /// Remote wake-up
         const REMOTE_WAKEUP = 0x40;
-        /// Eject
-        const Eject = 0x80;
+
+        /// Eject (device control setting)
+        ///
+        /// When set in device configuration, enables automatic smartcard ejection
+        /// after the configured timeout period.
+        const EJECT = 0x80;
     }
 }
 
@@ -1035,5 +1125,64 @@ impl DeviceFlags {
         let (i, _) = eof(i)?;
 
         Ok((i, v))
+    }
+}
+
+#[cfg(all(test, feature = "untested"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fips_capability_bit_encoding() {
+        // Verify FipsCapability uses correct bit positions per Yubico spec
+        // Bit encoding: FIDO(0) | PIV(1) | OpenPGP(2) | OATH(3) | HSMAuth(4)
+        assert_eq!(FipsCapability::FIDO.bits(), 0x01);
+        assert_eq!(FipsCapability::PIV.bits(), 0x02);
+        assert_eq!(FipsCapability::OPENPGP.bits(), 0x04);
+        assert_eq!(FipsCapability::OATH.bits(), 0x08);
+        assert_eq!(FipsCapability::HSMAUTH.bits(), 0x10);
+    }
+
+    #[test]
+    fn test_fips_capability_differs_from_capability() {
+        // FipsCapability uses different bit encoding than Capability
+        // See: https://docs.yubico.com/hardware/yubikey/yk-tech-manual/yk5-fips-specifics.html
+        assert_eq!(FipsCapability::PIV.bits(), 0x02);
+        assert_eq!(Capability::PIV.bits(), 0x10);
+        assert_ne!(FipsCapability::PIV.bits(), Capability::PIV.bits());
+    }
+
+    #[test]
+    fn test_fips_capability_value_0x0003() {
+        // Value 0x0003 = bits 0 and 1 = FIDO | PIV
+        let caps = FipsCapability::from_bits_retain(0x0003);
+        assert!(caps.contains(FipsCapability::FIDO));
+        assert!(caps.contains(FipsCapability::PIV));
+        assert!(!caps.contains(FipsCapability::OPENPGP));
+        assert!(!caps.contains(FipsCapability::OATH));
+        assert!(!caps.contains(FipsCapability::HSMAUTH));
+    }
+
+    #[test]
+    fn test_fips_capability_combined() {
+        // Test combining multiple FIPS capabilities
+        let caps = FipsCapability::PIV | FipsCapability::OATH | FipsCapability::HSMAUTH;
+        assert_eq!(caps.bits(), 0x1A); // 0x02 | 0x08 | 0x10 = 0x1A
+        assert!(caps.contains(FipsCapability::PIV));
+        assert!(caps.contains(FipsCapability::OATH));
+        assert!(caps.contains(FipsCapability::HSMAUTH));
+        assert!(!caps.contains(FipsCapability::FIDO));
+        assert!(!caps.contains(FipsCapability::OPENPGP));
+    }
+
+    #[test]
+    fn test_fips_capability_from_bits_retain() {
+        // Test from_bits_retain handles all valid values
+        let caps_all = FipsCapability::from_bits_retain(0x1F); // All 5 bits set
+        assert!(caps_all.contains(FipsCapability::FIDO));
+        assert!(caps_all.contains(FipsCapability::PIV));
+        assert!(caps_all.contains(FipsCapability::OPENPGP));
+        assert!(caps_all.contains(FipsCapability::OATH));
+        assert!(caps_all.contains(FipsCapability::HSMAUTH));
     }
 }

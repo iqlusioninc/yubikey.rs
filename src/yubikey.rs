@@ -80,7 +80,7 @@ const TAG_DYN_AUTH: u8 = 0x7c;
 pub type CachedPin = secrecy::SecretVec<u8>;
 
 /// YubiKey serial number.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct Serial(pub u32);
 
 impl From<u32> for Serial {
@@ -398,6 +398,149 @@ impl YubiKey {
     /// Get device configuration.
     pub fn config(&mut self) -> Result<Config> {
         Config::get(self)
+    }
+
+    /// Checks if this YubiKey's PIV application is in FIPS 140-2 approved mode
+    ///
+    /// Returns `Ok(true)` if PIV is in FIPS-approved mode, `Ok(false)` if not or cannot be
+    /// determined (firmware < 5.7 or non-FIPS hardware). Returns `Err` on communication errors.
+    ///
+    /// FIPS mode is activated when PIN, PUK, and management key are changed from defaults.
+    ///
+    /// # Firmware Support
+    ///
+    /// - **Firmware 5.7+**: Detects activation status via TAG_FIPS_APPROVED (0x15)
+    /// - **Firmware 5.4.3+**: Returns `Ok(false)` (TAG_FIPS_APPROVED not available)
+    /// - **YubiKey 4 FIPS**: Returns `Error::ParseError`
+    ///
+    /// For firmware < 5.7, verify FIPS mode manually by checking credentials are not defaults.
+    /// Use [`is_fips_capable`](Self::is_fips_capable) to detect FIPS-capable hardware
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use yubikey::YubiKey;
+    ///
+    /// let mut yubikey = YubiKey::open()?;
+    /// if yubikey.is_fips()? {
+    ///     println!("This is a FIPS 140-2 validated YubiKey");
+    /// } else {
+    ///     println!("This is not a FIPS-validated YubiKey");
+    /// }
+    /// # Ok::<(), yubikey::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Unable to communicate with the YubiKey
+    /// - Unable to query device configuration
+    /// - Device does not support the configuration query command
+    ///
+    /// # See Also
+    ///
+    /// - [`is_fips_capable`](Self::is_fips_capable) - Check if hardware is FIPS-capable
+    /// - [`mgm::FipsCapability`] - FIPS capability bitflags
+    /// - [Yubico FIPS documentation](https://www.yubico.com/products/yubikey-fips/)
+    #[cfg(feature = "untested")]
+    pub fn is_fips(&mut self) -> Result<bool> {
+        use crate::{
+            mgm::{self, FipsCapability},
+            transaction::Transaction,
+        };
+
+        // Create transaction and select management applet
+        let mut txn = Transaction::new(&mut self.card)?;
+        txn.select_application(
+            mgm::APPLET_ID,
+            mgm::APPLET_NAME,
+            "failed selecting YubiKey management application",
+        )?;
+
+        // Read device configuration
+        let device_info = txn.read_config()?;
+
+        // Re-select PIV application for normal operations
+        txn.select_piv_application()?;
+
+        // Check if PIV is in the FIPS-approved capabilities
+        // TAG_FIPS_APPROVED (0x15) is the authoritative source (firmware 5.7+)
+        // Note: TAG_FIPS_APPROVED uses FipsCapability bit encoding where PIV = bit 1 (0x02)
+        // This is different from standard Capability encoding where PIV = bit 4 (0x10)
+        if let Some(fips_approved) = device_info.config.fips_approved {
+            // Firmware sends explicit FIPS approved status
+            return Ok(fips_approved.contains(FipsCapability::PIV));
+        }
+
+        // TAG_FIPS_APPROVED not present in device config
+        // This means either:
+        // 1. Device is not FIPS-capable hardware
+        // 2. FIPS mode is not activated (PIN/PUK still at defaults)
+        // 3. Firmware < 5.7 (doesn't support TAG_FIPS_APPROVED)
+        // 4. Firmware 4.x (different config structure, parse may fail)
+
+        Ok(false)
+    }
+
+    /// Query if the YubiKey hardware is FIPS-capable.
+    ///
+    /// Returns `Ok(true)` if hardware is FIPS 140-2 Level 2 validated, `Ok(false)` if not
+    /// or firmware doesn't support detection. Independent of activation status (see [`is_fips`]).
+    ///
+    /// # Firmware Support
+    ///
+    /// - **Firmware 5.7+**: Uses TAG_FIPS_CAPABLE (0x14)
+    /// - **Firmware 5.4.3+**: Uses FORM_FACTOR bit 7 (0x80) fallback
+    /// - **YubiKey 4 FIPS**: Returns `Error::ParseError`
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use yubikey::YubiKey;
+    ///
+    /// let mut yubikey = YubiKey::open()?;
+    /// if yubikey.is_fips_capable()? {
+    ///     println!("FIPS-capable hardware");
+    /// }
+    /// # Ok::<(), yubikey::Error>(())
+    /// ```
+    ///
+    /// [`is_fips`]: YubiKey::is_fips
+    #[cfg(feature = "untested")]
+    pub fn is_fips_capable(&mut self) -> Result<bool> {
+        use crate::{
+            mgm::{self, FipsCapability},
+            transaction::Transaction,
+        };
+
+        // Create transaction and select management applet
+        let mut txn = Transaction::new(&mut self.card)?;
+        txn.select_application(
+            mgm::APPLET_ID,
+            mgm::APPLET_NAME,
+            "failed selecting YubiKey management application",
+        )?;
+
+        // Read device configuration
+        let device_info = txn.read_config()?;
+
+        // Re-select PIV application for normal operations
+        txn.select_piv_application()?;
+
+        // Primary method: TAG_FIPS_CAPABLE (firmware 5.7+)
+        // TAG_FIPS_CAPABLE (0x14) indicates which applications have FIPS-validated hardware
+        if let Some(fips_capable) = device_info.config.fips_capable {
+            return Ok(fips_capable.contains(FipsCapability::PIV));
+        }
+
+        // Fallback method: FORM_FACTOR bit 7 (firmware < 5.7, including 5.4.3 FIPS)
+        // Bit 7 (0x80) of form_factor indicates FIPS-capable hardware
+        if let Some(form_factor) = device_info.config.form_factor_raw {
+            return Ok((form_factor & 0x80) != 0);
+        }
+
+        // No FIPS capability information available
+        Ok(false)
     }
 
     /// Get Cardholder Unique Identifier (CHUID).
