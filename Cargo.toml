@@ -21,7 +21,7 @@ members = [".", "cli"]
 
 [workspace.dependencies]
 sha2 = "0.11.0-rc.3"
-x509-cert = { version = "0.3.0-rc.2", features = ["builder", "hazmat"] }
+x509-cert = { version = "0.3.0-rc.3", features = ["builder", "hazmat"] }
 
 [dependencies]
 aes = { version = "0.9.0-rc.1", features = ["zeroize"] }
@@ -44,7 +44,7 @@ rsa = { version = "0.10.0-rc.13", features = ["sha2"] }
 secrecy = "0.8"
 sha1 = { version = "0.11.0-rc.3", features = ["oid"] }
 sha2 = { workspace = true, features = ["oid"] }
-signature = "3.0.0-rc.4"
+signature = "3.0.0-rc.6"
 subtle = "2"
 uuid = { version = "1.2", features = ["v4"] }
 x509-cert.workspace = true

@@ -1104,9 +1104,9 @@ checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
 
 [[package]]
 name = "x509-cert"
-version = "0.3.0-rc.2"
+version = "0.3.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "214929cc983d42a67db8bfacea8595625bc252e9d88457aab2770cea58371145"
+checksum = "8a142a239aab5f1ad69b9e5eba6f1eb17f1b2cec4ff1696fd711bda2bb9c33a5"
 dependencies = [
  "const-oid",
  "der",
