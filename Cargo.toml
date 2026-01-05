@@ -38,8 +38,8 @@ p256 = "=0.14.0-pre.11"
 p384 = "=0.14.0-pre.11"
 pbkdf2 = { version = "0.13.0-rc.1", default-features = false, features = ["hmac"] }
 pcsc = "2.3.1"
-rand = "0.9"
-rand_core = { version = "0.9", features = ["os_rng"] }
+rand = "0.10.0-rc.5"
+rand_core = "0.10.0-rc-3"
 rsa = { version = "0.10.0-rc.8", features = ["sha2"] }
 secrecy = "0.8"
 sha1 = { version = "0.11.0-rc.2", features = ["oid"] }
