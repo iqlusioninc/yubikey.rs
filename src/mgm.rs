@@ -39,7 +39,8 @@ use crate::{
 };
 use bitflags::bitflags;
 use cipher::{
-    typenum::Unsigned, BlockCipherDecrypt, BlockCipherEncrypt, Key, KeyInit, KeySizeUser,
+    crypto_common::Generate, typenum::Unsigned, BlockCipherDecrypt, BlockCipherEncrypt, Key,
+    KeyInit, KeySizeUser,
 };
 use log::error;
 use rand::TryCryptoRng;
@@ -199,19 +200,19 @@ enum MgmKeyKind {
 
 impl MgmKey {
     /// Generates a random MGM key for the given algorithm.
-    pub fn generate(alg: MgmAlgorithmId, rng: &mut impl TryCryptoRng) -> Result<Self> {
+    pub fn generate<R: TryCryptoRng + ?Sized>(alg: MgmAlgorithmId, rng: &mut R) -> Result<Self> {
         match alg {
             MgmAlgorithmId::ThreeDes => {
-                des::TdesEde3::try_generate_key_with_rng(rng).map(MgmKeyKind::Tdes)
+                Key::<des::TdesEde3>::try_generate_from_rng(rng).map(MgmKeyKind::Tdes)
             }
             MgmAlgorithmId::Aes128 => {
-                aes::Aes128::try_generate_key_with_rng(rng).map(MgmKeyKind::Aes128)
+                Key::<aes::Aes128>::try_generate_from_rng(rng).map(MgmKeyKind::Aes128)
             }
             MgmAlgorithmId::Aes192 => {
-                aes::Aes192::try_generate_key_with_rng(rng).map(MgmKeyKind::Aes192)
+                Key::<aes::Aes192>::try_generate_from_rng(rng).map(MgmKeyKind::Aes192)
             }
             MgmAlgorithmId::Aes256 => {
-                aes::Aes256::try_generate_key_with_rng(rng).map(MgmKeyKind::Aes256)
+                Key::<aes::Aes256>::try_generate_from_rng(rng).map(MgmKeyKind::Aes256)
             }
         }
         .map_err(|e| {
@@ -223,7 +224,7 @@ impl MgmKey {
 
     /// Generates a random MGM key using the preferred algorithm for the given Yubikey's
     /// firmware version.
-    pub fn generate_for(yubikey: &YubiKey, rng: &mut impl TryCryptoRng) -> Result<Self> {
+    pub fn generate_for<R: TryCryptoRng + ?Sized>(yubikey: &YubiKey, rng: &mut R) -> Result<Self> {
         let alg = MgmAlgorithmId::default_for_version(yubikey.version());
         Self::generate(alg, rng)
     }
