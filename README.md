@@ -72,9 +72,9 @@ for government and enterprise environments that mandate FIPS-validated cryptogra
 modules (e.g., DoD, Federal agencies).
 
 **Firmware Support:**
-- **Firmware 5.4.3+**: `is_fips_capable()` detects FIPS hardware
-- **Firmware 5.7+**: `is_fips()` detects if PIV is in FIPS-approved mode
-- **YubiKey 4 FIPS**: Returns `ParseError` (different configuration structure)
+- **Firmware 5.7+**: Full support via TAG_FIPS_CAPABLE and TAG_FIPS_APPROVED
+- **Firmware 5.4.3+**: `is_fips_capable()` via FORM_FACTOR fallback
+- **YubiKey 4 FIPS (4.4.x)**: `is_fips_capable()` via version-based detection
 
 **FIPS Mode Activation:**
 To operate in FIPS-approved mode, the PIN (minimum 6 chars), PUK (minimum 6 chars), and management key must all be changed from defaults.

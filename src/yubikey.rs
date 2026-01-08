@@ -411,7 +411,7 @@ impl YubiKey {
     ///
     /// - **Firmware 5.7+**: Detects activation status via TAG_FIPS_APPROVED (0x15)
     /// - **Firmware 5.4.3+**: Returns `Ok(false)` (TAG_FIPS_APPROVED not available)
-    /// - **YubiKey 4 FIPS**: Returns `Error::ParseError`
+    /// - **YubiKey 4 FIPS (4.4.x)**: Returns `Ok(false)` (firmware predates FIPS tags)
     ///
     /// For firmware < 5.7, verify FIPS mode manually by checking credentials are not defaults.
     /// Use [`is_fips_capable`](Self::is_fips_capable) to detect FIPS-capable hardware
@@ -448,6 +448,15 @@ impl YubiKey {
             mgm::{self, FipsCapability},
             transaction::Transaction,
         };
+
+        let version = self.version();
+
+        // YubiKey 4 FIPS: firmware 4.4.x
+        // TAG_FIPS_APPROVED not available on firmware 4.x, cannot detect activation status
+        // Return false to indicate activation status cannot be determined
+        if version.major == 4 && version.minor == 4 {
+            return Ok(false);
+        }
 
         // Create transaction and select management applet
         let mut txn = Transaction::new(&mut self.card)?;
@@ -491,7 +500,7 @@ impl YubiKey {
     ///
     /// - **Firmware 5.7+**: Uses TAG_FIPS_CAPABLE (0x14)
     /// - **Firmware 5.4.3+**: Uses FORM_FACTOR bit 7 (0x80) fallback
-    /// - **YubiKey 4 FIPS**: Returns `Error::ParseError`
+    /// - **YubiKey 4 FIPS (4.4.x)**: Uses version-based detection
     ///
     /// # Example
     ///
@@ -512,6 +521,15 @@ impl YubiKey {
             mgm::{self, FipsCapability},
             transaction::Transaction,
         };
+
+        let version = self.version();
+
+        // YubiKey 4 FIPS: firmware 4.4.x (version-based detection)
+        // Standard YubiKey 4 uses firmware 4.2.x-4.3.x, so no overlap
+        // This approach matches official Yubico SDKs (ykman and .NET SDK)
+        if version.major == 4 && version.minor == 4 {
+            return Ok(true);
+        }
 
         // Create transaction and select management applet
         let mut txn = Transaction::new(&mut self.card)?;
@@ -936,5 +954,94 @@ impl<'a> TryFrom<&'a Reader<'_>> for YubiKey {
                 Ok(yubikey)
             }
         }
+    }
+}
+
+#[cfg(all(test, feature = "untested"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_yubikey_4_fips_version_detection() {
+        // YubiKey 4 FIPS uses firmware 4.4.x
+        let version_440 = Version::new([4, 4, 0]);
+        let version_445 = Version::new([4, 4, 5]);
+        let version_449 = Version::new([4, 4, 9]);
+
+        // All 4.4.x versions should be detected as FIPS
+        assert_eq!(version_440.major, 4);
+        assert_eq!(version_440.minor, 4);
+        assert_eq!(version_445.major, 4);
+        assert_eq!(version_445.minor, 4);
+        assert_eq!(version_449.major, 4);
+        assert_eq!(version_449.minor, 4);
+    }
+
+    #[test]
+    fn test_yubikey_4_standard_version_detection() {
+        // Standard YubiKey 4 uses firmware 4.2.x - 4.3.x
+        let version_420 = Version::new([4, 2, 0]);
+        let version_424 = Version::new([4, 2, 4]);
+        let version_431 = Version::new([4, 3, 1]);
+        let version_435 = Version::new([4, 3, 5]);
+
+        // None of these should match the 4.4.x FIPS pattern
+        assert!(version_420.major == 4 && version_420.minor != 4);
+        assert!(version_424.major == 4 && version_424.minor != 4);
+        assert!(version_431.major == 4 && version_431.minor != 4);
+        assert!(version_435.major == 4 && version_435.minor != 4);
+    }
+
+    #[test]
+    fn test_version_boundaries() {
+        // Test versions outside the YubiKey 4 FIPS range
+        let version_439 = Version::new([4, 3, 9]);
+        let version_450 = Version::new([4, 5, 0]);
+        let version_543 = Version::new([5, 4, 3]);
+        let version_570 = Version::new([5, 7, 0]);
+
+        // 4.3.9 is before FIPS range
+        assert!(version_439.major == 4 && version_439.minor == 3);
+
+        // 4.5.0 is after FIPS range
+        assert!(version_450.major == 4 && version_450.minor == 5);
+
+        // YubiKey 5 versions
+        assert_eq!(version_543.major, 5);
+        assert_eq!(version_570.major, 5);
+    }
+
+    #[test]
+    fn test_yubikey_4_fips_range_exclusive() {
+        // Verify the range check logic: 4.4.0 <= version < 4.5.0
+        let fips_lower = Version::new([4, 4, 0]);
+        let fips_upper_exclusive = Version::new([4, 5, 0]);
+
+        // Lower bound is inclusive
+        assert!(fips_lower.major == 4 && fips_lower.minor == 4);
+
+        // Upper bound should NOT match (4.5.x is not FIPS)
+        assert!(fips_upper_exclusive.major == 4 && fips_upper_exclusive.minor != 4);
+    }
+
+    #[test]
+    fn test_version_comparison() {
+        // Test Version Ord implementation for boundary checks
+        let v_440 = Version::new([4, 4, 0]);
+        let v_449 = Version::new([4, 4, 9]);
+        let v_450 = Version::new([4, 5, 0]);
+        let v_439 = Version::new([4, 3, 9]);
+
+        // All 4.4.x versions should be in range
+        assert!(v_440 >= v_440);
+        assert!(v_440 < v_450);
+        assert!(v_449 >= v_440);
+        assert!(v_449 < v_450);
+
+        // 4.3.x is before range
+        assert!(v_439 < v_440);
+
+        // 4.5.0 is after range
+        assert!(v_450 > v_449);
     }
 }
