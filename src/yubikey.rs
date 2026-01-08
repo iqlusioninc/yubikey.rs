@@ -500,7 +500,9 @@ impl YubiKey {
     ///
     /// - **Firmware 5.7+**: Uses TAG_FIPS_CAPABLE (0x14)
     /// - **Firmware 5.4.3+**: Uses FORM_FACTOR bit 7 (0x80) fallback
-    /// - **YubiKey 4 FIPS (4.4.x)**: Uses version-based detection
+    /// - **YubiKey 4 FIPS**:
+    ///   - **4.4.5 only**: Valid historical certificate (CMVP #3517) - returns `Ok(true)`
+    ///   - **All other 4.4.x**: Returns `Ok(false)` (revoked or undocumented certificates)
     ///
     /// # Example
     ///
@@ -526,8 +528,15 @@ impl YubiKey {
 
         // YubiKey 4 FIPS: firmware 4.4.x (version-based detection)
         // Standard YubiKey 4 uses firmware 4.2.x-4.3.x, so no overlap
-        // This approach matches official Yubico SDKs (ykman and .NET SDK)
-        if version.major == 4 && version.minor == 4 {
+        //
+        // IMPORTANT: Only firmware 4.4.5 has a valid FIPS certificate.
+        // - 4.4.5: Valid historical certificate (CMVP #3517)
+        // - 4.4.2, 4.4.4: Certificates revoked (CMVP #3204)
+        // - Other 4.4.x: No documented valid certificates
+        //
+        // We conservatively only accept 4.4.5 to ensure users don't rely on
+        // revoked or undocumented certificates.
+        if version.major == 4 && version.minor == 4 && version.patch == 5 {
             return Ok(true);
         }
 
@@ -963,18 +972,28 @@ mod tests {
 
     #[test]
     fn test_yubikey_4_fips_version_detection() {
-        // YubiKey 4 FIPS uses firmware 4.4.x
-        let version_440 = Version::new([4, 4, 0]);
+        // Only YubiKey 4 FIPS firmware 4.4.5 has a valid FIPS certificate
         let version_445 = Version::new([4, 4, 5]);
-        let version_449 = Version::new([4, 4, 9]);
 
-        // All 4.4.x versions should be detected as FIPS
-        assert_eq!(version_440.major, 4);
-        assert_eq!(version_440.minor, 4);
+        // Only 4.4.5 should be detected as FIPS-capable
         assert_eq!(version_445.major, 4);
         assert_eq!(version_445.minor, 4);
-        assert_eq!(version_449.major, 4);
-        assert_eq!(version_449.minor, 4);
+        assert_eq!(version_445.patch, 5);
+    }
+
+    #[test]
+    fn test_yubikey_4_fips_invalid_versions() {
+        // These 4.4.x versions should NOT be detected as FIPS-capable
+        let version_440 = Version::new([4, 4, 0]);
+        let version_442 = Version::new([4, 4, 2]); // Revoked cert (CMVP #3204)
+        let version_444 = Version::new([4, 4, 4]); // Revoked cert (CMVP #3204)
+        let version_449 = Version::new([4, 4, 9]);
+
+        // All are 4.4.x but not 4.4.5
+        assert!(version_440.major == 4 && version_440.minor == 4 && version_440.patch != 5);
+        assert!(version_442.major == 4 && version_442.minor == 4 && version_442.patch != 5);
+        assert!(version_444.major == 4 && version_444.minor == 4 && version_444.patch != 5);
+        assert!(version_449.major == 4 && version_449.minor == 4 && version_449.patch != 5);
     }
 
     #[test]

@@ -10,11 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `YubiKey::is_fips()` - Check if PIV application is in FIPS-approved mode
     - Firmware 5.7+: Detects activation status via TAG_FIPS_APPROVED (0x15)
     - Firmware 5.4.3+: Returns `Ok(false)` (TAG_FIPS_APPROVED not available)
-    - YubiKey 4 FIPS (4.4.x): Returns `Ok(false)` (firmware predates FIPS tags)
+    - YubiKey 4 FIPS: Returns `Ok(false)` (firmware predates FIPS tags)
   - `YubiKey::is_fips_capable()` - Check if hardware is FIPS 140-2 Level 2 validated
     - Firmware 5.7+: Uses TAG_FIPS_CAPABLE (0x14)
     - Firmware 5.4.3+: Uses FORM_FACTOR bit 7 (0x80) fallback
-    - YubiKey 4 FIPS (4.4.x): Uses version-based detection
+    - YubiKey 4 FIPS: Only firmware 4.4.5 returns `Ok(true)` (CMVP #3517 - valid historical cert)
   - `mgm::FipsCapability` - Bitflags for FIPS-capable/approved applications (different bit encoding than `Capability`)
   - `mgm::DeviceConfig::fips_capable` - Optional field for FIPS hardware capability
   - `mgm::DeviceConfig::fips_approved` - Optional field for FIPS-approved applications

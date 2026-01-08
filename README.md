@@ -74,7 +74,7 @@ modules (e.g., DoD, Federal agencies).
 **Firmware Support:**
 - **Firmware 5.7+**: Full support via TAG_FIPS_CAPABLE and TAG_FIPS_APPROVED
 - **Firmware 5.4.3+**: `is_fips_capable()` via FORM_FACTOR fallback
-- **YubiKey 4 FIPS (4.4.x)**: `is_fips_capable()` via version-based detection
+- **YubiKey 4 FIPS**: Only firmware 4.4.5 supported (valid CMVP #3517 certificate)
 
 **FIPS Mode Activation:**
 To operate in FIPS-approved mode, the PIN (minimum 6 chars), PUK (minimum 6 chars), and management key must all be changed from defaults.
