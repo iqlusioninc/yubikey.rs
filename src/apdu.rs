@@ -34,6 +34,17 @@ use crate::{transaction::Transaction, Buffer, Result};
 use log::trace;
 use zeroize::{Zeroize, Zeroizing};
 
+pub(crate) trait UseLE {
+    const LE: bool = false;
+}
+
+pub(crate) struct NoLE;
+impl UseLE for NoLE {}
+pub(crate) struct LE;
+impl UseLE for LE {
+    const LE: bool = true;
+}
+
 /// Maximum amount of command data that can be included in an APDU
 const APDU_DATA_MAX: usize = 0xFF;
 
@@ -115,15 +126,15 @@ impl Apdu {
     }
 
     /// Transmit this APDU using the given card transaction
-    pub fn transmit(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response> {
+    pub fn transmit<L: UseLE>(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response> {
         trace!(">>> {:?}", self);
-        let response = Response::from(txn.transmit(&self.to_bytes(), recv_len)?);
+        let response = Response::from(txn.transmit(&self.to_bytes::<L>(), recv_len)?);
         trace!("<<< {:?}", &response);
         Ok(response)
     }
 
     /// Serialize this APDU as a self-zeroizing byte buffer
-    pub fn to_bytes(&self) -> Buffer {
+    pub fn to_bytes<L: UseLE>(&self) -> Buffer {
         let mut bytes = Vec::with_capacity(5 + self.data.len());
         bytes.push(self.cla);
         bytes.push(self.ins.code());
@@ -131,6 +142,11 @@ impl Apdu {
         bytes.push(self.p2);
         bytes.push(self.data.len() as u8);
         bytes.extend_from_slice(self.data.as_ref());
+        // We should advertise we request extended payload
+        if L::LE {
+            bytes.push(0);
+            bytes.push(0);
+        }
         Zeroizing::new(bytes)
     }
 }
@@ -213,6 +229,21 @@ pub enum Ins {
     /// Management // DeviceReset
     DeviceReset,
 
+    /// YubiHSM Auth // Calculate session keys
+    Calculate,
+
+    /// YubiHSM Auth // Get challenge
+    GetHostChallenge,
+
+    /// YubiHSM Auth // List credentials
+    ListCredentials,
+
+    /// YubiHSM Auth // Put credential
+    PutCredential,
+
+    /// YubiHSM Auth // Delete credential
+    DeleteCredential,
+
     /// Other/unrecognized instruction codes
     Other(u8),
 }
@@ -244,6 +275,13 @@ impl Ins {
             Ins::WriteConfig => 0x1c,
             Ins::DeviceReset => 0x1f,
 
+            // Yubihsm auth
+            Ins::PutCredential => 0x01,
+            Ins::DeleteCredential => 0x02,
+            Ins::Calculate => 0x03,
+            Ins::GetHostChallenge => 0x04,
+            Ins::ListCredentials => 0x05,
+
             Ins::Other(code) => code,
         }
     }
@@ -257,6 +295,11 @@ impl From<u8> for Ins {
             0x1c => Ins::WriteConfig,
             0x1f => Ins::DeviceReset,
 
+            0x01 => Ins::PutCredential,
+            0x02 => Ins::DeleteCredential,
+            0x03 => Ins::Calculate,
+            0x04 => Ins::GetHostChallenge,
+            0x05 => Ins::ListCredentials,
             0x20 => Ins::Verify,
             0x24 => Ins::ChangeReference,
             0x2c => Ins::ResetRetry,

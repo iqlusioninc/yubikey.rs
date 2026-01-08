@@ -5,7 +5,7 @@
 
 use log::trace;
 use once_cell::sync::Lazy;
-use rand_core::{OsRng, RngCore, TryRngCore};
+use rand_core::RngCore;
 use rsa::{pkcs1v15, RsaPublicKey};
 use sha2::{Digest, Sha256};
 use signature::hazmat::PrehashVerifier;
@@ -114,7 +114,7 @@ fn test_verify_pin() {
 #[test]
 #[ignore]
 fn test_set_mgmkey() {
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
     let mut yubikey = YUBIKEY.lock().unwrap();
     let default_key = MgmKey::get_default(&yubikey).unwrap();
 
@@ -173,7 +173,7 @@ fn generate_self_signed_cert<KT: yubikey_signer::KeyType>() -> Certificate {
     // 0x80 0x00 ... (20bytes) is invalid because of high MSB (serial will keep the sign)
     // we'll limit ourselves to 19 bytes serial.
     let mut serial = [0u8; 19];
-    let mut rng = OsRng.unwrap_err();
+    let mut rng = rand::rng();
     rng.fill_bytes(&mut serial);
     let serial = SerialNumber::new(&serial[..]).expect("serial can't be more than 20 bytes long");
     let validity = Validity::from_now(Duration::new(500000, 0)).unwrap();
