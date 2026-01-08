@@ -35,3 +35,6 @@ pub(crate) const TAG_UNLOCK: u8 = 0x0B;
 pub(crate) const TAG_REBOOT: u8 = 0x0C;
 pub(crate) const TAG_NFC_SUPPORTED: u8 = 0x0D;
 pub(crate) const TAG_NFC_ENABLED: u8 = 0x0E;
+pub(crate) const TAG_MORE_DATA: u8 = 0x10;
+pub(crate) const TAG_FIPS_CAPABLE: u8 = 0x14;
+pub(crate) const TAG_FIPS_APPROVED: u8 = 0x15;
