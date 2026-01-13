@@ -82,6 +82,35 @@ fn test_get_config() {
 }
 
 //
+// FIPS detection support
+//
+
+#[test]
+#[ignore]
+fn test_is_fips() {
+    let mut yubikey = YUBIKEY.lock().unwrap();
+
+    // Should return Ok(bool), not an error
+    let fips_result = yubikey.is_fips();
+    assert!(
+        fips_result.is_ok(),
+        "is_fips() should not error: {:?}",
+        fips_result.err()
+    );
+
+    let is_fips = fips_result.unwrap();
+    trace!("FIPS status: {}", is_fips);
+
+    // Log the serial and version for context
+    trace!(
+        "Serial: {}, Version: {}, FIPS: {}",
+        yubikey.serial(),
+        yubikey.version(),
+        is_fips
+    );
+}
+
+//
 // Cryptographic key support
 //
 
