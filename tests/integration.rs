@@ -43,7 +43,10 @@ static YUBIKEY: Lazy<Mutex<YubiKey>> = Lazy::new(|| {
 #[test]
 #[ignore]
 fn test_get_cccid() {
-    let mut yubikey = YUBIKEY.lock().unwrap();
+    let mut yubikey = match YUBIKEY.lock() {
+        Ok(yubikey) => yubikey,
+        Err(poison) => poison.into_inner(),
+    };
 
     match yubikey.cccid() {
         Ok(cccid) => trace!("CCCID: {:?}", cccid),
@@ -59,7 +62,10 @@ fn test_get_cccid() {
 #[test]
 #[ignore]
 fn test_get_chuid() {
-    let mut yubikey = YUBIKEY.lock().unwrap();
+    let mut yubikey = match YUBIKEY.lock() {
+        Ok(yubikey) => yubikey,
+        Err(poison) => poison.into_inner(),
+    };
 
     match yubikey.chuid() {
         Ok(chuid) => trace!("CHUID: {:?}", chuid),
@@ -75,7 +81,10 @@ fn test_get_chuid() {
 #[test]
 #[ignore]
 fn test_get_config() {
-    let mut yubikey = YUBIKEY.lock().unwrap();
+    let mut yubikey = match YUBIKEY.lock() {
+        Ok(yubikey) => yubikey,
+        Err(poison) => poison.into_inner(),
+    };
     let config_result = yubikey.config();
     assert!(config_result.is_ok());
     trace!("config: {:?}", config_result.unwrap());
@@ -88,7 +97,10 @@ fn test_get_config() {
 #[test]
 #[ignore]
 fn test_list_keys() {
-    let mut yubikey = YUBIKEY.lock().unwrap();
+    let mut yubikey = match YUBIKEY.lock() {
+        Ok(yubikey) => yubikey,
+        Err(poison) => poison.into_inner(),
+    };
     let keys_result = Key::list(&mut yubikey);
     assert!(keys_result.is_ok());
     trace!("keys: {:?}", keys_result.unwrap());
@@ -101,7 +113,10 @@ fn test_list_keys() {
 #[test]
 #[ignore]
 fn test_verify_pin() {
-    let mut yubikey = YUBIKEY.lock().unwrap();
+    let mut yubikey = match YUBIKEY.lock() {
+        Ok(yubikey) => yubikey,
+        Err(poison) => poison.into_inner(),
+    };
     assert!(yubikey.verify_pin(b"000000").is_err());
     assert!(yubikey.verify_pin(b"123456").is_ok());
 }
@@ -115,7 +130,10 @@ fn test_verify_pin() {
 #[ignore]
 fn test_set_mgmkey() {
     let mut rng = OsRng;
-    let mut yubikey = YUBIKEY.lock().unwrap();
+    let mut yubikey = match YUBIKEY.lock() {
+        Ok(yubikey) => yubikey,
+        Err(poison) => poison.into_inner(),
+    };
     let default_key = MgmKey::get_default(&yubikey).unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
@@ -269,6 +287,31 @@ fn generate_self_signed_ec_cert() {
 
 #[test]
 #[ignore]
+fn generate_self_signed_cv_cert() {
+    let cert = generate_self_signed_cert::<ed25519_dalek::SigningKey>();
+
+    //
+    // Verify that the certificate is signed correctly
+    //
+
+    let pubkey =
+        ed25519_dalek::VerifyingKey::try_from(cert.subject_pki()).expect("ed25519 key expected");
+
+    let data = cert.cert.to_der().expect("serialize certificate");
+    let cert_len = data[2] as usize;
+    let tbs_cert_len = data[5] as usize;
+    let sig_algo_len: usize = 64;
+    let sig_start = cert_len - sig_algo_len + 3;
+    let msg = &data[3..6 + tbs_cert_len];
+    let sig =
+        ed25519_dalek::Signature::from_slice(&data[sig_start..sig_start + sig_algo_len]).unwrap();
+
+    use ed25519_dalek::Verifier;
+    assert!(pubkey.verify(msg, &sig).is_ok());
+}
+
+#[test]
+#[ignore]
 fn test_slot_id_display() {
     assert_eq!(format!("{}", SlotId::Authentication), "Authentication");
     assert_eq!(format!("{}", SlotId::Signature), "Signature");
@@ -320,7 +363,10 @@ fn test_slot_id_display() {
 #[test]
 #[ignore]
 fn test_read_metadata() {
-    let mut yubikey = YUBIKEY.lock().unwrap();
+    let mut yubikey = match YUBIKEY.lock() {
+        Ok(yubikey) => yubikey,
+        Err(poison) => poison.into_inner(),
+    };
     let default_key = MgmKey::get_default(&yubikey).unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
