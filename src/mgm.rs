@@ -39,7 +39,8 @@ use crate::{
 };
 use bitflags::bitflags;
 use cipher::{
-    typenum::Unsigned, BlockCipherDecrypt, BlockCipherEncrypt, Key, KeyInit, KeySizeUser,
+    common::Generate, typenum::Unsigned, BlockCipherDecrypt, BlockCipherEncrypt, Key, KeyInit,
+    KeySizeUser,
 };
 use log::error;
 use rand::TryCryptoRng;
@@ -69,11 +70,8 @@ pub(crate) const APPLET_NAME: &str = "YubiKey MGMT";
 #[cfg(feature = "untested")]
 pub(crate) const APPLET_ID: &[u8] = &[0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
 
-/// Size of a DES key
-const DES_LEN_DES: usize = 8;
-
-/// Size of a 3DES key
-pub(super) const DES_LEN_3DES: usize = DES_LEN_DES * 3;
+mod tdes;
+pub(crate) use tdes::DES_LEN_3DES;
 
 pub(crate) const ADMIN_FLAGS_1_PROTECTED_MGM: u8 = 0x02;
 
@@ -199,19 +197,19 @@ enum MgmKeyKind {
 
 impl MgmKey {
     /// Generates a random MGM key for the given algorithm.
-    pub fn generate(alg: MgmAlgorithmId, rng: &mut impl TryCryptoRng) -> Result<Self> {
+    pub fn generate<R: TryCryptoRng + ?Sized>(alg: MgmAlgorithmId, rng: &mut R) -> Result<Self> {
         match alg {
             MgmAlgorithmId::ThreeDes => {
-                des::TdesEde3::try_generate_key_with_rng(rng).map(MgmKeyKind::Tdes)
+                Key::<des::TdesEde3>::try_generate_from_rng(rng).map(MgmKeyKind::Tdes)
             }
             MgmAlgorithmId::Aes128 => {
-                aes::Aes128::try_generate_key_with_rng(rng).map(MgmKeyKind::Aes128)
+                Key::<aes::Aes128>::try_generate_from_rng(rng).map(MgmKeyKind::Aes128)
             }
             MgmAlgorithmId::Aes192 => {
-                aes::Aes192::try_generate_key_with_rng(rng).map(MgmKeyKind::Aes192)
+                Key::<aes::Aes192>::try_generate_from_rng(rng).map(MgmKeyKind::Aes192)
             }
             MgmAlgorithmId::Aes256 => {
-                aes::Aes256::try_generate_key_with_rng(rng).map(MgmKeyKind::Aes256)
+                Key::<aes::Aes256>::try_generate_from_rng(rng).map(MgmKeyKind::Aes256)
             }
         }
         .map_err(|e| {
@@ -223,7 +221,7 @@ impl MgmKey {
 
     /// Generates a random MGM key using the preferred algorithm for the given Yubikey's
     /// firmware version.
-    pub fn generate_for(yubikey: &YubiKey, rng: &mut impl TryCryptoRng) -> Result<Self> {
+    pub fn generate_for<R: TryCryptoRng + ?Sized>(yubikey: &YubiKey, rng: &mut R) -> Result<Self> {
         let alg = MgmAlgorithmId::default_for_version(yubikey.version());
         Self::generate(alg, rng)
     }
@@ -295,7 +293,9 @@ impl MgmKey {
 
         let mut mgm = Key::<des::TdesEde3>::default();
         pbkdf2_hmac::<Sha1>(pin, salt, ITER_MGM_PBKDF2, &mut mgm);
-        des::TdesEde3::weak_key_test(&mgm).map_err(|_| Error::KeyError)?;
+        if tdes::is_weak_key(mgm.as_ref()) {
+            return Err(Error::KeyError);
+        }
         Ok(Self(MgmKeyKind::Tdes(mgm)))
     }
 
@@ -480,7 +480,9 @@ impl MgmKey {
             MgmAlgorithmId::ThreeDes => {
                 let key =
                     Key::<des::TdesEde3>::try_from(bytes.as_ref()).map_err(|_| Error::SizeError)?;
-                des::TdesEde3::weak_key_test(&key).map_err(|_| Error::KeyError)?;
+                if tdes::is_weak_key(key.as_ref()) {
+                    return Err(Error::KeyError);
+                }
                 Ok(MgmKeyKind::Tdes(key))
             }
             MgmAlgorithmId::Aes128 => Key::<aes::Aes128>::try_from(bytes.as_ref())

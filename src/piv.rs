@@ -53,7 +53,7 @@ use crate::{
     yubikey::YubiKey,
     Buffer, ObjectId,
 };
-use elliptic_curve::{sec1::EncodedPoint as EcPublicKey, PublicKey};
+use elliptic_curve::{sec1::Sec1Point as EcPublicKey, PublicKey};
 use log::{debug, error, warn};
 use p256::NistP256;
 use p384::NistP384;
