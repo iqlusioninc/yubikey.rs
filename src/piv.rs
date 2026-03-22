@@ -599,7 +599,13 @@ impl Key {
             };
 
             if !buf.is_empty() {
-                let cert = Certificate::from_bytes(buf)?;
+                let cert = match Certificate::from_bytes(buf) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        debug!("error parsing certificate in slot {:?}: {}", slot, e);
+                        continue;
+                    }
+                };
                 keys.push(Key { slot, cert });
             }
         }

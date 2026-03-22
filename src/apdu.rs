@@ -114,11 +114,31 @@ impl Apdu {
         self
     }
 
-    /// Transmit this APDU using the given card transaction
+    /// Transmit this APDU using the given card transaction.
+    ///
+    /// Handles ISO 7816-4 `SW1=61` (bytes remaining) responses by issuing
+    /// [`Ins::GetResponseApdu`] commands until all response data is collected.
     pub fn transmit(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response> {
         trace!(">>> {:?}", self);
-        let response = Response::from(txn.transmit(&self.to_bytes(), recv_len)?);
+        let mut response = Response::from(txn.transmit(&self.to_bytes(), recv_len)?);
         trace!("<<< {:?}", &response);
+
+        if let StatusWords::BytesRemaining { .. } = response.status_words() {
+            let mut data = response.data().to_vec();
+            let mut sw = response.status_words();
+
+            while let StatusWords::BytesRemaining { .. } = sw {
+                let next = Response::from(
+                    txn.transmit(&Apdu::new(Ins::GetResponseApdu).to_bytes(), recv_len)?,
+                );
+                trace!("<<< {:?}", &next);
+                data.extend_from_slice(next.data());
+                sw = next.status_words();
+            }
+
+            response = Response::new(sw, data);
+        }
+
         Ok(response)
     }
 
