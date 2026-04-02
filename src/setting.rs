@@ -41,7 +41,7 @@ use std::{
 };
 
 /// Source of how a setting was configured.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum SettingSource {
     /// User-specified setting: sourced via `YUBIKEY_PIV_*` environment vars.
     User,
@@ -51,13 +51,8 @@ pub enum SettingSource {
     Admin,
 
     /// Default setting.
+    #[default]
     Default,
-}
-
-impl Default for SettingSource {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 /// Setting booleans: configuration values sourced from a file or the environment.

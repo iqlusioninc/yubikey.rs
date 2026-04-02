@@ -25,8 +25,7 @@ Rust **1.60** or newer.
 - [YubiKey 4] series
 - [YubiKey 5] series
 
-NOTE: Nano and USB-C variants of the above are also supported.
-      Pre-YK4 [YubiKey NEO] series is **NOT** supported (see [#18]).
+NOTE: Nano and USB-C variants of the above are also supported. NEO series is NOT supported.
 
 ## Security Warning
 
@@ -84,7 +83,7 @@ or conditions.
 [docs-image]: https://docs.rs/yubikey-cli/badge.svg
 [docs-link]: https://docs.rs/yubikey-cli/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
-[rustc-image]: https://img.shields.io/badge/rustc-1.60+-blue.svg
+[rustc-image]: https://img.shields.io/badge/rustc-1.85+-blue.svg
 [maintenance-image]: https://img.shields.io/badge/maintenance-experimental-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
@@ -98,7 +97,6 @@ or conditions.
 [PIV]: https://piv.idmanagement.gov/
 [yk-guide]: https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html
 [Yubico]: https://www.yubico.com/
-[YubiKey NEO]: https://support.yubico.com/support/solutions/articles/15000006494-yubikey-neo
 [YubiKey 4]: https://support.yubico.com/support/solutions/articles/15000006486-yubikey-4
 [YubiKey 5]: https://www.yubico.com/products/yubikey-5-overview/
 [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/
