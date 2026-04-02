@@ -1,6 +1,6 @@
 [package]
 name = "yubikey"
-version = "0.8.0"
+version = "0.9.0-pre"
 description = """
 Pure Rust cross-platform host-side driver for YubiKey devices from Yubico with
 support for hardware-backed public-key decryption and digital signatures using
@@ -20,36 +20,35 @@ rust-version = "1.85"
 members = [".", "cli"]
 
 [workspace.dependencies]
-sha2 = "0.11.0-rc.2"
-x509-cert = { version = "0.3.0-rc.2", features = ["builder", "hazmat"] }
+sha2 = "0.11"
+x509-cert = { version = "0.3.0-rc.4", features = ["builder", "hazmat"] }
 
 [dependencies]
-aes = { version = "0.9.0-rc.1", features = ["zeroize"] }
+aes = { version = "0.9.0-rc.4", features = ["zeroize"] }
 bitflags = "2.5.0"
-cipher = { version = "0.5.0-rc.1", features = ["rand_core"] }
-der = "0.8.0-rc.9"
-des = "0.9.0-rc.1"
-elliptic-curve = "0.14.0-rc.13"
+cipher = { version = "0.5", features = ["getrandom", "rand_core"] }
+curve25519-dalek = "5.0.0-pre.6"
+der = "0.8"
+des = "0.9.0-rc.3"
+ecdsa = { version = "0.17.0-rc.16", features = ["digest", "pem"] }
+ed25519-dalek = { version = "3.0.0-pre.6", features = ["alloc", "pkcs8"] }
+elliptic-curve = "0.14.0-rc.29"
 hex = { package = "base16ct", version = "0.2", features = ["alloc"] }
 log = "0.4"
 nom = "8"
-ecdsa = { version = "0.17.0-rc.6", features = ["digest", "pem"] }
-p256 = "=0.14.0-pre.11"
-p384 = "=0.14.0-pre.11"
-pbkdf2 = { version = "0.13.0-rc.1", default-features = false, features = ["hmac"] }
-curve25519-dalek = "5.0.0-pre.0"
-x25519-dalek = "3.0.0-pre.0"
-ed25519-dalek = { version = "3.0.0-pre.0", features = ["alloc", "pkcs8"] }
+p256 = "0.14.0-rc.8"
+p384 = "0.14.0-rc.8"
+pbkdf2 = { version = "0.13.0-rc.10", default-features = false, features = ["hmac"] }
 pcsc = "2.3.1"
-rand = "0.9"
-rand_core = { version = "0.9", features = ["os_rng"] }
-rsa = { version = "0.10.0-rc.8", features = ["sha2"] }
-secrecy = "0.8"
-sha1 = { version = "0.11.0-rc.2", features = ["oid"] }
+rand = "0.10"
+rand_core = "0.10"
+rsa = { version = "0.10.0-rc.17", features = ["sha2"] }
+sha1 = { version = "0.11", features = ["oid"] }
 sha2 = { workspace = true, features = ["oid"] }
-signature = "3.0.0-rc.4"
+signature = "3.0.0-rc.10"
 subtle = "2"
 uuid = { version = "1.2", features = ["v4"] }
+x25519-dalek = "3.0.0-pre.6"
 x509-cert.workspace = true
 zeroize = "1"
 

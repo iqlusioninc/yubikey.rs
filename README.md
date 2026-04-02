@@ -54,13 +54,14 @@ See [Yubico's guide to PIV-enabled YubiKeys][yk-guide] for more information
 on which devices support PIV and the available functionality.
 
 ### Supported Algorithms
+
 - **Authentication**: `3DES`
 - **Encryption**:
-  - RSA: `RSA1024`, `RSA2048`, `RSA3072`, `RSA4096`
-  - ECC: `ECCP256`, `ECCP384` (NIST curves: P-256, P-384)
+    - RSA: `RSA1024`, `RSA2048`, `RSA3072`, `RSA4096`
+    - ECC: `ECCP256`, `ECCP384` (NIST curves: P-256, P-384)
 - **Signatures**:
-  - RSASSA-PKCS#1v1.5: `RSA1024`, `RSA2048`, `RSA3072`, `RSA4096`
-  - ECDSA: `ECCP256`, `ECCP384` (NIST curves: P-256, P-384)
+    - RSASSA-PKCS#1v1.5: `RSA1024`, `RSA2048`, `RSA3072`, `RSA4096`
+    - ECDSA: `ECCP256`, `ECCP384` (NIST curves: P-256, P-384)
 
 NOTE:
 
@@ -76,8 +77,7 @@ Rust **1.60** or newer.
 - [YubiKey 4] series
 - [YubiKey 5] series
 
-NOTE: Nano and USB-C variants of the above are also supported.
-      Pre-YK4 [YubiKey NEO] series is **NOT** supported (see [#18]).
+NOTE: Nano and USB-C variants of the above are also supported. NEO series is NOT supported.
 
 ## Supported Operating Systems
 
@@ -105,8 +105,8 @@ We would appreciate any help testing this functionality and removing the
 
 ## Testing
 
-To run the full test suite, you'll need a connected YubiKey NEO/4/5 device in
-the default state (i.e. default PIN/PUK).
+To run the full test suite, you'll need a supported YubiKey device connected
+which is in the default state (i.e. default PIN/PUK).
 
 Tests which run live against a YubiKey device are marked as `#[ignore]` by
 default in order to pass when running in a CI environment. To run these
@@ -217,7 +217,7 @@ or conditions.
 [docs-link]: https://docs.rs/yubikey/
 [license-image]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-link]: https://github.com/iqlusioninc/yubikey.rs/blob/main/COPYING
-[msrv-image]: https://img.shields.io/badge/rustc-1.81+-blue.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.85+-blue.svg
 [safety-image]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 [safety-link]: https://github.com/rust-secure-code/safety-dance/
 [build-image]: https://github.com/iqlusioninc/yubikey.rs/actions/workflows/ci.yml/badge.svg
@@ -234,7 +234,6 @@ or conditions.
 [PC/SC]: https://en.wikipedia.org/wiki/PC/SC
 [`pcsc` crate]: https://github.com/bluetech/pcsc-rust
 [yk-guide]: https://developers.yubico.com/PIV/Introduction/YubiKey_and_PIV.html
-[YubiKey NEO]: https://support.yubico.com/support/solutions/articles/15000006494-yubikey-neo
 [YubiKey 4]: https://support.yubico.com/support/solutions/articles/15000006486-yubikey-4
 [YubiKey 5]: https://www.yubico.com/products/yubikey-5-overview/
 [yubico-piv-tool]: https://github.com/Yubico/yubico-piv-tool/

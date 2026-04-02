@@ -41,9 +41,10 @@ use crate::{
     reader::{Context, Reader},
     transaction::Transaction,
 };
+use cipher::common::getrandom::SysRng;
 use log::{error, info};
 use pcsc::Card;
-use rand_core::{OsRng, RngCore, TryRngCore};
+use rand_core::TryRng;
 use std::{
     cmp::{Ord, Ordering},
     fmt::{self, Display},
@@ -60,7 +61,6 @@ use {
         transaction::ChangeRefAction,
         Buffer, ObjectId,
     },
-    secrecy::ExposeSecret,
     std::time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -77,7 +77,8 @@ pub(crate) const KEY_CARDMGM: u8 = 0x9b;
 const TAG_DYN_AUTH: u8 = 0x7c;
 
 /// Cached YubiKey PIN.
-pub type CachedPin = secrecy::SecretVec<u8>;
+// TODO(tarcieri): add a newtype for this with a zeroize impl
+pub type CachedPin = Vec<u8>;
 
 /// YubiKey serial number.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -320,10 +321,7 @@ impl YubiKey {
             pcsc::Disposition::ResetCard,
         )?;
 
-        let pin = self
-            .pin
-            .as_ref()
-            .map(|p| Buffer::new(p.expose_secret().clone()));
+        let pin = self.pin.as_ref().map(|p| Buffer::new(p.clone()));
 
         let txn = Transaction::new(&mut self.card)?;
         txn.select_piv_application()?;
@@ -443,8 +441,9 @@ impl YubiKey {
         data.push(challenge_len as u8);
 
         let mut host_challenge = vec![0u8; challenge_len];
-        let mut rng = OsRng.unwrap_err();
-        rng.fill_bytes(&mut host_challenge);
+        SysRng
+            .try_fill_bytes(&mut host_challenge)
+            .map_err(|_| Error::GenericError)?;
 
         data.extend_from_slice(&host_challenge);
 
@@ -501,7 +500,7 @@ impl YubiKey {
         }
 
         if !pin.is_empty() {
-            self.pin = Some(CachedPin::new(pin.into()))
+            self.pin = Some(pin.into())
         }
 
         Ok(())
@@ -557,7 +556,7 @@ impl YubiKey {
         }
 
         if !new_pin.is_empty() {
-            self.pin = Some(CachedPin::new(new_pin.into()));
+            self.pin = Some(new_pin.into());
         }
 
         Ok(())
