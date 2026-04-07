@@ -3,7 +3,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
 
-use cipher::common::{getrandom::SysRng, Generate};
+#[cfg(feature = "untested")]
+use cipher::common::getrandom::SysRng;
+use cipher::common::Generate;
 use log::trace;
 use once_cell::sync::Lazy;
 use rsa::{pkcs1v15, RsaPublicKey};

@@ -20,10 +20,10 @@ use crate::mgm::{DeviceConfig, DeviceInfo, Lock};
 
 const CB_PIN_MAX: usize = 8;
 
-#[cfg(feature = "untested")]
 pub(crate) enum ChangeRefAction {
     ChangePin,
     ChangePuk,
+    #[cfg(feature = "untested")]
     UnblockPin,
 }
 
@@ -205,7 +205,6 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Change the PIN.
-    #[cfg(feature = "untested")]
     pub fn change_ref(
         &self,
         action: ChangeRefAction,
@@ -222,6 +221,7 @@ impl<'tx> Transaction<'tx> {
         let templ = match action {
             ChangeRefAction::ChangePin => [0, Ins::ChangeReference.code(), 0, PIN],
             ChangeRefAction::ChangePuk => [0, Ins::ChangeReference.code(), 0, PUK],
+            #[cfg(feature = "untested")]
             ChangeRefAction::UnblockPin => [0, Ins::ResetRetry.code(), 0, PIN],
         };
 
