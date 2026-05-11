@@ -309,6 +309,10 @@ pub mod yubikey_signer {
 
         /// Prepare buffer before submitting it for signature
         fn prepare(input: &[u8]) -> SigResult<Vec<u8>>;
+
+        /// Prepare a prehashed message before submitting it for signature
+        fn prepare_prehash(hashed: &[u8]) -> SigResult<Vec<u8>>;
+
         /// Read back the signature from the device
         fn read_signature(input: &[u8]) -> SigResult<Self::Signature>;
     }
@@ -340,6 +344,10 @@ pub mod yubikey_signer {
             Ok(Sha256::digest(input).to_vec())
         }
 
+        fn prepare_prehash(hashed: &[u8]) -> SigResult<Vec<u8>> {
+            Ok(hashed.to_vec())
+        }
+
         fn read_signature(input: &[u8]) -> SigResult<Self::Signature> {
             Self::Signature::from_bytes(input)
         }
@@ -354,6 +362,10 @@ pub mod yubikey_signer {
 
         fn prepare(input: &[u8]) -> SigResult<Vec<u8>> {
             Ok(Sha384::digest(input).to_vec())
+        }
+
+        fn prepare_prehash(hashed: &[u8]) -> SigResult<Vec<u8>> {
+            Ok(hashed.to_vec())
         }
 
         fn read_signature(input: &[u8]) -> SigResult<Self::Signature> {
@@ -415,7 +427,10 @@ pub mod yubikey_signer {
 
         fn prepare(input: &[u8]) -> SigResult<Vec<u8>> {
             let hashed = Sha256::digest(input).to_vec();
+            Self::prepare_prehash(&hashed)
+        }
 
+        fn prepare_prehash(hashed: &[u8]) -> SigResult<Vec<u8>> {
             OctetString::new(hashed)
                 .map_err(|e| e.into())
                 .and_then(Self::emsa_pkcs1_1_5)
@@ -503,6 +518,22 @@ pub mod yubikey_signer {
     impl<KT: KeyType> signature::Signer<KT::Signature> for Signer<'_, KT> {
         fn try_sign(&self, msg: &[u8]) -> SigResult<KT::Signature> {
             let data = KT::prepare(msg)?;
+
+            let out = sign_data(
+                &mut self.yubikey.borrow_mut(),
+                &data,
+                KT::ALGORITHM,
+                self.key,
+            )
+            .map_err(signature::Error::from_source)?;
+            let out = KT::read_signature(&out)?;
+            Ok(out)
+        }
+    }
+
+    impl<KT: KeyType> signature::hazmat::PrehashSigner<KT::Signature> for Signer<'_, KT> {
+        fn sign_prehash(&self, hashed: &[u8]) -> SigResult<KT::Signature> {
+            let data = KT::prepare_prehash(hashed)?;
 
             let out = sign_data(
                 &mut self.yubikey.borrow_mut(),
