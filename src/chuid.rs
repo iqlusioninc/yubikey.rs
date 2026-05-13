@@ -112,7 +112,6 @@ impl ChuId {
     }
 
     /// Set Cardholder Unique Identifier (CHUID)
-    #[cfg(feature = "untested")]
     pub fn set(&self, yubikey: &mut YubiKey) -> Result<()> {
         let mut buf = CHUID_TMPL.to_vec();
         buf[..Self::BYTE_SIZE].copy_from_slice(&self.0);

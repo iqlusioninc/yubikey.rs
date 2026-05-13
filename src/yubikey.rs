@@ -39,7 +39,7 @@ use crate::{
     mgm::MgmKey,
     piv,
     reader::{Context, Reader},
-    transaction::Transaction,
+    transaction::{ChangeRefAction, Transaction},
 };
 use cipher::common::getrandom::SysRng;
 use log::{error, info};
@@ -58,7 +58,6 @@ use {
         consts::{TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP},
         metadata::AdminData,
         mgm,
-        transaction::ChangeRefAction,
         Buffer, ObjectId,
     },
     std::time::{SystemTime, UNIX_EPOCH},
@@ -548,7 +547,6 @@ impl YubiKey {
     /// Change the Personal Identification Number (PIN).
     ///
     /// The default PIN code is `123456`.
-    #[cfg(feature = "untested")]
     pub fn change_pin(&mut self, current_pin: &[u8], new_pin: &[u8]) -> Result<()> {
         {
             let txn = self.begin_transaction()?;
@@ -593,7 +591,6 @@ impl YubiKey {
     /// The PUK is part of the PIV standard that the YubiKey follows.
     ///
     /// The default PUK code is `12345678`.
-    #[cfg(feature = "untested")]
     pub fn change_puk(&mut self, current_puk: &[u8], new_puk: &[u8]) -> Result<()> {
         let txn = self.begin_transaction()?;
         txn.change_ref(ChangeRefAction::ChangePuk, current_puk, new_puk)
@@ -733,7 +730,6 @@ impl YubiKey {
     /// WARNING: this is a destructive operation which will destroy all keys!
     ///
     /// The reset function is only available when both pins are blocked.
-    #[cfg(feature = "untested")]
     pub fn reset_device(&mut self) -> Result<()> {
         let templ = [0, Ins::Reset.code(), 0, 0];
         let txn = self.begin_transaction()?;
