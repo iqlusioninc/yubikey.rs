@@ -643,11 +643,11 @@ pub fn generate(
         AlgorithmId::Rsa1024
         | AlgorithmId::Rsa2048
         | AlgorithmId::Rsa3072
-        | AlgorithmId::Rsa4096 => {
+        | AlgorithmId::Rsa4096
             if yubikey.version.major == 4
                 && (yubikey.version.minor < 3
                     || yubikey.version.minor == 3 && (yubikey.version.patch < 5))
-            {
+            => {
                 setting_roca = setting::Setting::get(SZ_SETTING_ROCA, true);
 
                 let psz_msg = match setting_roca.source {
@@ -680,7 +680,6 @@ pub fn generate(
                     return Err(Error::NotSupported);
                 }
             }
-        }
         _ => (),
     }
 
