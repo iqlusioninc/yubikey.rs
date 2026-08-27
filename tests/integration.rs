@@ -3,7 +3,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
 
-use cipher::common::{getrandom::SysRng, Generate};
+#[cfg(feature = "untested")]
+use cipher::common::getrandom::SysRng;
+use cipher::common::Generate;
 use log::trace;
 use once_cell::sync::Lazy;
 use rsa::{pkcs1v15, RsaPublicKey};
@@ -13,14 +15,17 @@ use std::{env, str::FromStr, sync::Mutex, time::Duration};
 use x509_cert::{der::Encode, name::Name, serial_number::SerialNumber, time::Validity};
 use yubikey::{
     certificate::{yubikey_signer, Certificate},
+    hsmauth,
     piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
     Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
 };
 
-static YUBIKEY: Lazy<Mutex<YubiKey>> = Lazy::new(|| {
+static YUBIKEY: Lazy<Mutex<YubiKey>> = Lazy::new(|| Mutex::new(open_test_yubikey()));
+
+fn open_test_yubikey() -> YubiKey {
     // Only show logs if `RUST_LOG` is set
     if env::var("RUST_LOG").is_ok() {
-        env_logger::builder().format_timestamp(None).init();
+        let _ = env_logger::builder().format_timestamp(None).try_init();
     }
 
     let yubikey = if let Ok(serial) = env::var("YUBIKEY_SERIAL") {
@@ -33,8 +38,8 @@ static YUBIKEY: Lazy<Mutex<YubiKey>> = Lazy::new(|| {
     trace!("serial: {}", yubikey.serial());
     trace!("version: {}", yubikey.version());
 
-    Mutex::new(yubikey)
-});
+    yubikey
+}
 
 //
 // CCCID support
@@ -437,6 +442,111 @@ fn test_read_metadata_missing_key() {
     }
 
     panic!("No empty slots to check");
+}
+
+struct HsmAuthTestCleanup {
+    hsmauth: hsmauth::HsmAuth,
+    labels: Vec<String>,
+}
+
+impl Drop for HsmAuthTestCleanup {
+    fn drop(&mut self) {
+        for label in &self.labels {
+            let parsed = hsmauth::Label::from_str(label).expect("valid hsmauth label");
+            if let Err(err) = self.hsmauth.delete_credential(None, parsed) {
+                eprintln!("failed to clean up YubiHSM Auth test credential `{label}`: {err}");
+            }
+        }
+    }
+}
+
+#[test]
+#[ignore]
+fn test_hsmauth_list_credentials_large_response() {
+    if env::var("YUBIKEY_HSMAUTH_TEST").is_err() {
+        eprintln!("skipping destructive hsmauth test; set YUBIKEY_HSMAUTH_TEST=1 to run it");
+        return;
+    }
+
+    let yubikey = open_test_yubikey();
+    let serial = yubikey.serial();
+    let mut hsmauth = match yubikey.hsmauth() {
+        Ok(hsmauth) => hsmauth,
+        Err(Error::AppletNotFound { .. }) => {
+            eprintln!("YubiHSM Auth applet not available on this device");
+            return;
+        }
+        Err(err) => panic!("failed to open YubiHSM Auth applet: {err}"),
+    };
+
+    let existing = match hsmauth.list_credentials() {
+        Ok(credentials) => credentials,
+        Err(Error::NotSupported) => {
+            eprintln!("YubiHSM Auth applet not supported on this device");
+            return;
+        }
+        Err(err) => panic!("failed to list YubiHSM Auth credentials: {err}"),
+    };
+
+    if existing.len() > 12 {
+        eprintln!(
+            "skipping hsmauth large-response test; device already has {} credentials and this test needs room for 20 more",
+            existing.len()
+        );
+        return;
+    }
+
+    let labels: Vec<String> = (0..20)
+        .map(|i| format!("ykrs-hsmauth-{serial}-{i:02}"))
+        .collect();
+
+    for label in &labels {
+        let label = hsmauth::Label::from_str(label).expect("valid hsmauth label");
+        let _ = hsmauth.delete_credential(None, label);
+    }
+
+    let mut cleanup = HsmAuthTestCleanup { hsmauth, labels };
+
+    let password = b"0123456789abcdef";
+    let enc_key = [0x11; 16];
+    let mac_key = [0x22; 16];
+
+    for label in &cleanup.labels {
+        cleanup
+            .hsmauth
+            .put_credential(
+                None,
+                hsmauth::Label::from_str(label).expect("valid hsmauth label"),
+                password,
+                enc_key,
+                mac_key,
+                false,
+            )
+            .unwrap_or_else(|err| {
+                panic!("failed to create YubiHSM Auth credential `{label}`: {err}")
+            });
+    }
+
+    let credentials = cleanup
+        .hsmauth
+        .list_credentials()
+        .expect("listing YubiHSM Auth credentials after inserting 20 entries should succeed");
+
+    assert!(
+        credentials.len() >= cleanup.labels.len(),
+        "expected at least {} credentials, got {}",
+        cleanup.labels.len(),
+        credentials.len()
+    );
+
+    for label in &cleanup.labels {
+        assert!(
+            credentials
+                .iter()
+                .any(|credential| credential.label == label.as_bytes()),
+            "missing test credential `{label}` in list_credentials() response"
+        );
+    }
 }
 
 #[test]

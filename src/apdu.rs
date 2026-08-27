@@ -119,8 +119,26 @@ impl Apdu {
     /// Handles ISO 7816-4 `SW1=61` (bytes remaining) responses by issuing
     /// [`Ins::GetResponseApdu`] commands until all response data is collected.
     pub fn transmit(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response> {
+        self.transmit_as_bytes(txn, recv_len, Self::to_bytes)
+    }
+
+    /// Transmit this APDU using extended APDU encoding.
+    ///
+    /// This matches the YubiKey Manager behavior for YubiKey 4+/5+ devices,
+    /// which serialize APDUs using extended framing even when the command body
+    /// is empty.
+    pub fn transmit_extended(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response> {
+        self.transmit_as_bytes(txn, recv_len, Self::to_extended_bytes)
+    }
+
+    fn transmit_as_bytes(
+        &self,
+        txn: &Transaction<'_>,
+        recv_len: usize,
+        to_bytes: fn(&Apdu) -> Buffer,
+    ) -> Result<Response> {
         trace!(">>> {:?}", self);
-        let mut response = Response::from(txn.transmit(&self.to_bytes(), recv_len)?);
+        let mut response = Response::from(txn.transmit(&to_bytes(self), recv_len)?);
         trace!("<<< {:?}", &response);
 
         if let StatusWords::BytesRemaining { .. } = response.status_words() {
@@ -129,7 +147,7 @@ impl Apdu {
 
             while let StatusWords::BytesRemaining { .. } = sw {
                 let next = Response::from(
-                    txn.transmit(&Apdu::new(Ins::GetResponseApdu).to_bytes(), recv_len)?,
+                    txn.transmit(&to_bytes(&Apdu::new(Ins::GetResponseApdu)), recv_len)?,
                 );
                 trace!("<<< {:?}", &next);
                 data.extend_from_slice(next.data());
@@ -142,7 +160,7 @@ impl Apdu {
         Ok(response)
     }
 
-    /// Serialize this APDU as a self-zeroizing byte buffer
+    /// Serialize this APDU as a self-zeroizing short-APDU byte buffer.
     pub fn to_bytes(&self) -> Buffer {
         let mut bytes = Vec::with_capacity(5 + self.data.len());
         bytes.push(self.cla);
@@ -150,6 +168,19 @@ impl Apdu {
         bytes.push(self.p1);
         bytes.push(self.p2);
         bytes.push(self.data.len() as u8);
+        bytes.extend_from_slice(self.data.as_ref());
+        Zeroizing::new(bytes)
+    }
+
+    /// Serialize this APDU as a self-zeroizing extended-APDU byte buffer.
+    pub fn to_extended_bytes(&self) -> Buffer {
+        let mut bytes = Vec::with_capacity(7 + self.data.len());
+        bytes.push(self.cla);
+        bytes.push(self.ins.code());
+        bytes.push(self.p1);
+        bytes.push(self.p2);
+        bytes.push(0);
+        bytes.extend_from_slice(&(self.data.len() as u16).to_be_bytes());
         bytes.extend_from_slice(self.data.as_ref());
         Zeroizing::new(bytes)
     }
@@ -233,6 +264,21 @@ pub enum Ins {
     /// Management // DeviceReset
     DeviceReset,
 
+    /// YubiHSM Auth // Calculate session keys
+    Calculate,
+
+    /// YubiHSM Auth // Get challenge
+    GetHostChallenge,
+
+    /// YubiHSM Auth // List credentials
+    ListCredentials,
+
+    /// YubiHSM Auth // Put credential
+    PutCredential,
+
+    /// YubiHSM Auth // Delete credential
+    DeleteCredential,
+
     /// Other/unrecognized instruction codes
     Other(u8),
 }
@@ -264,6 +310,13 @@ impl Ins {
             Ins::WriteConfig => 0x1c,
             Ins::DeviceReset => 0x1f,
 
+            // Yubihsm auth
+            Ins::PutCredential => 0x01,
+            Ins::DeleteCredential => 0x02,
+            Ins::Calculate => 0x03,
+            Ins::GetHostChallenge => 0x04,
+            Ins::ListCredentials => 0x05,
+
             Ins::Other(code) => code,
         }
     }
@@ -277,6 +330,11 @@ impl From<u8> for Ins {
             0x1c => Ins::WriteConfig,
             0x1f => Ins::DeviceReset,
 
+            0x01 => Ins::PutCredential,
+            0x02 => Ins::DeleteCredential,
+            0x03 => Ins::Calculate,
+            0x04 => Ins::GetHostChallenge,
+            0x05 => Ins::ListCredentials,
             0x20 => Ins::Verify,
             0x24 => Ins::ChangeReference,
             0x2c => Ins::ResetRetry,
@@ -530,7 +588,22 @@ impl From<StatusWords> for u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::StatusWords;
+    use super::{Apdu, Ins, StatusWords};
+
+    #[test]
+    fn apdu_short_encoding() {
+        let bytes = Apdu::new(Ins::ListCredentials).to_bytes();
+        assert_eq!(bytes.as_slice(), &[0x00, 0x05, 0x00, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn apdu_extended_encoding() {
+        let bytes = Apdu::new(Ins::ListCredentials).to_extended_bytes();
+        assert_eq!(
+            bytes.as_slice(),
+            &[0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00]
+        );
+    }
 
     #[test]
     fn status_words_round_trip() {
