@@ -30,18 +30,9 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{Result, YubiKey};
+use crate::{Error, Result, YubiKey};
 use std::fmt::{self, Debug, Display};
 use uuid::Uuid;
-
-/// FASC-N offset
-const CHUID_FASCN_OFFS: usize = 2;
-
-/// GUID offset
-const CHUID_GUID_OFFS: usize = 29;
-
-/// Expiration offset
-const CHUID_EXPIRATION_OFFS: usize = 47;
 
 /// CHUID Object ID
 const OBJ_CHUID: u32 = 0x005f_c102;
@@ -63,15 +54,25 @@ const OBJ_CHUID: u32 = 0x005f_c102;
 /// - 0xfe: Error Detection Code (hard-coded)
 #[allow(dead_code)]
 const CHUID_TMPL: &[u8] = &[
-    0x30, 0x19, 0xd4, 0xe7, 0x39, 0xda, 0x73, 0x9c, 0xed, 0x39, 0xce, 0x73, 0x9d, 0x83, 0x68, 0x58,
-    0x21, 0x08, 0x42, 0x10, 0x84, 0x21, 0xc8, 0x42, 0x10, 0xc3, 0xeb, 0x34, 0x10, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x35, 0x08, 0x32,
-    0x30, 0x33, 0x30, 0x30, 0x31, 0x30, 0x31, 0x3e, 0x00, 0xfe, 0x00,
+    0x30, 0x19, // FASC-N tag + length
+    0xd4, 0xe7, 0x39, 0xda, 0x73, 0x9c, 0xed, 0x39, 0xce, 0x73, 0x9d, 0x83, 0x68, 0x58, 0x21, 0x08,
+    0x42, 0x10, 0x84, 0x21, 0xc8, 0x42, 0x10, 0xc3, 0xeb, // FASC-N
+    0x34, 0x10, // Card UUID tag + length
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, // Card UUID
+    0x35, 0x08, // Exp Date tag + length
+    0x32, 0x30, 0x33, 0x30, 0x30, 0x31, 0x30, 0x31, // Exp Date as ascii bytes (20300101)
+    0x3e, 0x00, // Signature + length
+    0xfe, 0x00, // Error detection code
 ];
 
 /// Cardholder Unique Identifier (CHUID).
 #[derive(Copy, Clone, Debug)]
-pub struct ChuId(pub [u8; Self::BYTE_SIZE]);
+pub struct ChuId {
+    fascn: [u8; ChuId::FASCN_SIZE],
+    uuid: Uuid,
+    expiration: [u8; ChuId::EXPIRATION_SIZE],
+}
 
 impl ChuId {
     /// CHUID size in bytes
@@ -83,52 +84,197 @@ impl ChuId {
     /// Expiration size
     pub const EXPIRATION_SIZE: usize = 8;
 
+    /// Return a builder that allows construction of a new ChuId value from it's
+    /// components.
+    pub fn builder(
+        fascn: &[u8; ChuId::FASCN_SIZE],
+        uuid: Uuid,
+        expiration: &[u8; ChuId::EXPIRATION_SIZE],
+    ) -> ChuIdBuilder {
+        ChuIdBuilder::new(fascn, uuid, expiration)
+    }
+
     /// Return FASC-N component of CHUID
     pub fn fascn(&self) -> [u8; Self::FASCN_SIZE] {
-        self.0[CHUID_FASCN_OFFS..(CHUID_FASCN_OFFS + Self::FASCN_SIZE)]
-            .try_into()
-            .expect("should be FASCN_SIZE")
+        self.fascn
     }
 
     /// Return Card UUID/GUID component of CHUID
     pub fn uuid(&self) -> Uuid {
-        Uuid::from_slice(&self.0[CHUID_GUID_OFFS..(CHUID_GUID_OFFS + 16)])
-            .expect("should be UUID-sized")
+        self.uuid
     }
 
     /// Return expiration date component of CHUID
     // TODO(tarcieri): parse expiration?
     pub fn expiration(&self) -> [u8; Self::EXPIRATION_SIZE] {
-        self.0[CHUID_EXPIRATION_OFFS..(CHUID_EXPIRATION_OFFS + Self::EXPIRATION_SIZE)]
-            .try_into()
-            .expect("should be EXPIRATION_SIZE")
+        self.expiration
     }
 
     /// Get Cardholder Unique Identifier (CHUID)
     pub fn get(yubikey: &mut YubiKey) -> Result<ChuId> {
         let txn = yubikey.begin_transaction()?;
         let response = txn.fetch_object(OBJ_CHUID)?;
-        Ok(response[..Self::BYTE_SIZE].try_into().map(Self)?)
+
+        Self::parse(&response)
     }
 
     /// Set Cardholder Unique Identifier (CHUID)
     pub fn set(&self, yubikey: &mut YubiKey) -> Result<()> {
-        let mut buf = CHUID_TMPL.to_vec();
-        buf[..Self::BYTE_SIZE].copy_from_slice(&self.0);
+        let buf = self.serialise();
 
         let txn = yubikey.begin_transaction()?;
         txn.save_object(OBJ_CHUID, &buf)
     }
-}
 
-impl AsRef<[u8]> for ChuId {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
+    #[cfg(feature = "untested")]
+    fn serialise(&self) -> Vec<u8> {
+        let mut buf: Vec<u8> = Vec::with_capacity(Self::BYTE_SIZE);
+
+        buf.extend([0x30, ChuId::FASCN_SIZE as u8]);
+        buf.extend(&self.fascn);
+
+        buf.extend([0x34, 0x10]);
+        buf.extend(self.uuid.as_bytes());
+
+        buf.extend([0x35, ChuId::EXPIRATION_SIZE as u8]);
+        buf.extend(&self.expiration);
+
+        buf.extend([0x3e, 0x00]);
+        buf.extend([0xfe, 0x00]);
+
+        buf
+    }
+
+    fn parse(input: &[u8]) -> Result<Self> {
+        let mut fascn = None;
+        let mut uuid = None;
+        let mut expiration = None;
+
+        let mut view = input;
+        loop {
+            if view.len() < 2 {
+                // Insufficient bytes to continue.
+                break;
+            }
+
+            let tag = view[0];
+            let length = view[1] as usize;
+
+            // Advance the buffer.
+            view = view.get(2..).ok_or(Error::ParseError)?;
+
+            if length > 0 {
+                let data = view.get(..length).ok_or(Error::ParseError)?;
+
+                match (tag, length) {
+                    (0x30, 0x19) => {
+                        let mut buf = [0; ChuId::FASCN_SIZE];
+                        buf.copy_from_slice(data);
+                        fascn = Some(buf);
+                    }
+                    (0x34, 0x10) => {
+                        let guid = Uuid::from_slice(data).map_err(|_| Error::ParseError)?;
+                        uuid = Some(guid);
+                    }
+                    (0x35, 0x08) => {
+                        let mut buf = [0; ChuId::EXPIRATION_SIZE];
+                        buf.copy_from_slice(data);
+                        expiration = Some(buf);
+                    }
+                    _ => {}
+                }
+
+                // Advance the buffer.
+                view = view.get(length..).ok_or(Error::ParseError)?;
+            }
+        }
+
+        match (fascn, uuid, expiration) {
+            (Some(fascn), Some(uuid), Some(expiration)) => Ok(Self {
+                fascn,
+                uuid,
+                expiration,
+            }),
+            _ => Err(Error::ParseError),
+        }
     }
 }
 
 impl Display for ChuId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&hex::upper::encode_string(self.as_ref()))
+        write!(
+            f,
+            "fascn: {}, uuid: {}, expiration: {}",
+            hex::upper::encode_string(&self.fascn),
+            self.uuid,
+            str::from_utf8(&self.expiration).unwrap_or("invalid")
+        )
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct ChuIdBuilder {
+    fascn: [u8; ChuId::FASCN_SIZE],
+    uuid: Uuid,
+    expiration: [u8; ChuId::EXPIRATION_SIZE],
+}
+
+impl ChuIdBuilder {
+    pub fn new(
+        fascn: &[u8; ChuId::FASCN_SIZE],
+        uuid: Uuid,
+        expiration: &[u8; ChuId::EXPIRATION_SIZE],
+    ) -> Self {
+        Self {
+            fascn: fascn.to_owned(),
+            uuid,
+            expiration: expiration.to_owned(),
+        }
+    }
+
+    pub fn build(self) -> ChuId {
+        ChuId {
+            fascn: self.fascn,
+            uuid: self.uuid,
+            expiration: self.expiration,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ChuId, CHUID_TMPL};
+
+    #[test]
+    fn parse_chuid_tmpl() {
+        let chuid = ChuId::parse(CHUID_TMPL).expect("Failed to parse template ChuId");
+
+        eprintln!("{}", chuid);
+
+        assert_eq!(
+            chuid.fascn,
+            [
+                0xd4, 0xe7, 0x39, 0xda, 0x73, 0x9c, 0xed, 0x39, 0xce, 0x73, 0x9d, 0x83, 0x68, 0x58,
+                0x21, 0x08, 0x42, 0x10, 0x84, 0x21, 0xc8, 0x42, 0x10, 0xc3, 0xeb, // FASC-N
+            ]
+        );
+
+        assert_eq!(
+            chuid.uuid(),
+            uuid::uuid!("00000000-0000-0000-0000-000000000000")
+        );
+
+        assert_eq!(
+            chuid.expiration(),
+            [
+                0x32, 0x30, 0x33, 0x30, 0x30, 0x31, 0x30,
+                0x31, // Exp Date as ascii bytes (20300101)
+            ]
+        );
+
+        // Assert that serialisation works too.
+        let bytes = chuid.serialise();
+
+        assert_eq!(&bytes, CHUID_TMPL);
     }
 }
