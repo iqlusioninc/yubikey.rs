@@ -43,6 +43,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
+    Buffer, ObjectId,
     apdu::{Ins, StatusWords},
     certificate::{self, Certificate},
     error::{Error, Result},
@@ -51,19 +52,18 @@ use crate::{
     serialization::*,
     setting,
     yubikey::YubiKey,
-    Buffer, ObjectId,
 };
-use elliptic_curve::{sec1::Sec1Point as EcPublicKey, PublicKey};
+use elliptic_curve::{PublicKey, sec1::Sec1Point as EcPublicKey};
 use log::{debug, error, warn};
 use p256::NistP256;
 use p384::NistP384;
-use rsa::{pkcs8::EncodePublicKey, BoxedUint, RsaPublicKey};
+use rsa::{BoxedUint, RsaPublicKey, pkcs8::EncodePublicKey};
 use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
 use x509_cert::{
-    der::{asn1::BitString, Decode},
+    der::{Decode, asn1::BitString},
     spki::{AlgorithmIdentifier, ObjectIdentifier, SubjectPublicKeyInfoOwned},
 };
 
@@ -74,7 +74,7 @@ use zeroize::Zeroizing;
 use crate::consts::CB_OBJ_MAX;
 
 #[cfg(feature = "untested")]
-use rsa::{traits::PrivateKeyParts, RsaPrivateKey};
+use rsa::{RsaPrivateKey, traits::PrivateKeyParts};
 
 /// PIV Applet Name
 pub(crate) const APPLET_NAME: &str = "PIV";
@@ -1031,10 +1031,10 @@ impl TryFrom<Buffer> for SlotMetadata {
 
     fn try_from(buf: Buffer) -> Result<Self> {
         use nom::{
+            Parser,
             combinator::{eof, map_res},
             multi::fold_many1,
             number::complete::u8,
-            Parser,
         };
 
         let out = fold_many1(

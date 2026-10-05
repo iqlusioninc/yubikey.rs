@@ -10,7 +10,7 @@ use std::{
 };
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, StandardStreamLock, WriteColor};
 use x509_cert::der::Encode;
-use yubikey::{certificate::Certificate, piv::*, YubiKey};
+use yubikey::{YubiKey, certificate::Certificate, piv::*};
 
 /// Print a success status message (in green if colors are enabled)
 #[macro_export]

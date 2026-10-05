@@ -31,16 +31,16 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
+    Error, Result, Version, YubiKey,
     consts::{TAG_ADMIN_FLAGS_1, TAG_ADMIN_SALT, TAG_PROTECTED_MGM},
     metadata::{AdminData, ProtectedData},
     piv::{ManagementSlotId, SlotAlgorithmId},
     transaction::Transaction,
-    Error, Result, Version, YubiKey,
 };
 use bitflags::bitflags;
 use cipher::{
-    common::Generate, typenum::Unsigned, BlockCipherDecrypt, BlockCipherEncrypt, Key, KeyInit,
-    KeySizeUser,
+    BlockCipherDecrypt, BlockCipherEncrypt, Key, KeyInit, KeySizeUser, common::Generate,
+    typenum::Unsigned,
 };
 use log::error;
 use rand::TryCryptoRng;
@@ -48,13 +48,13 @@ use rand::TryCryptoRng;
 #[cfg(feature = "untested")]
 use {
     crate::{
+        Serial,
         consts::{
             CB_BUF_MAX, TAG_AUTO_EJECT_TIMEOUT, TAG_CHALRESP_TIMEOUT, TAG_CONFIG_LOCK,
             TAG_DEVICE_FLAGS, TAG_FORM_FACTOR, TAG_NFC_ENABLED, TAG_NFC_SUPPORTED, TAG_REBOOT,
             TAG_SERIAL, TAG_UNLOCK, TAG_USB_ENABLED, TAG_USB_SUPPORTED, TAG_VERSION,
         },
         serialization::Tlv,
-        Serial,
     },
     pbkdf2::pbkdf2_hmac,
     sha1::Sha1,
@@ -801,11 +801,11 @@ impl DeviceInfo {
     #[cfg(feature = "untested")]
     pub(crate) fn parse(input: &[u8]) -> Result<Self> {
         use nom::{
+            Parser,
             bytes::complete::take,
             combinator::{eof, map},
             multi::fold_many1,
             number::complete::{be_u16, be_u32, u8},
-            Parser,
         };
 
         fn u8_parser(i: &[u8]) -> nom::IResult<&[u8], u8> {
@@ -1020,9 +1020,9 @@ impl DeviceFlags {
     #[cfg(feature = "untested")]
     fn parse(i: &[u8]) -> nom::IResult<&[u8], Self> {
         use nom::{
+            Parser,
             combinator::{eof, map},
             number::complete::u8,
-            Parser,
         };
 
         let (i, v) = map(u8, Self::from_bits_retain).parse(i)?;

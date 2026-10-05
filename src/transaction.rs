@@ -1,6 +1,7 @@
 //! YubiKey PC/SC transactions
 
 use crate::{
+    Buffer, ObjectId,
     apdu::Response,
     apdu::{Apdu, Ins, StatusWords},
     consts::{CB_BUF_MAX, CB_OBJ_MAX},
@@ -10,7 +11,6 @@ use crate::{
     piv::{self, AlgorithmId, SlotId},
     serialization::*,
     yubikey::*,
-    Buffer, ObjectId,
 };
 use log::{error, trace};
 use zeroize::Zeroizing;

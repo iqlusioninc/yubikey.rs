@@ -54,12 +54,12 @@ use std::{
 #[cfg(feature = "untested")]
 use {
     crate::{
+        Buffer, ObjectId,
         apdu::StatusWords,
         consts::{TAG_ADMIN_FLAGS_1, TAG_ADMIN_TIMESTAMP},
         metadata::AdminData,
         mgm,
         transaction::ChangeRefAction,
-        Buffer, ObjectId,
     },
     std::time::{SystemTime, UNIX_EPOCH},
 };
@@ -282,13 +282,12 @@ impl YubiKey {
                 Err(e) => {
                     // Save the first error we see that indicates we might have been able
                     // to find a matching YubiKey.
-                    if open_error.is_none() {
-                        if let Error::PcscError {
+                    if open_error.is_none()
+                        && let Error::PcscError {
                             inner: Some(pcsc::Error::SharingViolation),
                         } = e
-                        {
-                            open_error = Some(e);
-                        }
+                    {
+                        open_error = Some(e);
                     }
                     continue;
                 }

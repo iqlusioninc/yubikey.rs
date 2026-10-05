@@ -31,9 +31,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
+    Error, Result, YubiKey,
     consts::{CB_OBJ_MAX, CB_OBJ_TAG_MAX},
     serialization::*,
-    Error, Result, YubiKey,
 };
 use log::error;
 

@@ -1,6 +1,6 @@
 #![cfg(feature = "untested")]
 
-use yubikey::{mgm, YubiKey};
+use yubikey::{YubiKey, mgm};
 
 fn main() {
     let yubikey = YubiKey::open().unwrap();

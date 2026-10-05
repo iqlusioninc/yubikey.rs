@@ -1,10 +1,10 @@
 //! Print device status
 
-use crate::terminal::{print_cert_info, STDOUT};
+use crate::terminal::{STDOUT, print_cert_info};
 use clap::Parser;
 use std::io::{self, Write};
 use termcolor::{ColorSpec, StandardStreamLock, WriteColor};
-use yubikey::{piv::*, YubiKey};
+use yubikey::{YubiKey, piv::*};
 
 // String to use for `None`
 const NONE_STR: &str = "<none>";

@@ -13,7 +13,7 @@ repository = "https://github.com/iqlusioninc/yubikey.rs"
 readme = "README.md"
 categories = ["api-bindings", "authentication", "cryptography", "hardware-support"]
 keywords = ["ecdsa", "encryption", "rsa", "piv", "signature"]
-edition = "2021"
+edition = "2024"
 rust-version = "1.89"
 
 [workspace]

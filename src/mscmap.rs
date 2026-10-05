@@ -30,7 +30,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{consts::CB_OBJ_MAX, piv::SlotId, serialization::*, Error, Result, YubiKey};
+use crate::{Error, Result, YubiKey, consts::CB_OBJ_MAX, piv::SlotId, serialization::*};
 use log::error;
 
 const OBJ_MSCMAP: u32 = 0x005f_ff10;
