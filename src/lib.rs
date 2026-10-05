@@ -52,9 +52,7 @@ mod consts;
 mod error;
 mod metadata;
 pub mod mgm;
-#[cfg(feature = "untested")]
 mod mscmap;
-#[cfg(feature = "untested")]
 mod msroots;
 mod otp;
 pub mod piv;
@@ -79,7 +77,6 @@ pub use crate::{
     yubikey::{CachedPin, Serial, Version, YubiKey},
 };
 
-#[cfg(feature = "untested")]
 pub use crate::{mscmap::MsContainer, msroots::MsRoots};
 
 pub use uuid::Uuid;

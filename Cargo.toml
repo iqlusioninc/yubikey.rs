@@ -56,12 +56,8 @@ zeroize = "1"
 env_logger = "0.11"
 once_cell = "1"
 
-[features]
-untested = []
-
 [[example]]
 name = "change-mode"
-required-features = ["untested"]
 
 [package.metadata.docs.rs]
 all-features = true

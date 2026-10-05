@@ -1,5 +1,3 @@
-#![cfg(feature = "untested")]
-
 use yubikey::{YubiKey, mgm};
 
 fn main() {
