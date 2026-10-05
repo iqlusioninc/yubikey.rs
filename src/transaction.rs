@@ -15,12 +15,10 @@ use crate::{
 use log::{error, trace};
 use zeroize::Zeroizing;
 
-#[cfg(feature = "untested")]
 use crate::mgm::{DeviceConfig, DeviceInfo, Lock};
 
 const CB_PIN_MAX: usize = 8;
 
-#[cfg(feature = "untested")]
 pub(crate) enum ChangeRefAction {
     ChangePin,
     ChangePuk,
@@ -205,7 +203,6 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Change the PIN.
-    #[cfg(feature = "untested")]
     pub fn change_ref(
         &self,
         action: ChangeRefAction,
@@ -538,7 +535,6 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Write configuration to the YubiKey
-    #[cfg(feature = "untested")]
     pub fn write_config(
         &mut self,
         version: Version,
@@ -575,7 +571,6 @@ impl<'tx> Transaction<'tx> {
     }
 
     /// Write configuration to the YubiKey
-    #[cfg(feature = "untested")]
     pub fn read_config(&mut self) -> Result<DeviceInfo> {
         let mut data = [0u8; CB_BUF_MAX];
         let mut len = data.len();

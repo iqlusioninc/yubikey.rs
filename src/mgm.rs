@@ -45,7 +45,6 @@ use cipher::{
 use log::error;
 use rand::TryCryptoRng;
 
-#[cfg(feature = "untested")]
 use {
     crate::{
         Serial,
@@ -61,13 +60,11 @@ use {
 };
 
 /// YubiKey MGMT Applet Name
-#[cfg(feature = "untested")]
 pub(crate) const APPLET_NAME: &str = "YubiKey MGMT";
 
 /// MGMT Applet ID.
 ///
 /// <https://developers.yubico.com/PIV/Introduction/Admin_access.html>
-#[cfg(feature = "untested")]
 pub(crate) const APPLET_ID: &[u8] = &[0xa0, 0x00, 0x00, 0x05, 0x27, 0x47, 0x11, 0x17];
 
 /// Size of a DES key
@@ -78,7 +75,6 @@ pub(super) const DES_LEN_3DES: usize = DES_LEN_DES * 3;
 
 pub(crate) const ADMIN_FLAGS_1_PROTECTED_MGM: u8 = 0x02;
 
-#[cfg(feature = "untested")]
 const CB_ADMIN_SALT: usize = 16;
 
 /// The default MGM key loaded for both Triple-DES and AES keys
@@ -87,7 +83,6 @@ const DEFAULT_MGM_KEY: [u8; 24] = [
 ];
 
 /// Number of PBKDF2 iterations to use when deriving from a password
-#[cfg(feature = "untested")]
 const ITER_MGM_PBKDF2: u32 = 10000;
 
 /// Management Key (MGM) key types (manual/derived/protected).
@@ -270,7 +265,6 @@ impl MgmKey {
     ///
     /// Warning: PIN-derived mode is not secure. You should not use this technique. It is
     /// offered only for backwards compatibility.
-    #[cfg(feature = "untested")]
     pub fn get_derived(yubikey: &mut YubiKey, pin: &[u8]) -> Result<Self> {
         let txn = yubikey.begin_transaction()?;
 
@@ -572,12 +566,10 @@ impl AsRef<[u8]> for MgmKey {
 
 /// Manager for the YubiKey
 /// Allows to enable applications hosted on the YubiKey
-#[cfg(feature = "untested")]
 pub struct Manager {
     client: YubiKey,
 }
 
-#[cfg(feature = "untested")]
 impl Manager {
     /// Open the manager applet on the YubiKey
     pub fn new(mut client: YubiKey) -> Result<Self> {
@@ -682,7 +674,6 @@ pub struct DeviceConfig {
 }
 
 impl DeviceConfig {
-    #[cfg(feature = "untested")]
     pub(crate) fn as_tlv(
         &self,
         reboot: bool,
@@ -798,7 +789,6 @@ pub struct DeviceInfo {
 }
 
 impl DeviceInfo {
-    #[cfg(feature = "untested")]
     pub(crate) fn parse(input: &[u8]) -> Result<Self> {
         use nom::{
             Parser,
@@ -984,7 +974,6 @@ pub enum FormFactor {
 }
 
 impl FormFactor {
-    #[cfg(feature = "untested")]
     fn parse(input: &[u8]) -> Result<Self> {
         use nom::{combinator::eof, number::complete::u8};
 
@@ -1017,7 +1006,6 @@ bitflags! {
 }
 
 impl DeviceFlags {
-    #[cfg(feature = "untested")]
     fn parse(i: &[u8]) -> nom::IResult<&[u8], Self> {
         use nom::{
             Parser,

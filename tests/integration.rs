@@ -125,7 +125,6 @@ fn test_verify_pin() {
 // Management key support
 //
 
-#[cfg(feature = "untested")]
 #[test]
 #[ignore]
 fn test_set_mgmkey() {

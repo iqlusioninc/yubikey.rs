@@ -92,17 +92,6 @@ an experimental stage and may still contain high-severity issues.
 
 USE AT YOUR OWN RISK!
 
-## Status
-
-Functionality which has been successfully tested is available by default.
-
-Any functionality which is gated on the `untested` feature has not been
-properly tested and is not known to function correctly.
-
-Please see the [`untested` functionality tracking issue] for current status.
-We would appreciate any help testing this functionality and removing the
-`untested` gating as well as writing more automated tests.
-
 ## Testing
 
 To run the full test suite, you'll need a supported YubiKey device connected
@@ -242,7 +231,6 @@ or conditions.
 [cc-web]: https://contributor-covenant.org/
 [cc-md]: https://github.com/iqlusioninc/yubikey.rs/blob/main/CODE_OF_CONDUCT.md
 [BSDL]: https://opensource.org/licenses/BSD-2-Clause
-[`untested` functionality tracking issue]: https://github.com/iqlusioninc/yubikey.rs/issues/280
 
 [//]: # (github issues)
 

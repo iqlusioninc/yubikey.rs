@@ -67,13 +67,10 @@ use x509_cert::{
     spki::{AlgorithmIdentifier, ObjectIdentifier, SubjectPublicKeyInfoOwned},
 };
 
-#[cfg(feature = "untested")]
 use zeroize::Zeroizing;
 
-#[cfg(feature = "untested")]
 use crate::consts::CB_OBJ_MAX;
 
-#[cfg(feature = "untested")]
 use rsa::{RsaPrivateKey, traits::PrivateKeyParts};
 
 /// PIV Applet Name
@@ -92,10 +89,8 @@ const TAG_ECC_POINT: u8 = 0x86;
 /// OID for ed25519 and x25519 algorithms
 pub const OID_X25519: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.101.110");
 
-#[cfg(feature = "untested")]
 const KEYDATA_LEN: usize = 1024;
 
-#[cfg(feature = "untested")]
 const KEYDATA_RSA_EXP: u64 = 65537;
 
 /// Slot identifiers.
@@ -545,7 +540,6 @@ impl AlgorithmId {
         Tlv::write(buf, 0x80, &[self.into()])
     }
 
-    #[cfg(feature = "untested")]
     fn get_elem_len(self) -> usize {
         match self {
             AlgorithmId::Rsa1024 => 64,
@@ -559,7 +553,6 @@ impl AlgorithmId {
         }
     }
 
-    #[cfg(feature = "untested")]
     fn get_param_tag(self) -> u8 {
         match self {
             AlgorithmId::Rsa1024
@@ -742,7 +735,6 @@ pub fn generate(
     read_public_key(algorithm, value, true)
 }
 
-#[cfg(feature = "untested")]
 fn write_key(
     yubikey: &mut YubiKey,
     slot: SlotId,
@@ -790,7 +782,6 @@ fn write_key(
 }
 
 /// The key data that makes up an RSA key.
-#[cfg(feature = "untested")]
 pub struct RsaKeyData {
     /// The secret prime `p`.
     p: Buffer,
@@ -804,7 +795,6 @@ pub struct RsaKeyData {
     qinv: Buffer,
 }
 
-#[cfg(feature = "untested")]
 impl RsaKeyData {
     /// Generates a new RSA key data set from two (randomly generated) secret primes.
     ///
@@ -861,7 +851,6 @@ impl RsaKeyData {
 /// Imports a private RSA encryption or signing key into the YubiKey.
 ///
 /// Errors if `algorithm` isn't `AlgorithmId::Rsa1024` or `AlgorithmId::Rsa2048` or `AlgorithmId::Rsa3072` or `AlgorithmId::Rsa4096`.
-#[cfg(feature = "untested")]
 pub fn import_rsa_key(
     yubikey: &mut YubiKey,
     slot: SlotId,
@@ -898,7 +887,6 @@ pub fn import_rsa_key(
 /// Imports a private ECC encryption or signing key into the YubiKey.
 ///
 /// Errors if `algorithm` isn't `AlgorithmId::EccP256` or ` AlgorithmId::EccP384`.
-#[cfg(feature = "untested")]
 pub fn import_ecc_key(
     yubikey: &mut YubiKey,
     slot: SlotId,
@@ -926,7 +914,6 @@ pub fn import_ecc_key(
 /// Imports a private ECDH/EdDSA encryption or signing key into the YubiKey.
 ///
 /// Errors if `algorithm` isn't `AlgorithmId::Ed25519` or ` AlgorithmId::X25519`.
-#[cfg(feature = "untested")]
 pub fn import_cv_key(
     yubikey: &mut YubiKey,
     slot: SlotId,
@@ -954,7 +941,6 @@ pub fn import_cv_key(
 /// Generate an attestation certificate for a stored key.
 ///
 /// <https://developers.yubico.com/PIV/Introduction/PIV_attestation.html>
-#[cfg(feature = "untested")]
 pub fn attest(yubikey: &mut YubiKey, key: SlotId) -> Result<Buffer> {
     let templ = [0, Ins::Attest.code(), key.into(), 0];
     let txn = yubikey.begin_transaction()?;
@@ -989,7 +975,6 @@ pub fn sign_data(
 }
 
 /// Decrypt data using a PIV key.
-#[cfg(feature = "untested")]
 pub fn decrypt_data(
     yubikey: &mut YubiKey,
     input: &[u8],
