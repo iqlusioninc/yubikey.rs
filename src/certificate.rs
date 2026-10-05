@@ -31,18 +31,18 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
+    Buffer,
     consts::CB_OBJ_MAX,
     error::{Error, Result},
     piv::SlotId,
     serialization::*,
     transaction::Transaction,
     yubikey::YubiKey,
-    Buffer,
 };
 use log::error;
 use x509_cert::{
-    builder::{profile::BuilderProfile, Builder, CertificateBuilder},
-    der::{referenced::OwnedToRef, Decode, Encode},
+    builder::{Builder, CertificateBuilder, profile::BuilderProfile},
+    der::{Decode, Encode, referenced::OwnedToRef},
     name::Name,
     serial_number::SerialNumber,
     spki::{SubjectPublicKeyInfoOwned, SubjectPublicKeyInfoRef},
@@ -267,15 +267,15 @@ pub mod yubikey_signer {
     //! Signer implementation for yubikey
 
     use crate::{
+        YubiKey,
         error::{Error, Result},
         piv::AlgorithmId,
-        piv::{sign_data, SlotId},
-        YubiKey,
+        piv::{SlotId, sign_data},
     };
     use der::{
+        Encode, Sequence,
         asn1::{Any, OctetString},
         oid::db::rfc5912,
-        Encode, Sequence,
     };
     use sha2::{Digest, Sha256, Sha384, Sha512};
     use signature::Keypair;

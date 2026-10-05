@@ -11,8 +11,8 @@ repository = "https://github.com/iqlusioninc/yubikey.rs"
 readme = "README.md"
 categories = ["command-line-utilities", "cryptography", "hardware-support"]
 keywords = ["ecdsa", "rsa", "piv", "pcsc", "yubikey"]
-edition = "2021"
-rust-version = "1.85"
+edition = "2024"
+rust-version = "1.89"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

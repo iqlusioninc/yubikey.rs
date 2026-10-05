@@ -34,10 +34,10 @@ use std::{iter, marker::PhantomData};
 use zeroize::Zeroizing;
 
 use crate::{
+    Buffer, Error, Result,
     consts::{CB_OBJ_MAX, CB_OBJ_TAG_MAX},
     serialization::*,
     transaction::Transaction,
-    Buffer, Error, Result,
 };
 
 const TAG_ADMIN: u8 = 0x80;

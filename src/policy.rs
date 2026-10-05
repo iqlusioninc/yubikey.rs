@@ -1,6 +1,6 @@
 //! Enums representing key policies.
 
-use crate::{serialization::Tlv, Error, Result};
+use crate::{Error, Result, serialization::Tlv};
 
 /// Specifies how often the PIN needs to be entered for access to the credential in a
 /// given slot.

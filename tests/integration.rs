@@ -3,18 +3,18 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, trivial_casts, unused_qualifications)]
 
-use cipher::common::{getrandom::SysRng, Generate};
+use cipher::common::{Generate, getrandom::SysRng};
 use log::trace;
 use once_cell::sync::Lazy;
-use rsa::{pkcs1v15, RsaPublicKey};
+use rsa::{RsaPublicKey, pkcs1v15};
 use sha2::{Digest, Sha256};
 use signature::hazmat::PrehashVerifier;
 use std::{env, str::FromStr, sync::Mutex, time::Duration};
 use x509_cert::{der::Encode, name::Name, serial_number::SerialNumber, time::Validity};
 use yubikey::{
-    certificate::{yubikey_signer, Certificate},
-    piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
     Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
+    certificate::{Certificate, yubikey_signer},
+    piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
 };
 
 static YUBIKEY: Lazy<Mutex<YubiKey>> = Lazy::new(|| {
@@ -141,10 +141,12 @@ fn test_set_mgmkey() {
     assert!(yubikey.authenticate(&default_key).is_ok());
 
     // Set a protected management key.
-    assert!(MgmKey::generate_for(&yubikey, &mut rng)
-        .unwrap()
-        .set_protected(&mut yubikey)
-        .is_ok());
+    assert!(
+        MgmKey::generate_for(&yubikey, &mut rng)
+            .unwrap()
+            .set_protected(&mut yubikey)
+            .is_ok()
+    );
     let protected = MgmKey::get_protected(&mut yubikey).unwrap();
     assert!(yubikey.authenticate(&default_key).is_err());
     assert!(yubikey.authenticate(&protected).is_ok());
