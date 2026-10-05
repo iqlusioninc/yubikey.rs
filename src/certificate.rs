@@ -327,6 +327,10 @@ pub mod yubikey_signer {
             Ok(Sha512::digest(input).to_vec())
         }
 
+        fn prepare_prehash(hashed: &[u8]) -> SigResult<Vec<u8>> {
+            Ok(hashed.to_vec())
+        }
+
         fn read_signature(input: &[u8]) -> SigResult<Self::Signature> {
             Self::Signature::try_from(input)
         }

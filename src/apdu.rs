@@ -121,7 +121,7 @@ impl Apdu {
     pub fn transmit(&self, txn: &Transaction<'_>, recv_len: usize) -> Result<Response> {
         trace!(">>> {:?}", self);
         let mut response = Response::from(txn.transmit(&self.to_bytes(), recv_len)?);
-        trace!("<<< {:?}", &response);
+        trace!("<<< {:?}", response);
 
         if let StatusWords::BytesRemaining { .. } = response.status_words() {
             let mut data = response.data().to_vec();
@@ -131,7 +131,7 @@ impl Apdu {
                 let next = Response::from(
                     txn.transmit(&Apdu::new(Ins::GetResponseApdu).to_bytes(), recv_len)?,
                 );
-                trace!("<<< {:?}", &next);
+                trace!("<<< {:?}", next);
                 data.extend_from_slice(next.data());
                 sw = next.status_words();
             }
