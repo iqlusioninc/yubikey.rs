@@ -136,8 +136,8 @@ impl<'tx> Transaction<'tx> {
                 response.data().try_into()
             }
 
-            // YK5 implements getting the serial as a PIV applet command (0xf8)
-            5 => {
+            // YK5 and later implement getting the serial as a PIV applet command (0xf8)
+            5 | 6 => {
                 let response = Apdu::new(Ins::GetSerial).transmit(self, 0xFF)?;
 
                 if !response.is_success() {
