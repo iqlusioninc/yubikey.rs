@@ -31,11 +31,15 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{Error, Result, YubiKey};
+use jiff::civil::Date;
 use std::fmt::{self, Debug, Display};
 use uuid::Uuid;
 
 /// CHUID Object ID
 const OBJ_CHUID: u32 = 0x005f_c102;
+
+/// YYYYMMDD String Format
+const DATEFORMAT: &str = "%Y%m%d";
 
 /// Cardholder Unique Identifier (CHUID) Template
 ///
@@ -98,7 +102,8 @@ impl Display for Fascn {
 pub struct ChuId {
     fascn: Fascn,
     uuid: Uuid,
-    expiration: [u8; ChuId::EXPIRATION_SIZE],
+    expiration: Date,
+    // expiration: [u8; ChuId::EXPIRATION_SIZE],
 }
 
 impl ChuId {
@@ -113,7 +118,7 @@ impl ChuId {
 
     /// Return a builder that allows construction of a new ChuId value from it's
     /// components.
-    pub fn builder(uuid: Uuid, expiration: &[u8; ChuId::EXPIRATION_SIZE]) -> ChuIdBuilder {
+    pub fn builder(uuid: Uuid, expiration: Date) -> ChuIdBuilder {
         ChuIdBuilder::new(uuid, expiration)
     }
 
@@ -129,7 +134,7 @@ impl ChuId {
 
     /// Return expiration date component of CHUID
     // TODO(tarcieri): parse expiration?
-    pub fn expiration(&self) -> [u8; Self::EXPIRATION_SIZE] {
+    pub fn expiration(&self) -> Date {
         self.expiration
     }
 
@@ -159,7 +164,7 @@ impl ChuId {
         buf.extend(self.uuid.as_bytes());
 
         buf.extend([0x35, ChuId::EXPIRATION_SIZE as u8]);
-        buf.extend(&self.expiration);
+        buf.extend(self.expiration.strftime(DATEFORMAT).to_string().as_bytes());
 
         buf.extend([0x3e, 0x00]);
         buf.extend([0xfe, 0x00]);
@@ -201,7 +206,13 @@ impl ChuId {
                     (0x35, 0x08) => {
                         let mut buf = [0; ChuId::EXPIRATION_SIZE];
                         buf.copy_from_slice(data);
-                        expiration = Some(buf);
+
+                        let date_str = str::from_utf8(&buf).map_err(|_| Error::ParseError)?;
+
+                        let exp =
+                            Date::strptime(DATEFORMAT, date_str).map_err(|_| Error::ParseError)?;
+
+                        expiration = Some(exp);
                     }
                     _ => {}
                 }
@@ -227,9 +238,7 @@ impl Display for ChuId {
         write!(
             f,
             "fascn: {}, uuid: {}, expiration: {}",
-            self.fascn,
-            self.uuid,
-            str::from_utf8(&self.expiration).unwrap_or("invalid")
+            self.fascn, self.uuid, self.expiration
         )
     }
 }
@@ -238,15 +247,15 @@ impl Display for ChuId {
 pub struct ChuIdBuilder {
     fascn: Option<Fascn>,
     uuid: Uuid,
-    expiration: [u8; ChuId::EXPIRATION_SIZE],
+    expiration: Date,
 }
 
 impl ChuIdBuilder {
-    pub fn new(uuid: Uuid, expiration: &[u8; ChuId::EXPIRATION_SIZE]) -> Self {
+    pub fn new(uuid: Uuid, expiration: Date) -> Self {
         Self {
             fascn: None,
             uuid,
-            expiration: expiration.to_owned(),
+            expiration,
         }
     }
 
@@ -267,6 +276,7 @@ impl ChuIdBuilder {
 #[cfg(test)]
 mod tests {
     use super::{CHUID_TMPL, ChuId, Fascn};
+    use jiff::civil::Date;
 
     #[test]
     fn parse_chuid_tmpl() {
@@ -281,13 +291,7 @@ mod tests {
             uuid::uuid!("00000000-0000-0000-0000-000000000000")
         );
 
-        assert_eq!(
-            chuid.expiration(),
-            [
-                0x32, 0x30, 0x33, 0x30, 0x30, 0x31, 0x30,
-                0x31, // Exp Date as ascii bytes (20300101)
-            ]
-        );
+        assert_eq!(chuid.expiration(), Date::new(2030, 01, 01).unwrap());
 
         // Assert that serialisation works too.
         let bytes = chuid.serialise();
