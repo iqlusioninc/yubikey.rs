@@ -66,10 +66,37 @@ const CHUID_TMPL: &[u8] = &[
     0xfe, 0x00, // Error detection code
 ];
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Fascn {
+    data: [u8; ChuId::FASCN_SIZE],
+}
+
+impl Default for Fascn {
+    /// FASC-N containing S9999F9999F999999F0F1F0000000000300001E encoded in 4-bit BCD with 1 bit parity.
+    /// For most users of PIV this is the correct value per SP-800-73-4 which states that "since non-Federal
+    /// issuers do not have Agency Codes assigned to them, which means that they are
+    /// unable to create unique FASC-N identifiers for the cards they issue. As a result, PIV-I FAQ requires the first 14 digits of
+    /// the FASC-Ns for PIV-I cards (the Agency Code, System Code, and Credential Number) to be populated with all nines."
+    fn default() -> Self {
+        Self {
+            data: [
+                0xd4, 0xe7, 0x39, 0xda, 0x73, 0x9c, 0xed, 0x39, 0xce, 0x73, 0x9d, 0x83, 0x68, 0x58,
+                0x21, 0x08, 0x42, 0x10, 0x84, 0x21, 0xc8, 0x42, 0x10, 0xc3, 0xeb, // FASC-N
+            ],
+        }
+    }
+}
+
+impl Display for Fascn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::upper::encode_string(&self.data),)
+    }
+}
+
 /// Cardholder Unique Identifier (CHUID).
 #[derive(Copy, Clone, Debug)]
 pub struct ChuId {
-    fascn: [u8; ChuId::FASCN_SIZE],
+    fascn: Fascn,
     uuid: Uuid,
     expiration: [u8; ChuId::EXPIRATION_SIZE],
 }
@@ -86,16 +113,12 @@ impl ChuId {
 
     /// Return a builder that allows construction of a new ChuId value from it's
     /// components.
-    pub fn builder(
-        fascn: &[u8; ChuId::FASCN_SIZE],
-        uuid: Uuid,
-        expiration: &[u8; ChuId::EXPIRATION_SIZE],
-    ) -> ChuIdBuilder {
-        ChuIdBuilder::new(fascn, uuid, expiration)
+    pub fn builder(uuid: Uuid, expiration: &[u8; ChuId::EXPIRATION_SIZE]) -> ChuIdBuilder {
+        ChuIdBuilder::new(uuid, expiration)
     }
 
     /// Return FASC-N component of CHUID
-    pub fn fascn(&self) -> [u8; Self::FASCN_SIZE] {
+    pub fn fascn(&self) -> Fascn {
         self.fascn
     }
 
@@ -126,12 +149,11 @@ impl ChuId {
         txn.save_object(OBJ_CHUID, &buf)
     }
 
-    #[cfg(feature = "untested")]
     fn serialise(&self) -> Vec<u8> {
         let mut buf: Vec<u8> = Vec::with_capacity(Self::BYTE_SIZE);
 
         buf.extend([0x30, ChuId::FASCN_SIZE as u8]);
-        buf.extend(&self.fascn);
+        buf.extend(&self.fascn.data);
 
         buf.extend([0x34, 0x10]);
         buf.extend(self.uuid.as_bytes());
@@ -170,7 +192,7 @@ impl ChuId {
                     (0x30, 0x19) => {
                         let mut buf = [0; ChuId::FASCN_SIZE];
                         buf.copy_from_slice(data);
-                        fascn = Some(buf);
+                        fascn = Some(Fascn { data: buf });
                     }
                     (0x34, 0x10) => {
                         let guid = Uuid::from_slice(data).map_err(|_| Error::ParseError)?;
@@ -205,7 +227,7 @@ impl Display for ChuId {
         write!(
             f,
             "fascn: {}, uuid: {}, expiration: {}",
-            hex::upper::encode_string(&self.fascn),
+            self.fascn,
             self.uuid,
             str::from_utf8(&self.expiration).unwrap_or("invalid")
         )
@@ -214,27 +236,28 @@ impl Display for ChuId {
 
 #[derive(Copy, Clone, Debug)]
 pub struct ChuIdBuilder {
-    fascn: [u8; ChuId::FASCN_SIZE],
+    fascn: Option<Fascn>,
     uuid: Uuid,
     expiration: [u8; ChuId::EXPIRATION_SIZE],
 }
 
 impl ChuIdBuilder {
-    pub fn new(
-        fascn: &[u8; ChuId::FASCN_SIZE],
-        uuid: Uuid,
-        expiration: &[u8; ChuId::EXPIRATION_SIZE],
-    ) -> Self {
+    pub fn new(uuid: Uuid, expiration: &[u8; ChuId::EXPIRATION_SIZE]) -> Self {
         Self {
-            fascn: fascn.to_owned(),
+            fascn: None,
             uuid,
             expiration: expiration.to_owned(),
         }
     }
 
+    pub fn fascn(mut self, fascn: Option<Fascn>) -> Self {
+        self.fascn = fascn;
+        self
+    }
+
     pub fn build(self) -> ChuId {
         ChuId {
-            fascn: self.fascn,
+            fascn: self.fascn.unwrap_or_default(),
             uuid: self.uuid,
             expiration: self.expiration,
         }
@@ -243,7 +266,7 @@ impl ChuIdBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::{ChuId, CHUID_TMPL};
+    use super::{CHUID_TMPL, ChuId, Fascn};
 
     #[test]
     fn parse_chuid_tmpl() {
@@ -251,13 +274,7 @@ mod tests {
 
         eprintln!("{}", chuid);
 
-        assert_eq!(
-            chuid.fascn,
-            [
-                0xd4, 0xe7, 0x39, 0xda, 0x73, 0x9c, 0xed, 0x39, 0xce, 0x73, 0x9d, 0x83, 0x68, 0x58,
-                0x21, 0x08, 0x42, 0x10, 0x84, 0x21, 0xc8, 0x42, 0x10, 0xc3, 0xeb, // FASC-N
-            ]
-        );
+        assert_eq!(chuid.fascn, Fascn::default());
 
         assert_eq!(
             chuid.uuid(),
