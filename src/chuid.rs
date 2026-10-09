@@ -103,7 +103,6 @@ pub struct ChuId {
     fascn: Fascn,
     uuid: Uuid,
     expiration: Date,
-    // expiration: [u8; ChuId::EXPIRATION_SIZE],
 }
 
 impl ChuId {
@@ -133,7 +132,6 @@ impl ChuId {
     }
 
     /// Return expiration date component of CHUID
-    // TODO(tarcieri): parse expiration?
     pub fn expiration(&self) -> Date {
         self.expiration
     }
