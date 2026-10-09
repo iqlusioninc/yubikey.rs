@@ -157,6 +157,15 @@ impl MgmAlgorithmId {
         }
     }
 
+    /// Looks up the algorithm of the management key installed on the given Yubikey.
+    ///
+    /// A 3DES and an AES-192 key are both 24 bytes long, so this is what tells them
+    /// apart when parsing stored key material with [`MgmKey::from_bytes`].
+    pub fn current(yubikey: &mut YubiKey) -> Result<Self> {
+        let txn = yubikey.begin_transaction()?;
+        Self::query(&txn)
+    }
+
     /// Looks up the algorithm for the given Yubikey's current management key.
     fn query(txn: &Transaction<'_>) -> Result<Self> {
         match txn.get_metadata(crate::piv::SlotId::Management(ManagementSlotId::Management)) {
@@ -229,7 +238,8 @@ impl MgmKey {
     /// Returns an error if the slice is an invalid size or the key is weak.
     ///
     /// If `alg` is `None`, the algorithm will be selected based on the length of the
-    /// slice, returning an error if there is not a unique match.
+    /// slice, returning an error if there is not a unique match. A 24 byte key is
+    /// taken to be 3DES; pass [`MgmAlgorithmId::current`] to tell it from AES-192.
     pub fn from_bytes(bytes: impl AsRef<[u8]>, alg: Option<MgmAlgorithmId>) -> Result<Self> {
         match alg {
             Some(alg) => Self::parse_key(alg, bytes),

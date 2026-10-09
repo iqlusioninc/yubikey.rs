@@ -12,7 +12,7 @@ use signature::hazmat::PrehashVerifier;
 use std::{env, str::FromStr, sync::Mutex, time::Duration};
 use x509_cert::{der::Encode, name::Name, serial_number::SerialNumber, time::Validity};
 use yubikey::{
-    Error, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
+    Error, MgmAlgorithmId, MgmKey, PinPolicy, Serial, TouchPolicy, YubiKey,
     certificate::{Certificate, yubikey_signer},
     piv::{self, AlgorithmId, Key, ManagementSlotId, RetiredSlotId, SlotId},
 };
@@ -153,6 +153,10 @@ fn test_set_mgmkey() {
     // Set a manual management key.
     let manual = MgmKey::generate_for(&yubikey, &mut rng).unwrap();
     assert!(manual.set_manual(&mut yubikey, false).is_ok());
+    assert_eq!(
+        MgmAlgorithmId::current(&mut yubikey).unwrap(),
+        manual.algorithm_id()
+    );
     assert!(MgmKey::get_protected(&mut yubikey).is_err());
     assert!(yubikey.authenticate(&default_key).is_err());
     assert!(yubikey.authenticate(&protected).is_err());
