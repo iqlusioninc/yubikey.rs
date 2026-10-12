@@ -579,11 +579,22 @@ pub struct Key {
 impl Key {
     /// List Personal Identity Verification (PIV) keys stored in a YubiKey
     pub fn list(yubikey: &mut YubiKey) -> Result<Vec<Self>> {
-        let mut keys = vec![];
         let txn = yubikey.begin_transaction()?;
+        Self::list_with(|slot| certificate::read_certificate(&txn, slot))
+    }
+
+    fn list_with(mut read_certificate: impl FnMut(SlotId) -> Result<Buffer>) -> Result<Vec<Self>> {
+        let mut keys = vec![];
 
         for slot in SLOTS.iter().cloned() {
-            let buf = match certificate::read_certificate(&txn, slot) {
+            // Management pseudo-slots do not hold certificates. Their objects are the
+            // 9d certificate (PIN), the Key History object (PUK), and the R3 certificate
+            // (Management key); the 9d and R3 certificates are read from their own slots.
+            if matches!(slot, SlotId::Management(_)) {
+                continue;
+            }
+
+            let buf = match read_certificate(slot) {
                 Ok(b) => b,
                 Err(e) => {
                     debug!("error reading certificate in slot {:?}: {}", slot, e);
@@ -1332,5 +1343,52 @@ impl From<SlotAlgorithmId> for u8 {
             SlotAlgorithmId::Management(oth) => oth.into(),
             SlotAlgorithmId::Asymmetric(oth) => oth.into(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    const CERT: &[u8] = include_bytes!("../tests/assets/Bob.der");
+
+    // Key History object (5FC10C) as stored on a YubiKey: keysWithOnCardCerts (C1) and
+    // keysWithOffCardCerts (C2). It is not a certificate.
+    const KEY_HISTORY: &[u8] = &[0xc1, 0x01, 0x00, 0xc2, 0x01, 0x00];
+
+    /// Simulates `certificate::read_certificate` over a set of PIV data objects.
+    fn list(objects: &[(ObjectId, &[u8])]) -> Result<Vec<Key>> {
+        let objects: HashMap<_, _> = objects.iter().cloned().collect();
+        Key::list_with(|slot| {
+            Ok(Buffer::new(
+                objects
+                    .get(&slot.object_id())
+                    .map_or_else(Vec::new, |b| b.to_vec()),
+            ))
+        })
+    }
+
+    #[test]
+    fn list_skips_management_pseudo_slots() {
+        let keys = list(&[
+            (SlotId::Authentication.object_id(), CERT),
+            (SlotId::KeyManagement.object_id(), CERT),
+            (SlotId::Retired(RetiredSlotId::R1).object_id(), CERT),
+            (SlotId::Retired(RetiredSlotId::R3).object_id(), CERT),
+            (0x005f_c10c, KEY_HISTORY),
+        ])
+        .unwrap();
+
+        // The 9d and R3 certificates are listed once, in their real slots.
+        assert_eq!(
+            keys.iter().map(|k| k.slot()).collect::<Vec<_>>(),
+            [
+                SlotId::Authentication,
+                SlotId::KeyManagement,
+                SlotId::Retired(RetiredSlotId::R1),
+                SlotId::Retired(RetiredSlotId::R3),
+            ]
+        );
     }
 }
