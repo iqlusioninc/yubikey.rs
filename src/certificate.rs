@@ -424,7 +424,7 @@ pub mod yubikey_signer {
         type Error = signature::Error;
         type Signature = rsa::pkcs1v15::Signature;
         type VerifyingKey = rsa::pkcs1v15::VerifyingKey<Sha256>;
-        type PublicKey = rsa::RsaPublicKey;
+        type PublicKey = rsa::PublicKey;
         const ALGORITHM: AlgorithmId = N::ALGORITHM;
 
         fn prepare(input: &[u8]) -> SigResult<Vec<u8>> {

@@ -42,6 +42,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::consts::CB_OBJ_MAX;
 use crate::{
     Buffer, ObjectId,
     apdu::{Ins, StatusWords},
@@ -57,7 +58,7 @@ use elliptic_curve::{PublicKey, sec1::Sec1Point as EcPublicKey};
 use log::{debug, error, warn};
 use p256::NistP256;
 use p384::NistP384;
-use rsa::{BoxedUint, RsaPublicKey, pkcs8::EncodePublicKey};
+use rsa::{BoxedUint, pkcs8::EncodePublicKey, traits::PrivateKeyParts};
 use std::{
     fmt::{Display, Formatter},
     str::FromStr,
@@ -66,12 +67,7 @@ use x509_cert::{
     der::{Decode, asn1::BitString},
     spki::{AlgorithmIdentifier, ObjectIdentifier, SubjectPublicKeyInfoOwned},
 };
-
 use zeroize::Zeroizing;
-
-use crate::consts::CB_OBJ_MAX;
-
-use rsa::{RsaPrivateKey, traits::PrivateKeyParts};
 
 /// PIV Applet Name
 pub(crate) const APPLET_NAME: &str = "PIV";
@@ -806,7 +802,7 @@ impl RsaKeyData {
         let q = BoxedUint::from_be_slice_vartime(secret_q);
         let exp = BoxedUint::from(KEYDATA_RSA_EXP);
 
-        let mut private_key = RsaPrivateKey::from_p_q(p.clone(), q.clone(), exp)
+        let mut private_key = rsa::PrivateKey::from_p_q(p.clone(), q.clone(), exp)
             .map_err(|_| Error::AlgorithmError)?;
         private_key
             .precompute()
@@ -1243,7 +1239,7 @@ fn read_public_key(
             }
             let exp = exp_tlv.value.to_vec();
 
-            let pubkey = RsaPublicKey::new(
+            let pubkey = rsa::PublicKey::new(
                 BoxedUint::from_be_slice_vartime(&modulus),
                 BoxedUint::from_be_slice_vartime(&exp),
             )

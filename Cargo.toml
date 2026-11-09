@@ -42,7 +42,7 @@ pbkdf2 = { version = "0.13", default-features = false, features = ["hmac"] }
 pcsc = "2.9"
 rand = "0.10"
 rand_core = "0.10"
-rsa = { version = "0.10.0-rc.18", features = ["sha2"] }
+rsa = { version = "0.10", features = ["pkcs1v15"] }
 sha1 = { version = "0.11", features = ["oid"] }
 sha2 = { workspace = true, features = ["oid"] }
 signature = "3"

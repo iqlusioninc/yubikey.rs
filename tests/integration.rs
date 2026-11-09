@@ -6,7 +6,7 @@
 use cipher::common::{Generate, getrandom::SysRng};
 use log::trace;
 use once_cell::sync::Lazy;
-use rsa::{RsaPublicKey, pkcs1v15};
+use rsa::pkcs1v15;
 use sha2::{Digest, Sha256};
 use signature::hazmat::PrehashVerifier;
 use std::{env, str::FromStr, sync::Mutex, time::Duration};
@@ -221,7 +221,7 @@ fn generate_self_signed_rsa_cert() {
     // Verify that the certificate is signed correctly
     //
 
-    let pubkey = RsaPublicKey::try_from(cert.subject_pki()).expect("valid rsa key");
+    let pubkey = rsa::PublicKey::try_from(cert.subject_pki()).expect("valid rsa key");
     let pubkey = pkcs1v15::VerifyingKey::<Sha256>::new(pubkey);
 
     let data = cert.cert.to_der().expect("serialize certificate");
