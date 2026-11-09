@@ -6,7 +6,7 @@
 use cipher::common::{Generate, getrandom::SysRng};
 use log::trace;
 use once_cell::sync::Lazy;
-use rsa::{RsaPublicKey, pkcs1v15};
+use rsa::{PublicKey as RsaPublicKey, pkcs1v15};
 use sha2::{Digest, Sha256};
 use signature::hazmat::PrehashVerifier;
 use std::{env, str::FromStr, sync::Mutex, time::Duration};

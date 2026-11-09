@@ -57,7 +57,7 @@ use elliptic_curve::{PublicKey, sec1::Sec1Point as EcPublicKey};
 use log::{debug, error, warn};
 use p256::NistP256;
 use p384::NistP384;
-use rsa::{BoxedUint, RsaPublicKey, pkcs8::EncodePublicKey};
+use rsa::{BoxedUint, PublicKey as RsaPublicKey, pkcs8::EncodePublicKey};
 use std::{
     fmt::{Display, Formatter},
     str::FromStr,
@@ -71,7 +71,7 @@ use zeroize::Zeroizing;
 
 use crate::consts::CB_OBJ_MAX;
 
-use rsa::{RsaPrivateKey, traits::PrivateKeyParts};
+use rsa::{PrivateKey as RsaPrivateKey, traits::PrivateKeyParts};
 
 /// PIV Applet Name
 pub(crate) const APPLET_NAME: &str = "PIV";
