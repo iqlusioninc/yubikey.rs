@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - MSRV is now 1.81.
+- `Transaction::get_serial` accepts firmware major version 6 ([#595]).
+- `MgmKey::get_default` reads the management key algorithm from the slot's metadata and
+  takes `&mut YubiKey` ([#595]).
 - Migrated the public API to the following (pre-release) dependencies:
   - `der 0.8.0-rc.1`
   - `ecdsa 0.17.0-pre.9`
@@ -46,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `impl AsRef<[u8]> for MgmKey` instead).
   - `impl Default for MgmKey` (use `MgmKey::get_default` instead).
   - `impl TryFrom<&[u8]> for MgmKey` (use `MgmKey::from_bytes` instead).
+
+[#595]: https://github.com/iqlusioninc/yubikey.rs/issues/595
 
 ## 0.8.0 (2023-08-15)
 ### Added

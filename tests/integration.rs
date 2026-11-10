@@ -133,7 +133,7 @@ fn test_set_mgmkey() {
         Ok(yubikey) => yubikey,
         Err(poison) => poison.into_inner(),
     };
-    let default_key = MgmKey::get_default(&yubikey).unwrap();
+    let default_key = MgmKey::get_default(&mut yubikey).unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
     assert!(MgmKey::get_protected(&mut yubikey).is_err());
@@ -172,7 +172,7 @@ fn test_set_mgmkey() {
 
 fn generate_self_signed_cert<KT: yubikey_signer::KeyType>() -> Certificate {
     let mut yubikey = YUBIKEY.lock().unwrap();
-    let default_key = MgmKey::get_default(&yubikey).unwrap();
+    let default_key = MgmKey::get_default(&mut yubikey).unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
     assert!(yubikey.authenticate(&default_key).is_ok());
@@ -238,7 +238,7 @@ fn generate_self_signed_rsa_cert() {
 fn generate_rsa3072() {
     let mut yubikey = YUBIKEY.lock().unwrap();
     let version = yubikey.version();
-    let default_key = MgmKey::get_default(&yubikey).unwrap();
+    let default_key = MgmKey::get_default(&mut yubikey).unwrap();
 
     assert!(yubikey.authenticate(&default_key).is_ok());
 
@@ -366,7 +366,7 @@ fn test_read_metadata() {
         Ok(yubikey) => yubikey,
         Err(poison) => poison.into_inner(),
     };
-    let default_key = MgmKey::get_default(&yubikey).unwrap();
+    let default_key = MgmKey::get_default(&mut yubikey).unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
     assert!(yubikey.authenticate(&default_key).is_ok());
@@ -397,7 +397,7 @@ fn test_read_metadata() {
 #[ignore]
 fn test_read_metadata_missing_key() {
     let mut yubikey = YUBIKEY.lock().unwrap();
-    let default_key = MgmKey::get_default(&yubikey).unwrap();
+    let default_key = MgmKey::get_default(&mut yubikey).unwrap();
 
     assert!(yubikey.verify_pin(b"123456").is_ok());
     assert!(yubikey.authenticate(&default_key).is_ok());

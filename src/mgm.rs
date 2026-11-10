@@ -168,6 +168,8 @@ impl MgmAlgorithmId {
             },
             // Firmware versions without `GET METADATA` only support 3DES.
             Err(Error::NotSupported) => Ok(MgmAlgorithmId::ThreeDes),
+            // Default to 3DES on empty record
+            Err(Error::ParseError) => Ok(MgmAlgorithmId::ThreeDes),
             // `Error::AlgorithmError` only occurs when a new algorithm is encountered.
             Err(Error::AlgorithmError) => Err(Error::NotSupported),
             // Raise other errors as-is.
@@ -240,11 +242,14 @@ impl MgmKey {
         }
     }
 
-    /// Gets the default management key for the given Yubikey's firmware version.
+    /// Gets the default management key for the given Yubikey.
+    ///
+    /// The algorithm is the one reported by the management slot's metadata.
     ///
     /// Returns an error if the Yubikey's default algorithm is unsupported.
-    pub fn get_default(yubikey: &YubiKey) -> Result<Self> {
-        match MgmAlgorithmId::default_for_version(yubikey.version()) {
+    pub fn get_default(yubikey: &mut YubiKey) -> Result<Self> {
+        let txn = yubikey.begin_transaction()?;
+        match MgmAlgorithmId::query(&txn)? {
             MgmAlgorithmId::ThreeDes => Ok(Self(MgmKeyKind::Tdes(DEFAULT_MGM_KEY.into()))),
             MgmAlgorithmId::Aes192 => Ok(Self(MgmKeyKind::Aes192(DEFAULT_MGM_KEY.into()))),
             _ => Err(Error::NotSupported),
