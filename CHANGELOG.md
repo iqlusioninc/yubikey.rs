@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     containing a `yubikey::MgmAlgorithmId`.
 - Metadata command returns `Error:NotFound` instead of `Error::GenericError` when the object doesn't exist ([#558]).
 
+### Fixed
+- Ed25519 certificates are signed over the certificate itself, not its SHA-512 digest.
+
 ### Removed
 - `yubikey::mgm`:
   - `MgmKey::new` (use `MgmKey::from_bytes(_, Some(MgmAlgorithmId::ThreeDes))`
