@@ -34,6 +34,7 @@ ecdsa = { version = "0.17", features = ["digest", "pem"] }
 ed25519-dalek = { version = "3", features = ["alloc", "pkcs8"] }
 elliptic-curve = "0.14.1"
 hex = { package = "base16ct", version = "1", features = ["alloc"] }
+jiff = "0.2"
 log = "0.4"
 nom = "8"
 p256 = "0.14"
